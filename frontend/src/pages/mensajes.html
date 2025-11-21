@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        /* Fondo estilo WhatsApp Web */
         body {
             background-color: #efeae2;
         }
@@ -16,83 +15,122 @@
             background: #bbb;
             border-radius: 4px;
         }
+        .chat-message {
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Fondo con patrones de animales */
+        #chatMessages {
+            background-color: #f5f1e8;
+            background-image: 
+                url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='10' y='35' font-size='30' opacity='0.08'%3E🐾%3C/text%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg width='80' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='15' y='50' font-size='35' opacity='0.06'%3E🐶%3C/text%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg width='90' height='90' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='20' y='55' font-size='35' opacity='0.06'%3E🐱%3C/text%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg width='70' height='70' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='12' y='45' font-size='32' opacity='0.05'%3E🦴%3C/text%3E%3C/svg%3E"); 
+            background-position: 
+                0 0,
+                40px 120px,
+                200px 50px,
+                150px 200px,
+                80px 280px;
+            background-repeat: repeat;
+        }
     </style>
 </head>
 
 <body>
 
-<!-- ========================= HEADER EXACTO DE TU PÁGINA ========================= -->
+<!-- HEADER -->
+<header class="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto px-2 sm:px-4 py-3 sm:py-4">
+    
+    <!-- Desktop Header -->
+    <div class="hidden md:flex items-center justify-between">
+      <div class="flex items-center gap-3 cursor-pointer hover:scale-105 transition-transform" onclick="window.location.href='index.html'">
+        <span class="text-4xl drop-shadow-lg">🐾</span>
+        <h1 class="text-2xl font-bold tracking-wide text-white drop-shadow-md">AdoptaPet</h1>
+      </div>
 
-<header class="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500  shadow-lg sticky top-0 z-50">
-  <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex-1 max-w-xl mx-6 relative">
+        <input type="text"
+          placeholder="Buscar mascotas, refugios..."
+          class="w-full px-6 py-3 pr-12 border-2 border-white/30 bg-white/90 backdrop-blur rounded-full focus:ring-4 focus:ring-white/50 focus:border-white outline-none shadow-lg transition-all">
+        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">🔍</span>
+      </div>
 
-    <!-- Logo + Nombre -->
-    <div class="flex items-center gap-3 cursor-pointer hover:scale-105 transition-transform">
-      <span class="text-4xl drop-shadow-lg">🐾</span>
-      <h1 class="text-2xl font-bold tracking-wide text-white drop-shadow-md">AdoptaPet</h1>
+      <div class="flex items-center gap-4">
+        <button onclick="window.location.href='mensajes.html'" class="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#8b5cf6" stroke-width="2.5" viewBox="0 0 24 24" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z"/>
+          </svg>
+        </button>
+
+        <button onclick="window.location.href='notificaciones.html'" class="relative w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="w-6 h-6 stroke-[#f59e0b] stroke-[2.5]">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 18.75a1.5 1.5 0 1 1-3 0M4.5 9a7.5 7.5 0 1 1 15 0c0 3.15.75 4.5 1.5 5.25H3c.75-.75 1.5-2.1 1.5-5.25Z"/>
+          </svg>
+          <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md">3</span>
+        </button>
+
+        <a href="perfil.html" class="w-11 h-11 rounded-full transition-transform hover:scale-110 shadow-lg cursor-pointer block">
+          <img src="https://via.placeholder.com/44" alt="Perfil" class="w-full h-full rounded-full border-3 border-white object-cover" />
+        </a>
+        
+        <a href="perfil.html" class="ml-2 text-white font-semibold hover:underline">Nombre de Usuario</a> 
+      </div>
     </div>
 
-    <!-- Search mejorado -->
-    <div class="flex-1 max-w-xl mx-6 relative">
-      <input type="text"
-        placeholder="Buscar mascotas, refugios..."
-        class="w-full px-6 py-3 pr-12 border-2 border-white/30 bg-white/90 backdrop-blur rounded-full focus:ring-4 focus:ring-white/50 focus:border-white outline-none shadow-lg transition-all">
-      <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">🔍</span>
+    <!-- Mobile Header -->
+    <div class="flex md:hidden items-center justify-between">
+      <div class="flex items-center gap-2" onclick="window.location.href='index.html'">
+        <span class="text-3xl">🐾</span>
+        <h1 class="text-xl font-bold text-white">AdoptaPet</h1>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="window.location.href='mensajes.html'" class="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#8b5cf6" stroke-width="2.5" viewBox="0 0 24 24" class="w-5 h-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z"/>
+          </svg>
+        </button>
+        <button id="menuBtn" class="ml-1 text-2xl text-white">☰</button>
+      </div>
     </div>
-
-    <!-- Icons -->
-    <div class="flex items-center gap-4">
-      <button class="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#8b5cf6" stroke-width="2.5" viewBox="0 0 24 24" class="w-6 h-6">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z"/>
-        </svg>
-      </button>
-
-      <button class="relative w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="w-6 h-6 stroke-[#f59e0b] stroke-[2.5]">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 18.75a1.5 1.5 0 1 1-3 0M4.5 9a7.5 7.5 0 1 1 15 0c0 3.15.75 4.5 1.5 5.25H3c.75-.75 1.5-2.1 1.5-5.25Z"/>
-        </svg>
-        <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md">
-          3
-        </span>
-      </button>
-
-      <a href="perfil.html" 
-         class="w-11 h-11 rounded-full transition-transform hover:scale-110 shadow-lg cursor-pointer block">
-          <img src="https://via.placeholder.com/44" 
-               alt="Imagen de Perfil de Usuario"
-               class="w-full h-full rounded-full border-3 border-white object-cover" />
-      </a>
-
-      <a href="perfil.html" class="ml-2 text-white font-semibold hover:underline">Nombre de Usuario</a> 
-    </div>
-
-    <button id="menuBtn" class="ml-4 text-3xl text-white md:hidden hover:scale-110 transition">☰</button>
   </div>
 </header>
 
-<!-- ========================= CONTENIDO PRINCIPAL ========================= -->
+<!-- CONTENIDO PRINCIPAL -->
+<div class="max-w-7xl mx-auto pt-4 sm:pt-6 px-2 sm:px-4 flex gap-4 pb-6">
 
-<div class="max-w-7xl mx-auto pt-6 px-4 flex gap-4 pb-6">
-
-    <!-- SIDEBAR IZQUIERDA (como WhatsApp Web) -->
-    <aside class="hidden md:block w-1/4 bg-white rounded-xl shadow h-[80vh] overflow-y-auto p-4">
-
-        <h2 class="text-lg font-semibold mb-4">Chats</h2>
-
-        <a href="mensajes.html" 
-           class="block p-3 mb-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
-           ← Volver a mensajes
-        </a>
-
-        <div class="space-y-4">
-            <div class="flex items-center gap-3 p-3 bg-purple-50 rounded-xl cursor-pointer shadow hover:-translate-y-1 transition">
-                <img src="https://i.imgur.com/3G0z6YV.jpeg" class="w-12 h-12 rounded-full">
-                <div>
-                    <p class="font-semibold text-gray-800">Refugio San Luis</p>
-                    <p class="text-gray-500 text-sm">Claro, podemos agendar una visita...</p>
-                </div>
+    <!-- SIDEBAR IZQUIERDA -->
+    <aside class="hidden md:block w-1/4 bg-white rounded-xl shadow h-[80vh] flex flex-col">
+        
+        <!-- Buscador de chats -->
+        <div class="p-3 border-b bg-white rounded-t-xl">
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="searchInput"
+                    placeholder="Buscar  un chat"
+                    class="w-full px-4 py-2.5 pl-10 bg-gray-100 rounded-lg outline-none focus:bg-white focus:ring-2 focus:ring-purple-400 transition"
+                    oninput="filterChats()">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
             </div>
+        </div>
+
+        <!-- Lista de chats -->
+        <div class="flex-1 overflow-y-auto" id="chatList">
+            <!-- Lista de chats se genera con JS -->
         </div>
 
     </aside>
@@ -100,48 +138,262 @@
     <!-- CHAT PRINCIPAL -->
     <div class="flex-1 flex flex-col bg-white shadow rounded-xl h-[80vh]">
 
-        <!-- HEADER DEL CONTACTO (WhatsApp style) -->
+        <!-- HEADER DEL CONTACTO -->
         <header class="p-4 flex items-center gap-3 border-b bg-white rounded-t-xl">
-            <img src="https://i.imgur.com/3G0z6YV.jpeg" class="w-12 h-12 rounded-full shadow">
+            <button onclick="window.location.href='mensajes.html'" class="md:hidden text-purple-600 mr-2">←</button>
+            <img id="currentChatAvatar" src="https://i.imgur.com/3G0z6YV.jpeg" class="w-12 h-12 rounded-full shadow">
             <div>
-                <p class="font-semibold text-gray-800 text-lg">Refugio San Luis</p>
-                <p class="text-sm text-green-600">En línea</p>
+                <p id="currentChatName" class="font-semibold text-gray-800 text-lg">Refugio San Luis</p>
+                <p id="currentChatStatus" class="text-sm text-green-600">En línea</p>
             </div>
+            <button class="ml-auto text-gray-400 hover:text-gray-600 text-2xl">⋮</button>
         </header>
 
         <!-- CHAT BODY -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2]">
-
-            <div class="max-w-sm bg-white rounded-xl p-3 shadow">
-                <p>Hola 🐾 ¿sigues interesado en adoptar a la perrita?</p>
-                <span class="text-xs text-gray-400 block text-right">10:02 AM</span>
-            </div>
-
-            <div class="max-w-sm bg-purple-500 text-white rounded-xl p-3 ml-auto shadow">
-                <p>Sí, claro 😄 Me gustaría visitarla.</p>
-                <span class="text-xs text-purple-200 block text-right">10:03 AM</span>
-            </div>
-
-            <div class="max-w-sm bg-white rounded-xl p-3 shadow">
-                <p>Perfecto, hoy estamos disponibles hasta las 5pm 🐶💕</p>
-                <span class="text-xs text-gray-400 block text-right">10:06 AM</span>
-            </div>
-
+        <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2]">
+            <!-- Los mensajes se cargan aquí con JS -->
         </div>
 
         <!-- INPUT -->
         <footer class="bg-white p-4 flex items-center gap-3 border-t rounded-b-xl">
+            <button onclick="attachFile()" class="text-gray-500 hover:text-purple-600 text-xl transition">
+                📎
+            </button>
             <input 
+                id="messageInput"
                 type="text"
                 placeholder="Escribe un mensaje..."
-                class="flex-1 bg-gray-200 p-3 rounded-full outline-none">
-            <button class="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2 rounded-full shadow">
+                class="flex-1 bg-gray-100 p-3 rounded-full outline-none focus:ring-2 focus:ring-purple-400"
+                onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()" class="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2 rounded-full shadow transition-all hover:scale-105">
                 ➤
             </button>
         </footer>
     </div>
 
 </div>
+
+<script>
+// Base de datos de chats
+let chats = [
+    {
+        id: 1,
+        name: "Refugio San Luis",
+        avatar: "https://i.imgur.com/3G0z6YV.jpeg",
+        status: "En línea",
+        lastMessage: "Perfecto, hoy estamos disponibles hasta las 5pm 🐶💕",
+        messages: [
+            { text: "Hola 🐾 ¿sigues interesado en adoptar a la perrita?", time: "10:02 AM", sent: false },
+            { text: "Sí, claro 😄 Me gustaría visitarla.", time: "10:03 AM", sent: true },
+            { text: "Perfecto, hoy estamos disponibles hasta las 5pm 🐶💕", time: "10:06 AM", sent: false }
+        ]
+    },
+    {
+        id: 2,
+        name: "Fundación Huellitas",
+        avatar: "https://via.placeholder.com/48",
+        status: "Conectado hace 5 min",
+        lastMessage: "¿Te gustaría conocer a Max?",
+        messages: [
+            { text: "Hola! Vi tu publicación sobre Max 🐱", time: "9:30 AM", sent: true },
+            { text: "¡Hola! Sí, Max está disponible para adopción", time: "9:32 AM", sent: false },
+            { text: "¿Te gustaría conocer a Max?", time: "9:33 AM", sent: false }
+        ]
+    },
+    {
+        id: 3,
+        name: "Carlos Rodríguez",
+        avatar: "https://via.placeholder.com/48/FF6B6B",
+        status: "Desconectado",
+        lastMessage: "Gracias por la información!",
+        messages: [
+            { text: "Hola, ¿tienes mascotas disponibles?", time: "Ayer", sent: false },
+            { text: "Sí, tenemos varios perritos en adopción", time: "Ayer", sent: true },
+            { text: "Gracias por la información!", time: "Ayer", sent: false }
+        ]
+    }
+];
+
+let currentChatId = 1;
+
+// Inicializar
+function init() {
+    renderChatList();
+    loadChat(currentChatId);
+}
+
+// Renderizar lista de chats
+function renderChatList() {
+    const chatList = document.getElementById('chatList');
+    chatList.innerHTML = '';
+    
+    // Obtener término de búsqueda
+    const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    
+    // Filtrar chats solo por nombre
+    const filteredChats = chats.filter(chat => 
+        chat.name.toLowerCase().includes(searchTerm)
+    );
+    
+    // Mostrar mensaje si no hay resultados
+    if (filteredChats.length === 0) {
+        chatList.innerHTML = '<p class="text-center text-gray-400 py-8 px-4">No se encontraron chats</p>';
+        return;
+    }
+    
+    filteredChats.forEach(chat => {
+        const isActive = chat.id === currentChatId;
+        const div = document.createElement('div');
+        div.className = `flex items-center gap-3 p-3 cursor-pointer transition border-b border-gray-100 ${
+            isActive ? 'bg-purple-50' : 'hover:bg-gray-50'
+        }`;
+        div.onclick = () => loadChat(chat.id);
+        
+        div.innerHTML = `
+            <img src="${chat.avatar}" class="w-12 h-12 rounded-full flex-shrink-0">
+            <div class="flex-1 min-w-0">
+                <p class="font-semibold text-gray-800 truncate">${chat.name}</p>
+                <p class="text-gray-500 text-sm truncate">${chat.lastMessage}</p>
+            </div>
+        `;
+        
+        chatList.appendChild(div);
+    });
+}
+
+// Filtrar chats
+function filterChats() {
+    renderChatList();
+}
+
+// Cargar chat específico
+function loadChat(chatId) {
+    currentChatId = chatId;
+    const chat = chats.find(c => c.id === chatId);
+    
+    if (!chat) return;
+    
+    // Actualizar header
+    document.getElementById('currentChatName').textContent = chat.name;
+    document.getElementById('currentChatAvatar').src = chat.avatar;
+    document.getElementById('currentChatStatus').textContent = chat.status;
+    
+    // Renderizar mensajes
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = '';
+    
+    chat.messages.forEach(msg => {
+        addMessageToDOM(msg.text, msg.time, msg.sent);
+    });
+    
+    // Scroll al final
+    scrollToBottom();
+    
+    // Actualizar lista de chats
+    renderChatList();
+}
+
+// Agregar mensaje al DOM
+function addMessageToDOM(text, time, isSent) {
+    const chatMessages = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = `chat-message max-w-sm ${isSent ? 'ml-auto' : ''} ${
+        isSent ? 'bg-purple-500 text-white' : 'bg-white'
+    } rounded-xl p-3 shadow`;
+    
+    div.innerHTML = `
+        <p>${text}</p>
+        <span class="text-xs ${isSent ? 'text-purple-200' : 'text-gray-400'} block text-right mt-1">${time}</span>
+    `;
+    
+    chatMessages.appendChild(div);
+}
+
+// Enviar mensaje
+function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const text = input.value.trim();
+    
+    if (!text) return;
+    
+    const currentTime = new Date().toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+    
+    // Agregar a la base de datos
+    const chat = chats.find(c => c.id === currentChatId);
+    const newMessage = { text, time: currentTime, sent: true };
+    chat.messages.push(newMessage);
+    chat.lastMessage = text;
+    
+    // Agregar al DOM
+    addMessageToDOM(text, currentTime, true);
+    
+    // Limpiar input
+    input.value = '';
+    
+    // Scroll al final
+    scrollToBottom();
+    
+    // Simular respuesta automática (opcional)
+    setTimeout(() => {
+        simulateResponse();
+    }, 2000);
+}
+
+// Simular respuesta automática
+function simulateResponse() {
+    const responses = [
+        "Entiendo, déjame verificar eso 👍",
+        "Claro, con gusto te ayudo 😊",
+        "Perfecto, te envío más información",
+        "¡Excelente! ¿Algo más en lo que pueda ayudarte?",
+        "Ok, anotado ✅"
+    ];
+    
+    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+    const currentTime = new Date().toLocaleTimeString('es-ES', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+    
+    const chat = chats.find(c => c.id === currentChatId);
+    const newMessage = { text: randomResponse, time: currentTime, sent: false };
+    chat.messages.push(newMessage);
+    chat.lastMessage = randomResponse;
+    
+    addMessageToDOM(randomResponse, currentTime, false);
+    scrollToBottom();
+    renderChatList();
+}
+
+// Manejar Enter
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
+
+// Scroll al final
+function scrollToBottom() {
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Adjuntar archivo
+function attachFile() {
+    alert('Función de adjuntar archivos próximamente 📎');
+}
+
+// Menu móvil
+document.getElementById('menuBtn')?.addEventListener('click', () => {
+    alert('Menú móvil - Implementar según necesidad');
+});
+
+// Inicializar al cargar
+window.onload = init;
+</script>
 
 </body>
 </html>
