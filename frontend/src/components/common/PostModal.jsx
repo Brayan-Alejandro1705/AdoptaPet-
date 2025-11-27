@@ -1,3 +1,5 @@
+//este archivo es de la pagina adoptar
+
 import { useState } from 'react';
 
 export default function PostModal({ isOpen, onClose }) {

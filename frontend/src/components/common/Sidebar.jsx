@@ -1,3 +1,4 @@
+//este archivo es de la pagina adoptar
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 

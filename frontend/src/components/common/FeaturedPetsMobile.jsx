@@ -1,3 +1,7 @@
+//este archivo es de la pagina adoptar
+
+
+
 export default function FeaturedPetsMobile() {
   return (
     <div className="md:hidden bg-white rounded-2xl shadow-lg p-4">

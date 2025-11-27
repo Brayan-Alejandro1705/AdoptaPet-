@@ -1,3 +1,5 @@
+//este archivo es de la pagina adoptar
+
 export default function RightSidebar() {
   return (
     <aside className="hidden md:block md:col-span-3 space-y-4">

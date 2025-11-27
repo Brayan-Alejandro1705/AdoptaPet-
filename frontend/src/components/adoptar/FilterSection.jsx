@@ -1,3 +1,4 @@
+//este archivo es de la pagina adoptar
 import React from 'react';
 
 const FilterSection = ({ filters, onFilterChange, onApply }) => {

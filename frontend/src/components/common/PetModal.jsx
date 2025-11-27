@@ -1,3 +1,5 @@
+//este archivo es de la pagina adoptar
+
 import React from 'react';
 
 const PetModal = ({ pet, isOpen, onClose, onToggleFavorite, onAdopt, onContact }) => {
