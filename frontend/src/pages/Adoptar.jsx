@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Header from '../components/common/Header';  // ✅ Mismo Header que Home
 import PetCard from '../components/common/PetCard';
 import PetModal from '../components/common/PetModal';
 import FilterSection from '../components/adoptar/FilterSection';
@@ -212,13 +213,16 @@ export default function Adoptar() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 pb-20 md:pb-0">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 md:pb-0">
+      {/* ✅ MISMO HEADER QUE HOME */}
+      <Header />
+      
       <div className="max-w-7xl mx-auto px-4 py-6">
         
-        {/* Header */}
+        {/* Header de la página */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-2xl">
+            <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-2xl shadow-lg">
               <PawPrint className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-gray-800">

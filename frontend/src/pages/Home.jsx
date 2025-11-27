@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import Header from '../components/common/Header';
-import Sidebar from '../components/common/Sidebar';
-import RightSidebar from '../components/common/RightSidebar';
-import BottomNav from '../components/layout/BottomNav';
+import Header from '../components/common/Header';        // ✅ correcto
+import Sidebar from '../components/common/Sidebar';      // ✅ correcto
+import RightSidebar from '../components/common/RightSidebar';  // ✅ correcto
+import BottomNav from '../components/layout/BottomNav';  // ✅ correcto
 import PostCard from '../components/common/PostCard';
 import PostModal from '../components/common/PostModal';
 import FeaturedPetsMobile from '../components/common/FeaturedPetsMobile';
@@ -39,17 +39,29 @@ export default function Home() {
     <div className="bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 pb-20 md:pb-8">
       <Header />
       
-      <div className="max-w-7xl mx-auto pt-4 md:pt-6 px-3 md:px-4 grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-        <Sidebar onOpenModal={() => setIsModalOpen(true)} />
+      {/* LAYOUT CENTRADO CON GRID */}
+      <div className="max-w-7xl mx-auto pt-4 md:pt-6 px-3 md:px-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+          
+          {/* SIDEBAR IZQUIERDO - 3 columnas */}
+          <div className="hidden md:block md:col-span-3">
+            <Sidebar onOpenModal={() => setIsModalOpen(true)} />
+          </div>
 
-        <main className="md:col-span-6 space-y-4 md:space-y-6">
-          {posts.map(post => (
-            <PostCard key={post.id} post={post} />
-          ))}
-          <FeaturedPetsMobile />
-        </main>
+          {/* CONTENIDO PRINCIPAL CENTRADO - 6 columnas */}
+          <main className="col-span-1 md:col-span-6 space-y-4 md:space-y-6">
+            {posts.map(post => (
+              <PostCard key={post.id} post={post} />
+            ))}
+            <FeaturedPetsMobile />
+          </main>
 
-        <RightSidebar />
+          {/* SIDEBAR DERECHO - 3 columnas */}
+          <div className="hidden md:block md:col-span-3">
+            <RightSidebar />
+          </div>
+          
+        </div>
       </div>
 
       <BottomNav onOpenModal={() => setIsModalOpen(true)} />
