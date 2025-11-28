@@ -1,6 +1,6 @@
+//este codigo es de la pagina notificaciones
 import React from 'react';
 import { Clock, Trash2 } from 'lucide-react';
-
 const NotificationCard = ({ notification, onMarkAsRead, onDelete }) => {
   const colorMap = {
     purple: 'border-purple-500',

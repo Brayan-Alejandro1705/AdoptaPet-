@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import Header from '../components/common/Header.jsx';
+import NotificationCard from '../components/common/notificationcard.jsx';
+import EmptyNotifications from '../components/common/EmptyNotifications.jsx';
+import Notificationcard from '../components/common/notificationcard.jsx';
+import ConfirmModal from '../components/common/ConfirmModal.jsx';
 import { Check, Trash2 } from 'lucide-react';
-import NotificationCard from '../components/common/notificacioncard.jsx';
-import Header from '../components/common/Header';
 
 
 const Notificaciones = () => {

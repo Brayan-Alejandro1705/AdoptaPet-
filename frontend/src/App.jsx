@@ -5,6 +5,7 @@ import Adoptar from './pages/Adoptar';
 import Login from './pages/Login';
 import Perfil from './pages/Perfil';
 import Notificaciones from './pages/Notificaciones';
+import Publicar from './pages/publicar';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/notificaciones" element={<Notificaciones/>} />
+        <Route path="/publicar" element={<Publicar/>} />
       </Routes>
     </BrowserRouter>
   );
