@@ -1,5 +1,5 @@
 import React from 'react';
-
+//este codigo es de la pagina notificaciones
 const NotificationFilters = ({ currentFilter, counts, onFilterChange }) => {
   const filters = [
     { id: 'all', label: 'Todas', count: counts.all },

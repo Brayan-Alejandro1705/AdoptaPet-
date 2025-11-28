@@ -5,7 +5,8 @@ import Adoptar from './pages/Adoptar';
 import Login from './pages/Login';
 import Perfil from './pages/perfil';
 import Notificaciones from './pages/Notificaciones';
-import Registro from './pages/Registro'; // ✅ FIX: Import added
+import Registro from './pages/Registro';
+import Publicar from './pages/publicar';
 
 function App() {
   return (
@@ -15,8 +16,9 @@ function App() {
         <Route path="/adoptar" element={<Adoptar />} />
         <Route path="/login" element={<Login />} />
         <Route path="/perfil" element={<Perfil />} />
-        <Route path="/notificaciones" element={<Notificaciones/>} />
+        <Route path="/notificaciones" element={<Notificaciones />} />
         <Route path="/registro" element={<Registro />} />
+        <Route path="/publicar" element={<Publicar />} />
       </Routes>
     </BrowserRouter>
   );

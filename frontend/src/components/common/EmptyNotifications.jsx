@@ -1,5 +1,5 @@
 import React from 'react';
-
+//este codigo es de la pagina notificaciones
 const EmptyNotifications = () => {
   return (
     <div className="text-center py-16">

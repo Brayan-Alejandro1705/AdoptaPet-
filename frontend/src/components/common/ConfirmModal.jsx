@@ -1,5 +1,5 @@
 import React from 'react';
-
+//este codigo es de la pagina notificaciones
 const ConfirmModal = ({ isOpen, message, onConfirm, onCancel }) => {
   if (!isOpen) return null;
 
