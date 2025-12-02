@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import Header from '../components/common/Header';  // ✅ Mismo Header que Home
+import Header from '../components/common/Header';
+import Sidebar from '../components/common/Sidebar';
+import BottomNav from '../components/layout/BottomNav';
 import PetCard from '../components/common/PetCard';
 import PetModal from '../components/common/PetModal';
 import FilterSection from '../components/adoptar/FilterSection';
@@ -213,66 +215,80 @@ export default function Adoptar() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 md:pb-0">
-      {/* ✅ MISMO HEADER QUE HOME */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 md:pb-8">
       <Header />
       
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        
-        {/* Header de la página */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-2xl shadow-lg">
-              <PawPrint className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
-              Encuentra tu Compañero
-            </h1>
+      <div className="max-w-7xl mx-auto px-3 md:px-4 pt-4 md:pt-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+          
+          {/* SIDEBAR IZQUIERDO - 3 columnas */}
+          <div className="hidden md:block md:col-span-3">
+            <Sidebar />
           </div>
-          <p className="text-gray-600 ml-16">
-            {filteredPets.length} mascota{filteredPets.length !== 1 ? 's' : ''} esperando un hogar
-          </p>
-        </div>
 
-        {/* Filtros */}
-        <FilterSection 
-          filters={filters}
-          onFilterChange={setFilters}
-          onClearFilters={handleClearFilters}
-        />
-
-        {/* Grid de mascotas */}
-        {filteredPets.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPets.map(pet => (
-              <PetCard 
-                key={pet.id}
-                pet={pet}
-                onViewDetails={() => setSelectedPet(pet)}
-              />
-            ))}
-          </div>
-        ) : (
-          // Estado vacío
-          <div className="text-center py-20">
-            <div className="bg-white rounded-3xl p-12 max-w-md mx-auto shadow-md">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                No hay mascotas
-              </h3>
-              <p className="text-gray-600 mb-6">
-                No encontramos mascotas que coincidan con tus filtros
+          {/* CONTENIDO PRINCIPAL - 9 columnas */}
+          <main className="col-span-1 md:col-span-9">
+            
+            {/* Header de la página */}
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-2xl shadow-lg">
+                  <PawPrint className="w-6 h-6 text-white" />
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
+                  Encuentra tu Compañero
+                </h1>
+              </div>
+              <p className="text-gray-600 ml-16">
+                {filteredPets.length} mascota{filteredPets.length !== 1 ? 's' : ''} esperando un hogar
               </p>
-              <button 
-                onClick={handleClearFilters}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
-              >
-                Limpiar Filtros
-              </button>
             </div>
-          </div>
-        )}
+
+            {/* Filtros */}
+            <FilterSection 
+              filters={filters}
+              onFilterChange={setFilters}
+              onClearFilters={handleClearFilters}
+            />
+
+            {/* Grid de mascotas */}
+            {filteredPets.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredPets.map(pet => (
+                  <PetCard 
+                    key={pet.id}
+                    pet={pet}
+                    onViewDetails={() => setSelectedPet(pet)}
+                  />
+                ))}
+              </div>
+            ) : (
+              // Estado vacío
+              <div className="text-center py-20">
+                <div className="bg-white rounded-3xl p-12 max-w-md mx-auto shadow-md">
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                    No hay mascotas
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    No encontramos mascotas que coincidan con tus filtros
+                  </p>
+                  <button 
+                    onClick={handleClearFilters}
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+                  >
+                    Limpiar Filtros
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </main>
+          
+        </div>
       </div>
+
+      <BottomNav />
 
       {/* Modal de detalles */}
       {selectedPet && (

@@ -7,6 +7,7 @@ import Perfil from './pages/perfil';
 import Notificaciones from './pages/Notificaciones';
 import Registro from './pages/Registro';
 import Publicar from './pages/publicar';
+import Chat from './pages/Chat';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/notificaciones" element={<Notificaciones />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/publicar" element={<Publicar />} />
+        <Route path="/mensajes" element={<Chat />} />  {/* ← CAMBIAR AQUÍ */}
       </Routes>
     </BrowserRouter>
   );
