@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 function Perfil() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('solicitudes');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -51,10 +52,12 @@ function Perfil() {
       
     } catch (err) {
       console.error('Error:', err);
+      setError(err.message);
       
       const userData = localStorage.getItem('user');
       if (userData) {
         setUser(JSON.parse(userData));
+        setError('');
       }
     } finally {
       setLoading(false);
@@ -144,7 +147,7 @@ function Perfil() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <header className="bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg">
+      <header className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <a href="/" className="text-3xl font-bold text-white tracking-tight">
@@ -152,8 +155,7 @@ function Perfil() {
             </a>
             <ul className="hidden md:flex space-x-8">
               <li><a href="/" className="text-white font-medium hover:-translate-y-1 transition-transform duration-300 inline-block">Inicio</a></li>
-              <li><a href="/adoptar" className="text-white font-medium hover:-translate-y-1 transition-transform duration-300 inline-block">Adoptar</a></li>
-              <li><a href="/perfil" className="text-white font-medium underline hover:-translate-y-1 transition-transform duration-300 inline-block">Perfil</a></li>
+              
               <li>
                 <button 
                   onClick={handleLogout}
