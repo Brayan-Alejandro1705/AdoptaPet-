@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 function Perfil() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('solicitudes');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -52,12 +51,10 @@ function Perfil() {
       
     } catch (err) {
       console.error('Error:', err);
-      setError(err.message);
       
       const userData = localStorage.getItem('user');
       if (userData) {
         setUser(JSON.parse(userData));
-        setError('');
       }
     } finally {
       setLoading(false);
