@@ -1,3 +1,4 @@
+// este codigo es de la pagina de Ajustes
 import React from 'react';
 
 const SettingsOption = ({ icon, title, onClick }) => (
