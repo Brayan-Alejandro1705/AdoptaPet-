@@ -135,7 +135,7 @@ const OpcionEtiquetado = ({ valor, label, seleccionado, onClick }) => (
     onClick={onClick}
     className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
       seleccionado 
-        ? 'border-purple-700 bg-purple-100' 
+        ? 'border-purple-700 bg-purple-10' 
         : 'border-gray-200 hover:border-purple-500'
     }`}
   >

@@ -50,7 +50,7 @@ const NotificacionesModal = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-t-2xl">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white p-6 rounded-t-2xl">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">🔔 Notificaciones</h2>
             <button 
@@ -92,11 +92,7 @@ const NotificacionesModal = ({ isOpen, onClose }) => {
               onChange={() => toggleNotificacion('menciones')}
             />
             
-            <NotificationToggle 
-              label="Mensajes directos"
-              checked={notificaciones.mensajes}
-              onChange={() => toggleNotificacion('mensajes')}
-            />
+            
           </div>
 
           {/* Canales de notificación */}
@@ -120,7 +116,7 @@ const NotificacionesModal = ({ isOpen, onClose }) => {
           <button 
             onClick={handleGuardar}
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Guardando...' : 'Guardar cambios'}
           </button>
