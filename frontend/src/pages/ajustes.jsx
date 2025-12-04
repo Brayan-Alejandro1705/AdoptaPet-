@@ -1,5 +1,7 @@
+// este codigo es de la pagina de Ajustes
 import React, { useState } from 'react';
 import Header from '../components/common/Header';
+import Sidebar from '../components/common/Sidebar';
 import SettingsOption from '../components/common/SettingsOption';
 import CuentaModal from '../components/common/CuentaModal';
 import NotificacionesModal from '../components/common/NotificacionesModal';
@@ -15,8 +17,9 @@ const Ajustes = () => {
   return (
     <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
       <Header />
+      <Sidebar />
       
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8 ml-64">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <SettingsOption 
             icon="👤" 
@@ -51,6 +54,3 @@ const Ajustes = () => {
 };
 
 export default Ajustes;
-
-
-

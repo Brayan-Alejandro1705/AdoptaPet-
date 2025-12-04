@@ -8,7 +8,7 @@ import Notificaciones from './pages/Notificaciones';
 import Registro from './pages/registro';
 import Publicar from './pages/publicar';
 import Chat from './pages/Chat';
-import Ajustes from './pages/ajustes';
+import Ajustes from './pages/Ajustes';
 
 function App() {
   return (

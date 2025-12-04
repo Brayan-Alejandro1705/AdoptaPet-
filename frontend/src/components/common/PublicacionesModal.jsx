@@ -1,3 +1,4 @@
+// este codigo es de la pagina de Ajustes
 import React from 'react';
 import Modal from './Modal';
 import SubOption from './SubOption';
