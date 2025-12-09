@@ -191,7 +191,7 @@ function Login() {
         {/* Redirección a Registro */}
         <p className="text-center mt-2 text-sm">
           ¿No tienes cuenta?{' '}
-          <Link to="/register" className="text-blue-600 font-semibold hover:underline">
+          <Link to="/registro" className="text-blue-600 font-semibold hover:underline">
             Regístrate
           </Link>
         </p>

@@ -259,7 +259,7 @@ async function testAdoptionModel() {
         // PRUEBA 8: REGISTRAR PAGO
         console.log('\n💰 === PRUEBA 8: REGISTRAR PAGO ===');
         
-        await adoption.registerPayment(150000, 'transferencia', 'https://receipts.com/abc123.pdf');
+        await adoption.registroPayment(150000, 'transferencia', 'https://receipts.com/abc123.pdf');
         
         console.log(`✅ Pago registrado:`);
         console.log(`   💵 Monto: ${adoption.adoptionFee.amount.toLocaleString()}`);

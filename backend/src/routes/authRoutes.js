@@ -9,7 +9,7 @@ const { protect } = require('../middleware/auth');
 
 // Validaciones
 const {
-  registerValidation,
+  registroValidation,
   loginValidation,
 } = require('../middleware/validations/authValidations');
 
@@ -18,11 +18,11 @@ const {
 // =============================================
 
 /**
- * @route   POST /api/auth/register
+ * @route   POST /api/auth/registro
  * @desc    Registrar nuevo usuario
  * @access  Public
  */
-router.post('/register', registerValidation, authController.register);
+router.post('/registro', registroValidation, authController.registro);
 
 /**
  * @route   POST /api/auth/login

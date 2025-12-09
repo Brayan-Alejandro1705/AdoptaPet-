@@ -19,7 +19,7 @@ const handleValidationErrors = (req, res, next) => {
 /**
  * Validaciones para Registro
  */
-exports.registerValidation = [
+exports.registroValidation = [
   body('nombre')  // ← CAMBIADO de 'name' a 'nombre'
     .trim()
     .notEmpty().withMessage('El nombre es obligatorio')

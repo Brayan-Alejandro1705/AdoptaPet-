@@ -19,10 +19,10 @@ const generateToken = (userId) => {
 
 // =============================================
 // @desc    Registrar nuevo usuario
-// @route   POST /api/auth/register
+// @route   POST /api/auth/registro
 // @access  Public
 // =============================================
-exports.register = async (req, res) => {
+exports.registro = async (req, res) => {
   try {
     const { nombre, email, password, passwordConfirm, telefono } = req.body;
 

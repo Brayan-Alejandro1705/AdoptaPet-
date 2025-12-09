@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 function Perfil() {
@@ -21,6 +21,10 @@ function Perfil() {
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsCount, setPostsCount] = useState(0);
 
+  // Estados para upload de avatar
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
+
   useEffect(() => {
     cargarPerfil();
   }, []);
@@ -40,7 +44,7 @@ function Perfil() {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/users/profile', {
+      const response = await fetch('http://127.0.0.1:5000/profile', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -91,7 +95,6 @@ function Perfil() {
 
       console.log('📦 Respuesta del servidor:', response.data);
       
-      // ✅ CORRECCIÓN: Acceder correctamente a los posts
       if (response.data.success && response.data.data) {
         const postsArray = response.data.data.posts || [];
         console.log('✅ Posts encontrados:', postsArray.length);
@@ -130,6 +133,83 @@ function Perfil() {
     } catch (err) {
       console.error('Error al eliminar:', err);
       showNotification('❌ Error al eliminar la publicación');
+    }
+  };
+
+  // Función para abrir selector de archivo
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Función para subir avatar
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files[0];
+    
+    if (!file) return;
+
+    // Validar tipo de archivo
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      showNotification('❌ Solo se permiten imágenes (JPG, PNG, GIF, WEBP)');
+      e.target.value = ''; // Limpiar input
+      return;
+    }
+
+    // Validar tamaño (5MB máximo)
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('❌ La imagen no puede superar los 5MB');
+      e.target.value = ''; // Limpiar input
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        showNotification('❌ No estás autenticado. Por favor inicia sesión.');
+        window.location.href = '/login';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      console.log('📤 Enviando avatar al servidor...');
+
+      const response = await fetch('http://127.0.0.1:5000/api/users/avatar', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      console.log('📡 Respuesta del servidor:', response.status);
+
+      const data = await response.json();
+      console.log('📦 Datos recibidos:', data);
+
+      if (response.ok && data.success) {
+        // Actualizar usuario con nuevo avatar
+        const updatedUser = {
+          ...user,
+          avatar: `http://127.0.0.1:5000${data.avatar}`
+        };
+        
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        showNotification('✅ Foto de perfil actualizada correctamente');
+      } else {
+        showNotification('❌ ' + (data.message || 'Error al subir la imagen'));
+      }
+    } catch (error) {
+      console.error('❌ Error completo:', error);
+      showNotification('❌ Error al subir la imagen. Revisa la consola para más detalles.');
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = ''; // Limpiar input
     }
   };
 
@@ -181,7 +261,6 @@ function Perfil() {
     setTimeout(() => setNotification(''), 5000);
   };
 
-  // ✅ FUNCIONES AUXILIARES
   const formatTimeAgo = (date) => {
     if (!date) return 'reciente';
     try {
@@ -276,6 +355,32 @@ function Perfil() {
                   src={avatarUrl}
                   alt="Foto de perfil" 
                   className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-lg object-cover"
+                />
+                
+                {/* Overlay para cambiar foto */}
+                <div 
+                  onClick={handleAvatarClick}
+                  className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                >
+                  <div className="text-white text-center">
+                    <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="text-xs font-semibold">
+                      {isUploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Input oculto para seleccionar archivo */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                  disabled={isUploadingAvatar}
                 />
               </div>
               
@@ -514,12 +619,30 @@ function Perfil() {
             </div>
 
             <div className="space-y-6">
-              <div className="text-center">
-                <img 
-                  src={avatarUrl}
-                  alt="Foto de perfil" 
-                  className="w-32 h-32 rounded-full border-4 border-purple-300 object-cover mx-auto"
-                />
+              <div className="text-center mb-6">
+                <div className="relative inline-block group">
+                  <img 
+                    src={avatarUrl}
+                    alt="Foto de perfil" 
+                    className="w-32 h-32 rounded-full border-4 border-purple-300 object-cover mx-auto"
+                  />
+                  
+                  <div 
+                    onClick={handleAvatarClick}
+                    className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    <div className="text-white text-center">
+                      <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-xs">Cambiar</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500 mt-2">
+                  Click en la imagen para cambiar tu foto
+                </p>
               </div>
 
               <div>
@@ -584,4 +707,3 @@ function Perfil() {
 }
 
 export default Perfil;
-

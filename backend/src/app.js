@@ -34,8 +34,8 @@ if (process.env.NODE_ENV === 'development') {
 const allowedOrigins = process.env.FRONTEND_URL
   ? [process.env.FRONTEND_URL]
   : [
-      'http://localhost:5000',      // React
-      'http://127.0.0.1:5000',      // Live Server
+      'http://localhost:3000',      // React
+      'http://127.0.0.1:3000',      // Live Server
       'http://localhost:8080',      // Webpack
       'http://localhost:5173',      // Vite
     ];
@@ -115,11 +115,13 @@ app.get('/api/health', (req, res) => {
 });
 
 // Rutas principales
-const authRoutes = require('./routes/authRoutes');
-const petRoutes = require('./routes/petRoutes');
-const shelterRoutes = require('./routes/shelterRoutes');
+const authRoutes = require('../src/routes/authRoutes');
+const userRoutes = require('../src/routes/userRoutes');  
+const petRoutes = require('../src/routes/petRoutes');
+const shelterRoutes = require('../src/routes/shelterRoutes');
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/pets', petRoutes);
 app.use('/api/v1/shelters', shelterRoutes);
 

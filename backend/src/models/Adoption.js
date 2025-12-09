@@ -768,7 +768,7 @@ adoptionSchema.methods.scheduleindexVisit = function(date, address) {
 };
 
 // Método: Registrar pago
-adoptionSchema.methods.registerPayment = function(amount, method, receiptUrl = '') {
+adoptionSchema.methods.registroPayment = function(amount, method, receiptUrl = '') {
     this.adoptionFee.amount = amount;
     this.adoptionFee.paid = true;
     this.adoptionFee.paymentDate = new Date();
