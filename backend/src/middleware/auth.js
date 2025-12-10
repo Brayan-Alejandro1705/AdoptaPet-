@@ -46,7 +46,7 @@ exports.protect = async (req, res, next) => {
     }
 
     // 6. Verificar si el usuario está activo
-    if (!user.isActive) {
+    if (user.status !== 'active') {
       return res.status(401).json({
         success: false,
         message: 'Esta cuenta ha sido desactivada'
@@ -140,7 +140,7 @@ exports.optionalAuth = async (req, res, next) => {
       const decoded = jwt.verify(token, JWT_SECRET);
       const user = await User.findById(decoded.id);
 
-      if (user && user.isActive) {
+      if (user && user.status === 'active') {
         req.user = user;
       }
     } catch (err) {

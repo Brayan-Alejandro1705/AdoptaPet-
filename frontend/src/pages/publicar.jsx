@@ -52,6 +52,8 @@ const Publicar = () => {
 
       // Obtener token del usuario
       const token = localStorage.getItem('token');
+      console.log('🔑 Token encontrado:', token ? '✅ Sí' : '❌ No');
+      
       if (!token) {
         setError("Debes iniciar sesión para publicar");
         setLoading(false);
@@ -65,11 +67,13 @@ const Publicar = () => {
       
       // Si hay imagen, agregarla
       if (imageFile) {
+        console.log('📸 Imagen agregada:', imageFile.name, imageFile.size, 'bytes');
         formData.append('imagen', imageFile);
       }
 
       // Si hay información de mascota, agregarla
       if (petData.nombre || petData.tipo || petData.raza || petData.edad) {
+        console.log('🐾 Info de mascota:', petData);
         formData.append('petInfo', JSON.stringify({
           nombre: petData.nombre,
           tipo: petData.tipo,
@@ -80,6 +84,10 @@ const Publicar = () => {
 
       formData.append('disponibleAdopcion', petData.adopcion);
 
+      console.log('📤 Enviando petición a: http://localhost:5000/api/posts');
+      console.log('📤 Método: POST');
+      console.log('📤 Contenido:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+
       // Enviar al backend
       const response = await fetch('http://localhost:5000/api/posts', {
         method: 'POST',
@@ -89,13 +97,27 @@ const Publicar = () => {
         body: formData
       });
 
-      const data = await response.json();
+      console.log('📥 Status Code:', response.status);
+      console.log('📥 Status Text:', response.statusText);
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al publicar');
+      // Intentar leer la respuesta
+      let data;
+      const contentType = response.headers.get("content-type");
+      
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+        console.log('📥 Respuesta JSON:', data);
+      } else {
+        const textResponse = await response.text();
+        console.log('📥 Respuesta TEXT:', textResponse);
+        throw new Error(`El servidor no respondió correctamente. Verifica que el backend esté corriendo en http://localhost:5000`);
       }
 
-      console.log('✅ Publicación creada:', data);
+      if (!response.ok) {
+        throw new Error(data.message || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      console.log('✅ Publicación creada exitosamente:', data);
 
       // Limpiar formulario
       setText("");
@@ -117,8 +139,20 @@ const Publicar = () => {
       }, 2000);
 
     } catch (err) {
-      console.error('❌ Error al publicar:', err);
-      setError(err.message || 'Error al publicar. Intenta de nuevo.');
+      console.error('❌ ERROR COMPLETO:', err);
+      console.error('❌ Mensaje:', err.message);
+      console.error('❌ Stack:', err.stack);
+      
+      // Mensajes de error más específicos
+      let errorMessage = err.message;
+      
+      if (err.message.includes('Failed to fetch')) {
+        errorMessage = 'No se puede conectar al servidor. Verifica que el backend esté corriendo en http://localhost:5000';
+      } else if (err.message.includes('NetworkError')) {
+        errorMessage = 'Error de red. Verifica tu conexión o que el backend esté activo.';
+      }
+      
+      setError(errorMessage || 'Error al publicar. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -165,7 +199,7 @@ const Publicar = () => {
                 </div>
               )}
 
-              {/* Área de texto - ✅ CORREGIDO */}
+              {/* Área de texto */}
               <PublishTextarea 
                 value={text}
                 setValue={setText}

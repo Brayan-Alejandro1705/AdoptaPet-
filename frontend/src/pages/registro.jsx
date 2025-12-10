@@ -168,6 +168,42 @@ export default function Registro() {
     }
   };
 
+  // ✅ NUEVA FUNCIÓN PARA GOOGLE LOGIN CON DEBUGGING
+  const handleGoogleLogin = async (e) => {
+    e.preventDefault();
+    
+    console.log('🔍 Iniciando Google Login...');
+    console.log('URL destino:', 'http://localhost:5000/auth/google');
+    
+    try {
+      // Verificar que el backend esté activo
+      const response = await fetch('http://localhost:5000/health');
+      const data = await response.json();
+      
+      console.log('✅ Backend activo:', data);
+      console.log('✅ Google Auth:', data.services?.googleAuth);
+      
+      if (data.services?.googleAuth === 'disabled') {
+        setMessage({ 
+          text: 'Google OAuth no está disponible. Verifica la configuración del servidor.', 
+          type: 'error' 
+        });
+        return;
+      }
+      
+      // Todo bien, redirigir a Google
+      console.log('🔄 Redirigiendo a Google OAuth...');
+      window.location.href = 'http://localhost:5000/auth/google';
+      
+    } catch (err) {
+      console.error('❌ Error al verificar backend:', err);
+      setMessage({ 
+        text: 'No se puede conectar con el servidor. Verifica que esté corriendo en el puerto 5000.', 
+        type: 'error' 
+      });
+    }
+  };
+
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-5 bg-cover bg-center bg-fixed relative"
@@ -181,10 +217,6 @@ export default function Registro() {
         
         <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">Unete a AdoptaPet</h1>
         <p className="text-gray-600 text-sm mb-8 text-center">Dale un hogar a tu nuevo mejor amigo</p>
-
-
-
-
 
         {message.text && (
           <div className={`mb-4 p-3 rounded-lg text-sm font-medium text-center ${
@@ -325,9 +357,12 @@ export default function Registro() {
         <div className="mt-5 text-gray-600 text-sm text-center">
           Ya tienes cuenta? <Link to="/login" className="text-purple-600 font-semibold hover:underline">Inicia sesion</Link>
         </div>
-                <a 
-          href="http://localhost:5000/auth/google"
-          className="flex items-center justify-center w-full py-3.5 px-5 bg-white border-2 border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-50 hover:border-blue-500 hover:shadow-lg transition-all mb-5"
+
+        {/* ✅ BOTÓN DE GOOGLE CORREGIDO - Ahora es un button con onClick */}
+        <button 
+          onClick={handleGoogleLogin}
+          type="button"
+          className="flex items-center justify-center w-full py-3.5 px-5 bg-white border-2 border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-50 hover:border-blue-500 hover:shadow-lg transition-all mb-5 mt-5"
         >
           <svg className="w-6 h-6 mr-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -336,7 +371,7 @@ export default function Registro() {
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
           Registrarse con Google
-        </a>
+        </button>
 
         <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
           <div className="flex items-center text-gray-600 text-xs">

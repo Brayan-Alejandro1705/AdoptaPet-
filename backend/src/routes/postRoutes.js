@@ -37,26 +37,67 @@ const upload = multer({
   }
 });
 
-// Middleware de autenticación
-const auth = (req, res, next) => {
+// Middleware de autenticación mejorado
+const auth = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    console.log('🔐 ===== VERIFICANDO AUTENTICACIÓN =====');
+    console.log('📍 Ruta:', req.method, req.path);
     
-    if (!token) {
+    const authHeader = req.headers.authorization;
+    console.log('📋 Authorization header:', authHeader ? '✅ Presente' : '❌ Ausente');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Token no proporcionado o formato incorrecto');
       return res.status(401).json({
         success: false,
         message: 'No autorizado - Token no proporcionado'
       });
     }
 
+    const token = authHeader.split(' ')[1];
+    console.log('🔑 Token extraído:', token.substring(0, 20) + '...');
+
     const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'adoptapet_secreto_super_seguro_2025');
+    const User = require('../models/User');
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'adoptapet_secreto_super_seguro_2025');
+      console.log('✅ Token verificado. User ID:', decoded.id);
+    } catch (jwtError) {
+      console.error('❌ Error verificando token:', jwtError.message);
+      return res.status(401).json({
+        success: false,
+        message: 'Token inválido o expirado'
+      });
+    }
+
+    // Buscar usuario en BD
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      console.log('❌ Usuario no encontrado en BD');
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    console.log('✅ Usuario autenticado:', {
+      id: user._id,
+      nombre: user.nombre || user.name,
+      email: user.email
+    });
+
     req.userId = decoded.id;
+    req.user = user;
+    console.log('🎉 Autenticación exitosa\n');
     next();
   } catch (error) {
+    console.error('❌ Error en auth middleware:', error);
     return res.status(401).json({
       success: false,
-      message: 'Token inválido o expirado'
+      message: 'Error de autenticación',
+      error: error.message
     });
   }
 };
@@ -82,7 +123,7 @@ router.get('/user/my-posts', auth, async (req, res) => {
       author: req.userId,
       status: 'active'
     })
-      .populate('author', 'name avatar role verified email')
+      .populate('author', 'nombre email avatar role')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -117,46 +158,116 @@ router.get('/user/my-posts', auth, async (req, res) => {
   }
 });
 
-// 1. CREAR PUBLICACIÓN
+// ⭐ NUEVO: OBTENER TODAS LAS PUBLICACIONES (FEED PRINCIPAL)
+router.get('/', auth, async (req, res) => {
+  try {
+    console.log('📰 Obteniendo todas las publicaciones...');
+    
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    const posts = await Post.find({ status: 'active' })
+      .populate('author', 'nombre email avatar role')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const totalPosts = await Post.countDocuments({ status: 'active' });
+
+    console.log(`✅ Posts encontrados: ${posts.length}`);
+
+    res.json({
+      success: true,
+      data: {
+        posts,
+        pagination: {
+          page,
+          limit,
+          total: totalPosts,
+          pages: Math.ceil(totalPosts / limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo posts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener publicaciones',
+      error: error.message
+    });
+  }
+});
+
+// 1. CREAR PUBLICACIÓN (CORREGIDO PARA TU MODELO)
 router.post('/', auth, upload.single('imagen'), async (req, res) => {
   try {
-    console.log('📝 Creando nueva publicación...');
+    console.log('📝 ===== CREANDO NUEVA PUBLICACIÓN =====');
     console.log('📦 Body:', req.body);
-    console.log('📸 Archivo:', req.file);
+    console.log('📸 Archivo:', req.file ? req.file.filename : 'Sin imagen');
     console.log('👤 UserId:', req.userId);
 
-    const { contenido, tipo } = req.body;
+    const { contenido, tipo, petInfo, disponibleAdopcion } = req.body;
 
     // Validación básica
     if (!contenido && !req.file) {
+      console.log('❌ Validación fallida: Sin contenido ni imagen');
       return res.status(400).json({
         success: false,
         message: 'Debes proporcionar contenido o una imagen'
       });
     }
 
-    // Crear objeto de publicación
+    // Crear objeto de publicación según TU modelo
     const postData = {
       author: req.userId,
       content: contenido || '',
       type: tipo || 'update',
-      status: 'active'
+      status: 'active',
+      media: {
+        images: [],
+        videos: []
+      },
+      stats: {
+        likes: [],
+        comments: 0,
+        shares: 0,
+        views: 0
+      },
+      settings: {
+        visibility: 'public',
+        allowComments: true,
+        allowSharing: true
+      }
     };
 
     // Si hay imagen, agregarla al array de images
     if (req.file) {
-      postData.images = [{
-        url: `/uploads/posts/${req.file.filename}`,
-        publicId: req.file.filename
-      }];
+      postData.media.images.push(`/uploads/posts/${req.file.filename}`);
+      console.log('✅ Imagen agregada:', postData.media.images[0]);
     }
+
+    // Si hay info de mascota, parsearla
+    if (petInfo) {
+      try {
+        const parsedPetInfo = typeof petInfo === 'string' ? JSON.parse(petInfo) : petInfo;
+        console.log('🐾 Info de mascota:', parsedPetInfo);
+        // Si tu modelo tiene un campo para esto, agrégalo aquí
+        // postData.petInfo = parsedPetInfo;
+      } catch (e) {
+        console.error('❌ Error parsing petInfo:', e);
+      }
+    }
+
+    console.log('💾 Datos del post a guardar:', JSON.stringify(postData, null, 2));
 
     // Crear el post
     const newPost = new Post(postData);
     await newPost.save();
 
     // Poblar información del autor
-    await newPost.populate('author', 'name email avatar role verified');
+    await newPost.populate('author', 'nombre email avatar role');
 
     console.log('✅ Post creado exitosamente:', newPost._id);
 
@@ -167,7 +278,10 @@ router.post('/', auth, upload.single('imagen'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creando post:', error);
+    console.error('❌ ERROR CREANDO POST:', error);
+    console.error('   Mensaje:', error.message);
+    console.error('   Stack:', error.stack);
+    
     res.status(500).json({
       success: false,
       message: 'Error al crear la publicación',
@@ -179,18 +293,22 @@ router.post('/', auth, upload.single('imagen'), async (req, res) => {
 // 2. OBTENER FEED DE PUBLICACIONES
 router.get('/feed', auth, async (req, res) => {
   try {
+    console.log('📰 Obteniendo feed...');
+    
     const limit = parseInt(req.query.limit) || 20;
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
     const posts = await Post.find({ status: 'active' })
-      .populate('author', 'name email avatar role verified')
+      .populate('author', 'nombre email avatar role')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
     const totalPosts = await Post.countDocuments({ status: 'active' });
+
+    console.log(`✅ Posts en feed: ${posts.length}`);
 
     res.json({
       success: true,
@@ -213,7 +331,7 @@ router.get('/feed', auth, async (req, res) => {
   }
 });
 
-// 3. OBTENER POSTS DE UN USUARIO (DEBE IR DESPUÉS DE /user/my-posts)
+// 3. OBTENER POSTS DE UN USUARIO
 router.get('/user/:userId', auth, async (req, res) => {
   try {
     console.log('📋 Obteniendo posts del usuario:', req.params.userId);
@@ -226,7 +344,7 @@ router.get('/user/:userId', auth, async (req, res) => {
       author: req.params.userId,
       status: 'active'
     })
-      .populate('author', 'name email avatar role verified')
+      .populate('author', 'nombre email avatar role')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -264,9 +382,10 @@ router.get('/user/:userId', auth, async (req, res) => {
 // 4. OBTENER PUBLICACIÓN POR ID
 router.get('/:postId', auth, async (req, res) => {
   try {
+    console.log('📄 Obteniendo post:', req.params.postId);
+    
     const post = await Post.findById(req.params.postId)
-      .populate('author', 'name email avatar role verified')
-      .populate('comments.user', 'name avatar role verified')
+      .populate('author', 'nombre email avatar role')
       .lean();
 
     if (!post) {
@@ -275,6 +394,8 @@ router.get('/:postId', auth, async (req, res) => {
         message: 'Publicación no encontrada'
       });
     }
+
+    console.log('✅ Post encontrado');
 
     res.json({
       success: true,
@@ -292,6 +413,8 @@ router.get('/:postId', auth, async (req, res) => {
 // 5. DAR/QUITAR LIKE
 router.post('/:postId/like', auth, async (req, res) => {
   try {
+    console.log('❤️ Like en post:', req.params.postId);
+    
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
@@ -302,28 +425,24 @@ router.post('/:postId/like', auth, async (req, res) => {
     }
 
     // Verificar si ya dio like
-    const likeIndex = post.likes?.findIndex(
-      like => {
-        const likeUserId = like?.user || like;
-        return likeUserId.toString() === req.userId.toString();
-      }
-    ) ?? -1;
+    const likeIndex = post.stats.likes.findIndex(
+      like => like.toString() === req.userId.toString()
+    );
     
     let liked = false;
     
     if (likeIndex > -1) {
       // Remover like
-      post.likes.splice(likeIndex, 1);
+      post.stats.likes.splice(likeIndex, 1);
       liked = false;
+      console.log('💔 Like removido');
     } else {
       // Agregar like
-      if (!post.likes) post.likes = [];
-      post.likes.push({ user: req.userId });
+      post.stats.likes.push(req.userId);
       liked = true;
+      console.log('❤️ Like agregado');
     }
 
-    // Actualizar stats
-    post.stats.likesCount = post.likes.length;
     await post.save();
 
     res.json({
@@ -331,7 +450,7 @@ router.post('/:postId/like', auth, async (req, res) => {
       message: liked ? 'Like agregado' : 'Like removido',
       data: { 
         liked,
-        likesCount: post.likes.length
+        likesCount: post.stats.likes.length
       }
     });
   } catch (error) {
@@ -356,13 +475,10 @@ router.delete('/:postId/like', auth, async (req, res) => {
     }
 
     // Remover like
-    post.likes = post.likes.filter(like => {
-      const likeUserId = like?.user || like;
-      return likeUserId.toString() !== req.userId.toString();
-    });
+    post.stats.likes = post.stats.likes.filter(
+      like => like.toString() !== req.userId.toString()
+    );
 
-    // Actualizar stats
-    post.stats.likesCount = post.likes.length;
     await post.save();
 
     res.json({
@@ -370,7 +486,7 @@ router.delete('/:postId/like', auth, async (req, res) => {
       message: 'Like removido',
       data: { 
         unliked: true,
-        likesCount: post.likes.length
+        likesCount: post.stats.likes.length
       }
     });
   } catch (error) {
@@ -382,61 +498,11 @@ router.delete('/:postId/like', auth, async (req, res) => {
   }
 });
 
-// 6. AGREGAR COMENTARIO
-router.post('/:postId/comments', auth, async (req, res) => {
-  try {
-    const { content } = req.body;
-    
-    if (!content || !content.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'El comentario no puede estar vacío'
-      });
-    }
-
-    const post = await Post.findById(req.params.postId);
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
-    }
-
-    // Agregar comentario
-    const newComment = {
-      user: req.userId,
-      content: content.trim(),
-      createdAt: new Date()
-    };
-
-    post.comments.push(newComment);
-    post.stats.commentsCount = post.comments.length;
-    await post.save();
-
-    // Popular el usuario del nuevo comentario
-    await post.populate('comments.user', 'name avatar role verified');
-
-    res.status(201).json({
-      success: true,
-      message: 'Comentario agregado exitosamente',
-      data: {
-        comment: post.comments[post.comments.length - 1],
-        commentsCount: post.comments.length
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error agregando comentario:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al agregar comentario'
-    });
-  }
-});
-
 // 7. ELIMINAR PUBLICACIÓN
 router.delete('/:postId', auth, async (req, res) => {
   try {
+    console.log('🗑️ Eliminando post:', req.params.postId);
+    
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
@@ -458,6 +524,8 @@ router.delete('/:postId', auth, async (req, res) => {
     post.status = 'deleted';
     await post.save();
 
+    console.log('✅ Post eliminado');
+
     res.json({
       success: true,
       message: 'Publicación eliminada exitosamente'
@@ -474,6 +542,8 @@ router.delete('/:postId', auth, async (req, res) => {
 // 8. EDITAR POST
 router.put('/:postId', auth, async (req, res) => {
   try {
+    console.log('✏️ Editando post:', req.params.postId);
+    
     const { contenido, content } = req.body;
     const post = await Post.findById(req.params.postId);
 
@@ -502,11 +572,11 @@ router.put('/:postId', auth, async (req, res) => {
     }
 
     post.content = newContent;
-    post.isEdited = true;
-    post.editedAt = new Date();
     await post.save();
 
-    await post.populate('author', 'name email avatar role verified');
+    await post.populate('author', 'nombre email avatar role');
+
+    console.log('✅ Post editado');
 
     res.json({
       success: true,
@@ -524,13 +594,13 @@ router.put('/:postId', auth, async (req, res) => {
 
 console.log('✅ Rutas de posts configuradas correctamente');
 console.log('   📝 POST   /api/posts - Crear publicación');
+console.log('   📰 GET    /api/posts - TODAS las publicaciones (NUEVO)');
 console.log('   📰 GET    /api/posts/feed - Feed de publicaciones');
 console.log('   👤 GET    /api/posts/user/my-posts - Mis publicaciones');
 console.log('   👥 GET    /api/posts/user/:userId - Posts de usuario');
 console.log('   📄 GET    /api/posts/:postId - Ver publicación');
 console.log('   ❤️  POST   /api/posts/:postId/like - Dar like');
 console.log('   💔 DELETE /api/posts/:postId/like - Quitar like');
-console.log('   💬 POST   /api/posts/:postId/comments - Comentar');
 console.log('   🗑️  DELETE /api/posts/:postId - Eliminar');
 console.log('   ✏️  PUT    /api/posts/:postId - Editar');
 

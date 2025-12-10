@@ -7,9 +7,8 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 const favoritesRoutes = require("./src/routes/favoritos");
-
-
 
 // ============================================
 // INICIALIZACIÓN
@@ -27,21 +26,61 @@ const services = {
 };
 
 // ============================================
-// 1. CORS
+// CREAR DIRECTORIO DE UPLOADS
 // ============================================
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+const uploadsDir = path.join(__dirname, 'uploads/avatars');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('📁 Directorio uploads/avatars creado');
+} else {
+  console.log('✅ Directorio uploads/avatars existe');
+}
 
 // ============================================
-// 2. SEGURIDAD
+// 1. CORS - CONFIGURACIÓN MEJORADA
+// ============================================
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
+    ];
+    
+    // Permitir requests sin origin (como Postman, mobile apps, etc.)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Permitir todos en desarrollo
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+console.log('✅ CORS configurado con soporte para uploads');
+
+// ============================================
+// HEADERS ADICIONALES PARA ARCHIVOS
+// ============================================
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  next();
+});
+
+// ============================================
+// 2. SEGURIDAD - CONFIGURACIÓN AJUSTADA
 // ============================================
 app.use(helmet({
   contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
 app.use(compression());
@@ -52,14 +91,39 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-
-
-
 // ============================================
-// SERVIR ARCHIVOS ESTÁTICOS (IMÁGENES)
+// SERVIR ARCHIVOS ESTÁTICOS - MEJORADO
 // ============================================
-app.use('/uploads', express.static('uploads'));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Middleware específico para servir uploads con headers CORS correctos
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Cache-Control', 'public, max-age=31536000');
+  res.header('Content-Type', 'image/jpeg'); // Por defecto, se ajustará según el archivo
+  next();
+});
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    // Establecer el tipo MIME correcto según la extensión
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp'
+    };
+    
+    if (mimeTypes[ext]) {
+      res.setHeader('Content-Type', mimeTypes[ext]);
+    }
+  }
+}));
+
+console.log('✅ Directorio uploads configurado en: /uploads');
+console.log('📂 Ruta física:', path.join(__dirname, 'uploads'));
+
 // ============================================
 // 4. PROTECCIÓN NOSQL INJECTION
 // ============================================
@@ -108,6 +172,18 @@ const authLimiter = rateLimit({
     message: 'Demasiados intentos de login, intenta en 15 minutos' 
   },
   skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter más permisivo para uploads
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 50, // 50 uploads cada 15 minutos
+  message: { 
+    success: false, 
+    message: 'Demasiados uploads, intenta más tarde' 
+  },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -221,7 +297,8 @@ app.get('/health', (req, res) => {
       api: 'operational',
       mongodb: services.mongoConnected ? 'connected' : 'disconnected',
       googleAuth: services.passportLoaded ? 'enabled' : 'disabled',
-      socketio: services.socketLoaded ? 'active' : 'inactive'
+      socketio: services.socketLoaded ? 'active' : 'inactive',
+      uploads: fs.existsSync(uploadsDir) ? 'enabled' : 'disabled'
     },
     memory: {
       used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
@@ -245,7 +322,8 @@ app.get('/api/info', (req, res) => {
       users: '/api/users',
       applications: '/api/applications',
       chat: '/api/chat',
-      posts: '/api/posts'
+      posts: '/api/posts',
+      uploads: '/uploads'
     }
   });
 });
@@ -261,6 +339,8 @@ app.get('/test/config', (req, res) => {
       mongodb: services.mongoConnected ? '✅ Conectado' : '❌ Desconectado',
       socketio: services.socketLoaded ? '✅ Activo' : '❌ Inactivo',
       session: '✅ Configurado',
+      uploads: fs.existsSync(uploadsDir) ? '✅ Habilitado' : '❌ Deshabilitado',
+      uploadPath: uploadsDir,
       googleClientId: process.env.GOOGLE_CLIENT_ID ? '✅ Configurado' : '❌ NO configurado',
       googleSecret: process.env.GOOGLE_CLIENT_SECRET ? '✅ Configurado' : '❌ NO configurado',
       jwtSecret: process.env.JWT_SECRET ? '✅ Configurado' : '❌ NO configurado',
@@ -412,10 +492,15 @@ try {
 
 try {
   const userRoutes = require('./src/routes/userRoutes');
+  // Aplicar rate limiter específico para uploads de avatars
+  app.use('/api/users/avatar', uploadLimiter);
   app.use('/api/users', userRoutes);
+  // También agregar soporte para /profile sin /api
+  app.use('/', userRoutes);
   logger.log.success('Rutas de usuarios cargadas');
 } catch (error) {
   logger.log.warning('Rutas de usuarios no disponibles');
+  console.error('Error detallado:', error.message);
 }
 
 try {
@@ -434,6 +519,7 @@ try {
   logger.log.warning('Rutas de posts no disponibles');
   console.error('Error detallado:', error.message);
 }
+
 try {
   const chatRoutes = require('./src/routes/chatRoutes');
   app.use('/api/chat', chatRoutes);
@@ -441,6 +527,13 @@ try {
 } catch (error) {
   logger.log.warning('Rutas de chat no disponibles');
   console.error('Error detallado:', error.message);
+}
+
+try {
+  app.use('/api/favoritos', favoritesRoutes);
+  logger.log.success('Rutas de favoritos cargadas');
+} catch (error) {
+  logger.log.warning('Rutas de favoritos no disponibles');
 }
 
 // ============================================
@@ -457,6 +550,7 @@ app.use((req, res, next) => {
     next();
   }
 });
+
 // ==========================================
 // RUTA DE REDIRECCIÓN POST-LOGIN GOOGLE
 // ==========================================
@@ -488,9 +582,6 @@ app.get('/Home', (req, res) => {
     res.redirect(`${frontendUrl}/login?error=invalid_data`);
   }
 });
-
-
-
 
 // ============================================
 // MIDDLEWARE DE MANEJO DE ERRORES GLOBAL
@@ -547,6 +638,21 @@ app.use((err, req, res, next) => {
     });
   }
   
+  // Error de Multer (upload de archivos)
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      success: false,
+      message: 'El archivo es demasiado grande. Máximo 5MB.'
+    });
+  }
+  
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({
+      success: false,
+      message: 'Campo de archivo inesperado'
+    });
+  }
+  
   const statusCode = err.statusCode || err.status || 500;
   res.status(statusCode).json({
     success: false,
@@ -570,6 +676,10 @@ server.listen(PORT, HOST, () => {
     mongoConnected: services.mongoConnected,
     socketLoaded: services.socketLoaded
   });
+  
+  console.log('\n📂 Uploads configurado:');
+  console.log(`   • URL: http://localhost:${PORT}/uploads`);
+  console.log(`   • Directorio: ${uploadsDir}`);
 });
 
 // ============================================

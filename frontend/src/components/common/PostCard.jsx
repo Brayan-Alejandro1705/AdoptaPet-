@@ -21,27 +21,80 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
     const [likesCount, setLikesCount] = useState(0);
     const [commentsCount, setCommentsCount] = useState(0);
 
+    // ===== FUNCIÓN HELPER PARA AVATARS =====
+    const getAvatarUrl = (user) => {
+        if (!user) return 'https://ui-avatars.com/api/?name=User&size=100&background=random';
+        
+        // Si ya tiene http, usar tal cual
+        if (user.avatar?.startsWith('http')) {
+            return user.avatar;
+        }
+        
+        // Si tiene avatar pero sin http, agregar dominio
+        if (user.avatar) {
+            return `http://127.0.0.1:5000${user.avatar}`;
+        }
+        
+        // Fallback a avatar generado
+        const name = user.name || user.nombre || 'User';
+        return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=100&background=random`;
+    };
+
+    // ===== FUNCIÓN HELPER PARA IMÁGENES =====
+    const getImageUrl = (imagePath) => {
+        if (!imagePath) return null;
+        
+        // Si ya tiene http, usar tal cual
+        if (imagePath.startsWith('http')) {
+            return imagePath;
+        }
+        
+        // Si comienza con /, agregar dominio del backend
+        if (imagePath.startsWith('/')) {
+            return `http://localhost:5000${imagePath}`;
+        }
+        
+        // Si no tiene /, agregarlo
+        return `http://localhost:5000/${imagePath}`;
+    };
+
+    // ===== OBTENER IMÁGENES DEL POST =====
+    const getPostImages = () => {
+        // Primero intentar post.media.images (tu estructura actual)
+        if (post.media?.images && Array.isArray(post.media.images) && post.media.images.length > 0) {
+            return post.media.images;
+        }
+        
+        // Fallback a post.images por si acaso
+        if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+            return post.images;
+        }
+        
+        return [];
+    };
+
+    const postImages = getPostImages();
+
     // ===== INICIALIZAR DATOS =====
     useEffect(() => {
         // Inicializar contadores
         if (post.stats) {
-            setLikesCount(post.stats.likesCount || 0);
+            setLikesCount(post.stats.likesCount || post.stats.likes?.length || 0);
             setCommentsCount(post.stats.commentsCount || 0);
         }
 
         // Verificar si ya dio like
-        if (Array.isArray(post.likes) && post.likes.length > 0) {
+        if (Array.isArray(post.stats?.likes) && post.stats.likes.length > 0) {
             const currentUserId = currentUser._id || currentUser.id || currentUser;
-            const liked = post.likes.some(like => {
+            const liked = post.stats.likes.some(like => {
                 if (!like) return false;
                 const likeUserId = like?.user?._id || like?.user || like;
                 return String(likeUserId) === String(currentUserId);
             });
             setIsLiked(liked);
             
-            // Si no hay stats, usar length de likes
             if (!post.stats?.likesCount) {
-                setLikesCount(post.likes.length);
+                setLikesCount(post.stats.likes.length);
             }
         }
 
@@ -94,7 +147,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 return;
             }
 
-            const response = await fetch(`/api/posts/${post._id}/like`, {
+            const response = await fetch(`http://127.0.0.1:5000/api/posts/${post._id}/like`, {
                 method: isLiked ? 'DELETE' : 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -128,7 +181,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 return;
             }
 
-            const response = await fetch(`/api/posts/${post._id}/comments`, {
+            const response = await fetch(`http://127.0.0.1:5000/api/posts/${post._id}/comments`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -158,7 +211,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/posts/${post._id}`, {
+            const response = await fetch(`http://127.0.0.1:5000/api/posts/${post._id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -186,17 +239,19 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
             <div className="p-4 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                     <img
-                        src={post.author?.avatar || 'https://ui-avatars.com/api/?name=User'}
-                        alt={post.author?.name || 'Usuario'}
-                        className="w-10 h-10 rounded-full object-cover"
+                        src={getAvatarUrl(post.author)}
+                        alt={post.author?.name || post.author?.nombre || 'Usuario'}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-100"
                         onError={(e) => {
-                            e.target.src = 'https://ui-avatars.com/api/?name=User';
+                            console.error('Error cargando avatar del autor:', post.author);
+                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.name || post.author?.nombre || 'User')}&size=100&background=random`;
                         }}
+                        crossOrigin="anonymous"
                     />
                     <div>
                         <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-gray-900">
-                                {post.author?.name || 'Usuario'}
+                                {post.author?.name || post.author?.nombre || 'Usuario'}
                             </h3>
                             {post.author?.verified?.email && (
                                 <span className="text-blue-500 text-sm">✓</span>
@@ -278,33 +333,43 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 )}
             </div>
 
-            {/* Images */}
-            {Array.isArray(post.images) && post.images.length > 0 && (
+            {/* ✅ IMÁGENES - CORREGIDO */}
+            {postImages.length > 0 && (
                 <div className={`grid gap-1 ${
-                    post.images.length === 1 ? 'grid-cols-1' :
-                    post.images.length === 2 ? 'grid-cols-2' :
-                    post.images.length === 3 ? 'grid-cols-3' :
+                    postImages.length === 1 ? 'grid-cols-1' :
+                    postImages.length === 2 ? 'grid-cols-2' :
+                    postImages.length === 3 ? 'grid-cols-3' :
                     'grid-cols-2'
                 }`}>
-                    {post.images.slice(0, 4).map((image, index) => (
-                        <div key={index} className="relative overflow-hidden">
-                            <img
-                                src={image.url || image}
-                                alt={`Imagen ${index + 1}`}
-                                className="w-full h-64 object-cover"
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                }}
-                            />
-                            {index === 3 && post.images.length > 4 && (
-                                <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
-                                    <span className="text-white text-2xl font-bold">
-                                        +{post.images.length - 4}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                    {postImages.slice(0, 4).map((image, index) => {
+                        const imageUrl = getImageUrl(image.url || image);
+                        console.log('🖼️ Mostrando imagen:', imageUrl);
+                        
+                        return (
+                            <div key={index} className="relative overflow-hidden bg-gray-100">
+                                <img
+                                    src={imageUrl}
+                                    alt={`Imagen ${index + 1}`}
+                                    className="w-full h-64 object-cover"
+                                    onError={(e) => {
+                                        console.error('❌ Error cargando imagen:', imageUrl);
+                                        e.target.style.display = 'none';
+                                        e.target.parentElement.innerHTML = '<div class="w-full h-64 flex items-center justify-center bg-gray-200 text-gray-500"><span>Error cargando imagen</span></div>';
+                                    }}
+                                    onLoad={() => {
+                                        console.log('✅ Imagen cargada correctamente:', imageUrl);
+                                    }}
+                                />
+                                {index === 3 && postImages.length > 4 && (
+                                    <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                                        <span className="text-white text-2xl font-bold">
+                                            +{postImages.length - 4}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
@@ -346,9 +411,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                     {/* Comment Form */}
                     <form onSubmit={handleComment} className="mt-4 flex gap-2">
                         <img
-                            src={currentUser?.avatar || 'https://ui-avatars.com/api/?name=User'}
+                            src={getAvatarUrl(currentUser)}
                             alt="Tu avatar"
                             className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                            crossOrigin="anonymous"
                         />
                         <div className="flex-1 flex gap-2">
                             <input
@@ -374,13 +440,14 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                             {post.comments.map((comment) => (
                                 <div key={comment._id || Math.random()} className="flex gap-2">
                                     <img
-                                        src={comment.user?.avatar || 'https://ui-avatars.com/api/?name=User'}
-                                        alt={comment.user?.name || 'Usuario'}
+                                        src={getAvatarUrl(comment.user)}
+                                        alt={comment.user?.name || comment.user?.nombre || 'Usuario'}
                                         className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                        crossOrigin="anonymous"
                                     />
                                     <div className="flex-1 bg-white rounded-lg px-3 py-2 shadow-sm">
                                         <h4 className="font-semibold text-sm text-gray-900">
-                                            {comment.user?.name || 'Usuario'}
+                                            {comment.user?.name || comment.user?.nombre || 'Usuario'}
                                         </h4>
                                         <p className="text-sm text-gray-800 mt-1">{comment.content}</p>
                                         <p className="text-xs text-gray-500 mt-1">

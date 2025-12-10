@@ -63,17 +63,42 @@ function Perfil() {
       }
 
       const data = await response.json();
+      console.log('📥 Datos del perfil desde backend:', data);
+      
       const userData = data.user || data;
+      
+      // ✅ CORRECCIÓN: Asegurar que el avatar tenga la URL completa
+      if (userData.avatar && !userData.avatar.startsWith('http')) {
+        userData.avatar = `http://127.0.0.1:5000${userData.avatar}`;
+      }
+      
+      console.log('👤 Usuario cargado:', {
+        email: userData.email,
+        avatar: userData.avatar
+      });
+      
       setUser(userData);
+      // Actualizar localStorage con los datos frescos del backend
+      localStorage.setItem('user', JSON.stringify(userData));
       
     } catch (err) {
-      console.error('Error:', err);
+      console.error('❌ Error al cargar perfil:', err);
       setError(err.message);
       
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
-        setError('');
+      // Fallback: intentar usar datos de localStorage
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          // Asegurar URL completa del avatar
+          if (userData.avatar && !userData.avatar.startsWith('http')) {
+            userData.avatar = `http://127.0.0.1:5000${userData.avatar}`;
+          }
+          setUser(userData);
+          setError('');
+        } catch (parseError) {
+          console.error('Error al parsear usuario de localStorage:', parseError);
+        }
       }
     } finally {
       setLoading(false);
@@ -98,11 +123,9 @@ function Perfil() {
       if (response.data.success && response.data.data) {
         const postsArray = response.data.data.posts || [];
         console.log('✅ Posts encontrados:', postsArray.length);
-        console.log('Posts:', postsArray);
         setPosts(postsArray);
         setPostsCount(postsArray.length);
       } else {
-        console.log('⚠️ No hay posts o respuesta inválida');
         setPosts([]);
         setPostsCount(0);
       }
@@ -136,12 +159,10 @@ function Perfil() {
     }
   };
 
-  // Función para abrir selector de archivo
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
 
-  // Función para subir avatar
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
     
@@ -192,14 +213,30 @@ function Perfil() {
       console.log('📦 Datos recibidos:', data);
 
       if (response.ok && data.success) {
+        // ✅ Construir URL completa del avatar
+        const avatarUrl = data.avatar.startsWith('http') 
+          ? data.avatar 
+          : `http://127.0.0.1:5000${data.avatar}`;
+        
+        console.log('🖼️ Nueva URL del avatar:', avatarUrl);
+        
+        // Actualizar estado del usuario
         const updatedUser = {
           ...user,
-          avatar: `http://127.0.0.1:5000${data.avatar}`
+          avatar: avatarUrl
         };
         
         setUser(updatedUser);
+        
+        // ✅ IMPORTANTE: Actualizar localStorage
         localStorage.setItem('user', JSON.stringify(updatedUser));
+        
         showNotification('✅ Foto de perfil actualizada correctamente');
+        
+        // Forzar recarga de la imagen agregando timestamp
+        const img = new Image();
+        img.src = avatarUrl + '?t=' + Date.now();
+        
       } else {
         showNotification('❌ ' + (data.message || 'Error al subir la imagen'));
       }
@@ -231,7 +268,7 @@ function Perfil() {
     setShowEditModal(true);
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
     
     if (!editForm.nombre || !editForm.email) {
@@ -239,20 +276,44 @@ function Perfil() {
       return;
     }
 
-    const updatedUser = {
-      ...user,
-      nombre: editForm.nombre,
-      name: editForm.nombre,
-      email: editForm.email,
-      bio: editForm.bio,
-      telefono: editForm.telefono,
-      ubicacion: editForm.ubicacion
-    };
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('http://127.0.0.1:5000/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nombre: editForm.nombre,
+          bio: editForm.bio,
+          telefono: editForm.telefono,
+          ubicacion: editForm.ubicacion
+        })
+      });
 
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    setShowEditModal(false);
-    showNotification('✅ Perfil actualizado correctamente');
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        const updatedUser = data.user;
+        
+        // Asegurar URL completa del avatar
+        if (updatedUser.avatar && !updatedUser.avatar.startsWith('http')) {
+          updatedUser.avatar = `http://127.0.0.1:5000${updatedUser.avatar}`;
+        }
+        
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setShowEditModal(false);
+        showNotification('✅ Perfil actualizado correctamente');
+      } else {
+        showNotification('❌ ' + (data.message || 'Error al actualizar perfil'));
+      }
+    } catch (error) {
+      console.error('Error al actualizar perfil:', error);
+      showNotification('❌ Error al actualizar perfil');
+    }
   };
 
   const showNotification = (message) => {
@@ -316,7 +377,11 @@ function Perfil() {
   const userName = user.nombre || user.name || 'Usuario';
   const userEmail = user.email || 'email@ejemplo.com';
   const userBio = user.bio || 'Amante de los animales 🐾';
+  
+  // ✅ CORRECCIÓN: Siempre usar el avatar del usuario si existe
   const avatarUrl = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=200&background=random`;
+  
+  console.log('🖼️ Avatar a mostrar:', avatarUrl);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -351,9 +416,15 @@ function Perfil() {
             <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-16 sm:-mt-20">
               <div className="relative group">
                 <img 
+                  key={avatarUrl} 
                   src={avatarUrl}
                   alt="Foto de perfil" 
                   className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-lg object-cover"
+                  onError={(e) => {
+                    console.error('❌ Error al cargar imagen:', avatarUrl);
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=200&background=random`;
+                  }}
+                  crossOrigin="anonymous"
                 />
                 
                 <div 
@@ -602,9 +673,14 @@ function Perfil() {
               <div className="text-center mb-6">
                 <div className="relative inline-block group">
                   <img 
+                    key={avatarUrl}
                     src={avatarUrl}
                     alt="Foto de perfil" 
                     className="w-32 h-32 rounded-full border-4 border-purple-300 object-cover mx-auto"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=200&background=random`;
+                    }}
                   />
                   
                   <div 
@@ -644,7 +720,9 @@ function Perfil() {
                   onChange={(e) => setEditForm({...editForm, email: e.target.value})}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                   placeholder="tu@email.com"
+                  disabled
                 />
+                <p className="text-xs text-gray-500 mt-1">El email no se puede cambiar</p>
               </div>
 
               <div>
@@ -656,7 +734,31 @@ function Perfil() {
                   maxLength={200}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none"
                   placeholder="Cuéntanos sobre ti..."></textarea>
-                <p className="text-sm text-gray-500 mt-1">Máximo 200 caracteres</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {editForm.bio.length}/200 caracteres
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Teléfono</label>
+                <input 
+                  type="tel"
+                  value={editForm.telefono}
+                  onChange={(e) => setEditForm({...editForm, telefono: e.target.value})}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  placeholder="+57 300 123 4567"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Ubicación</label>
+                <input 
+                  type="text"
+                  value={editForm.ubicacion}
+                  onChange={(e) => setEditForm({...editForm, ubicacion: e.target.value})}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  placeholder="Ciudad, País"
+                />
               </div>
 
               <div className="flex gap-4 pt-4">
