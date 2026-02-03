@@ -28,22 +28,40 @@ const Notificaciones = () => {
       const filters = {};
       if (currentFilter === 'unread') {
         filters.read = 'false';
-      } else if (currentFilter !== 'all') {
-        filters.type = currentFilter;
       }
       
       const data = await notificationService.getNotifications(1, 50, filters);
       
+      console.log('📦 Datos recibidos del servicio:', data);
+      
+      // ✅ Verificar el formato de los datos
+      let notificationsArray = [];
+      let unreadTotal = 0;
+      
+      if (Array.isArray(data)) {
+        // Si data es un array directamente
+        notificationsArray = data;
+        unreadTotal = data.filter(n => !n.read).length;
+      } else if (data && data.notifications && Array.isArray(data.notifications)) {
+        // Si data tiene estructura { notifications: [], unreadCount: X }
+        notificationsArray = data.notifications;
+        unreadTotal = data.unreadCount || 0;
+      } else {
+        console.warn('⚠️ Formato de datos inesperado:', data);
+        notificationsArray = [];
+        unreadTotal = 0;
+      }
+      
       // Transformar notificaciones del backend al formato del componente
-      const formattedNotifications = data.notifications.map(notif => ({
-        id: notif._id,
-        type: notif.type,
+      const formattedNotifications = notificationsArray.map(notif => ({
+        id: notif._id || notif.id,
+        type: notif.type || 'system',
         icon: getIconForType(notif.type),
-        title: notif.title,
-        message: notif.message,
+        title: notif.title || 'Notificación',
+        message: notif.message || '',
         time: formatTimeAgo(notif.createdAt),
         timestamp: new Date(notif.createdAt).getTime(),
-        read: notif.read,
+        read: notif.read || false,
         color: getColorForType(notif.type),
         sender: notif.sender,
         relatedModel: notif.relatedModel,
@@ -51,11 +69,13 @@ const Notificaciones = () => {
       }));
       
       setNotifications(formattedNotifications);
-      setUnreadCount(data.unreadCount);
+      setUnreadCount(unreadTotal);
       
       console.log('✅ Notificaciones cargadas:', formattedNotifications.length);
     } catch (error) {
       console.error('❌ Error al cargar notificaciones:', error);
+      setNotifications([]);
+      setUnreadCount(0);
       showToast('Error al cargar notificaciones');
     } finally {
       setLoading(false);
@@ -65,11 +85,15 @@ const Notificaciones = () => {
   // Helpers para iconos y colores según tipo
   const getIconForType = (type) => {
     const icons = {
-      'adoption_request': '🔔',
-      'favorite': '❤️',
-      'message': '📩',
+      'like': '❤️',
+      'comment': '💬',
+      'mention': '🔔',
+      'adoption_request': '🏡',
       'adoption_accepted': '✅',
       'adoption_rejected': '❌',
+      'message': '📩',
+      'favorite': '⭐',
+      'new_post': '📸',
       'system': 'ℹ️'
     };
     return icons[type] || '🔔';
@@ -77,12 +101,16 @@ const Notificaciones = () => {
 
   const getColorForType = (type) => {
     const colors = {
+      'like': 'pink',
+      'comment': 'blue',
+      'mention': 'purple',
       'adoption_request': 'yellow',
-      'favorite': 'pink',
-      'message': 'blue',
       'adoption_accepted': 'green',
       'adoption_rejected': 'red',
-      'system': 'purple'
+      'message': 'blue',
+      'favorite': 'yellow',
+      'new_post': 'purple',
+      'system': 'gray'
     };
     return colors[type] || 'gray';
   };
@@ -101,28 +129,23 @@ const Notificaciones = () => {
   };
 
   const getFilteredNotifications = () => {
-    return notifications; // Ya vienen filtradas del backend
+    return notifications;
   };
 
   const getCounts = () => {
-    // Recalcular desde todas las notificaciones (sin filtro)
     return {
       all: notifications.length,
-      unread: unreadCount,
-      adoption_request: notifications.filter(n => n.type === 'adoption_request').length,
-      message: notifications.filter(n => n.type === 'message').length,
-      system: notifications.filter(n => n.type === 'system').length
+      unread: unreadCount
     };
   };
 
   const handleMarkAsRead = async (id) => {
     try {
       const notification = notifications.find(n => n.id === id);
-      if (notification.read) return; // Ya está leída
+      if (!notification || notification.read) return;
 
       await notificationService.markAsRead(id);
       
-      // Actualizar estado local
       setNotifications(notifications.map(n =>
         n.id === id ? { ...n, read: true } : n
       ));
@@ -139,6 +162,8 @@ const Notificaciones = () => {
     if (event) event.stopPropagation();
     const notification = notifications.find(n => n.id === id);
 
+    if (!notification) return;
+
     setConfirmModal({
       isOpen: true,
       message: `¿Eliminar "${notification.title}"?`,
@@ -146,7 +171,6 @@ const Notificaciones = () => {
         try {
           await notificationService.deleteNotification(id);
           
-          // Actualizar estado local
           setNotifications(notifications.filter(n => n.id !== id));
           if (!notification.read) {
             setUnreadCount(prev => Math.max(0, prev - 1));
@@ -173,7 +197,6 @@ const Notificaciones = () => {
         try {
           await notificationService.markAllAsRead();
           
-          // Actualizar estado local
           setNotifications(notifications.map(n => ({ ...n, read: true })));
           setUnreadCount(0);
           
@@ -201,7 +224,6 @@ const Notificaciones = () => {
         try {
           const count = await notificationService.clearReadNotifications();
           
-          // Recargar notificaciones
           await loadNotifications();
           
           showToast(`🗑️ ${count} notificaciones eliminadas`);
@@ -238,7 +260,8 @@ const Notificaciones = () => {
       blue: 'bg-blue-100 text-blue-600',
       yellow: 'bg-yellow-100 text-yellow-600',
       pink: 'bg-pink-100 text-pink-600',
-      red: 'bg-red-100 text-red-600'
+      red: 'bg-red-100 text-red-600',
+      gray: 'bg-gray-100 text-gray-600'
     };
     return colors[color] || 'bg-gray-100 text-gray-600';
   };
@@ -296,27 +319,29 @@ const Notificaciones = () => {
                 </div>
               </div>
 
-              {/* TABS */}
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {[
-                  { key: 'all', label: 'Todas', count: counts.all },
-                  { key: 'unread', label: 'No leídas', count: counts.unread },
-                  { key: 'adoption_request', label: 'Adopciones', count: counts.adoption_request },
-                  { key: 'message', label: 'Mensajes', count: counts.message },
-                  { key: 'system', label: 'Sistema', count: counts.system }
-                ].map(filter => (
-                  <button
-                    key={filter.key}
-                    onClick={() => setCurrentFilter(filter.key)}
-                    className={`px-4 py-2 rounded-xl font-semibold transition-all ${
-                      currentFilter === filter.key
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
-                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {filter.label} ({filter.count})
-                  </button>
-                ))}
+              {/* TABS SIMPLIFICADOS - Solo "Todas" y "No leídas" */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentFilter('all')}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                    currentFilter === 'all'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Todas ({counts.all})
+                </button>
+                
+                <button
+                  onClick={() => setCurrentFilter('unread')}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                    currentFilter === 'unread'
+                      ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  No leídas ({counts.unread})
+                </button>
               </div>
             </div>
 
@@ -328,7 +353,7 @@ const Notificaciones = () => {
                 <p className="text-gray-600">
                   {currentFilter === 'all' 
                     ? 'Cuando recibas nuevas notificaciones, aparecerán aquí'
-                    : `No hay notificaciones en "${currentFilter === 'unread' ? 'No leídas' : currentFilter}"`
+                    : 'No tienes notificaciones sin leer'
                   }
                 </p>
               </div>
@@ -344,30 +369,30 @@ const Notificaciones = () => {
                   >
                     <div className="flex items-start gap-4">
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${getColorClass(
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0 ${getColorClass(
                           notification.color
                         )}`}
                       >
                         {notification.icon}
                       </div>
 
-                      <div className="flex-grow">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="text-lg font-bold text-gray-800">
+                      <div className="flex-grow min-w-0">
+                        <div className="flex justify-between items-start mb-2 gap-2">
+                          <h3 className="text-lg font-bold text-gray-800 break-words">
                             {notification.title}
                           </h3>
 
                           <button
                             onClick={(e) => handleDelete(notification.id, e)}
-                            className="text-gray-400 hover:text-red-500 transition-colors"
+                            className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
                         </div>
 
-                        <p className="text-gray-600 mb-2">{notification.message}</p>
+                        <p className="text-gray-600 mb-2 break-words">{notification.message}</p>
 
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
                           <span>{notification.time}</span>
                           {!notification.read && (
                             <span className="bg-purple-100 text-purple-600 px-3 py-1 rounded-full font-semibold text-xs">

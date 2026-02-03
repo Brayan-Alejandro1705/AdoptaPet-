@@ -373,13 +373,13 @@ app.get('/api/avatar/:name', async (req, res) => {
 // RUTAS DE GOOGLE OAUTH
 // ============================================
 if (services.passportLoaded) {
-  app.get('/api/auth/google', 
+  app.get('/auth/google', 
     passport.authenticate('google', { 
       scope: ['profile', 'email']
     })
   );
 
-  app.get('/api/auth/google/callback', 
+  app.get('/auth/google/callback', 
     passport.authenticate('google', { 
       failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`,
       session: true
@@ -473,7 +473,7 @@ if (services.passportLoaded) {
   });
 
 } else {
-  app.get('/api/auth/google', (req, res) => {
+  app.get('/auth/google', (req, res) => {
     res.status(503).json({
       success: false,
       message: 'Google OAuth no disponible. Verifica la configuración.'

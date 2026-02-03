@@ -22,13 +22,22 @@ export const notificationService = {
         headers: getAuthHeaders()
       });
       
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error al obtener notificaciones');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return data.data;
+      const data = await response.json();
+      
+      // ✅ Manejar ambos formatos de respuesta
+      if (data.success !== undefined) {
+        if (!data.success) {
+          throw new Error(data.message || 'Error al obtener notificaciones');
+        }
+        return data.data;
+      }
+      
+      // Si no tiene formato {success, data}, devolver directamente
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('❌ Error en getNotifications:', error);
       throw error;
@@ -42,16 +51,20 @@ export const notificationService = {
         headers: getAuthHeaders()
       });
       
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error al obtener contador');
+      if (!response.ok) {
+        return 0; // Si falla, devolver 0
       }
       
-      return data.data.count;
+      const data = await response.json();
+      
+      if (data.success !== undefined) {
+        return data.success ? data.data.count : 0;
+      }
+      
+      return data.count || 0;
     } catch (error) {
       console.error('❌ Error en getUnreadCount:', error);
-      throw error;
+      return 0;
     }
   },
 
@@ -63,13 +76,12 @@ export const notificationService = {
         headers: getAuthHeaders()
       });
       
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error al marcar notificación');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return data.data.notification;
+      const data = await response.json();
+      return data.notification || data.data?.notification || data;
     } catch (error) {
       console.error('❌ Error en markAsRead:', error);
       throw error;
@@ -84,13 +96,12 @@ export const notificationService = {
         headers: getAuthHeaders()
       });
       
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error al marcar todas');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return data.data.count;
+      const data = await response.json();
+      return data.count || data.data?.count || 0;
     } catch (error) {
       console.error('❌ Error en markAllAsRead:', error);
       throw error;
@@ -105,10 +116,8 @@ export const notificationService = {
         headers: getAuthHeaders()
       });
       
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error al eliminar notificación');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       return true;
@@ -126,36 +135,14 @@ export const notificationService = {
         headers: getAuthHeaders()
       });
       
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error al limpiar notificaciones');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return data.data.count;
+      const data = await response.json();
+      return data.count || data.data?.count || 0;
     } catch (error) {
       console.error('❌ Error en clearReadNotifications:', error);
-      throw error;
-    }
-  },
-
-  // Crear notificación de prueba (solo desarrollo)
-  createTestNotification: async () => {
-    try {
-      const response = await fetch(`${API_URL}/notifications/test`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      });
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'Error al crear notificación');
-      }
-      
-      return data.data.notification;
-    } catch (error) {
-      console.error('❌ Error en createTestNotification:', error);
       throw error;
     }
   }

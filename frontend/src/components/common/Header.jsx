@@ -1,9 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
+import { notificationService } from '../../services/notificationService';
 
 export default function Header() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   
   // Estados para el buscador
@@ -15,6 +17,12 @@ export default function Header() {
 
   useEffect(() => {
     cargarUsuario();
+    cargarContadorNotificaciones();
+
+    // Actualizar contador cada 30 segundos
+    const interval = setInterval(cargarContadorNotificaciones, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Cerrar resultados al hacer clic fuera
@@ -63,6 +71,17 @@ export default function Header() {
     const debounceTimer = setTimeout(searchUsers, 300);
     return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
+
+  const cargarContadorNotificaciones = async () => {
+    try {
+      const count = await notificationService.getUnreadCount();
+      setUnreadCount(count);
+      console.log('🔔 Contador de notificaciones:', count);
+    } catch (error) {
+      console.error('❌ Error al cargar contador:', error);
+      setUnreadCount(0);
+    }
+  };
 
   const cargarUsuario = async () => {
     const token = localStorage.getItem('token');
@@ -119,6 +138,12 @@ export default function Header() {
     setSearchQuery('');
     setShowResults(false);
     navigate(`/perfil/${userId}`);
+  };
+
+  const handleNotificationClick = () => {
+    navigate('/notificaciones');
+    // Opcional: marcar como visto el contador inmediatamente
+    // setUnreadCount(0);
   };
 
   const getAvatarUrl = (user) => {
@@ -227,12 +252,19 @@ export default function Header() {
             </svg>
           </Link>
 
-          <Link to="/notificaciones" className="relative w-10 h-10 md:w-11 md:h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all">
+          <button 
+            onClick={handleNotificationClick}
+            className="relative w-10 h-10 md:w-11 md:h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className="w-5 h-5 md:w-6 md:h-6 stroke-[#f59e0b] stroke-[2.5]">
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 18.75a1.5 1.5 0 1 1-3 0M4.5 9a7.5 7.5 0 1 1 15 0c0 3.15.75 4.5 1.5 5.25H3c.75-.75 1.5-2.1 1.5-5.25Z"/>
             </svg>
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse shadow-md">3</span>
-          </Link>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 animate-pulse shadow-md">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
 
           {/* Avatar del Usuario */}
           {loading ? (
