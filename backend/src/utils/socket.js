@@ -29,6 +29,7 @@ const initializeSocket = (server) => {
     socket.on('send_message', async (data) => {
       try {
         const { chatId, senderId, text } = data;
+        console.log('📤 Recibido mensaje via Socket.io:', { chatId, senderId, text });
 
         // Guardar mensaje en la base de datos
         const newMessage = new Message({
@@ -38,12 +39,16 @@ const initializeSocket = (server) => {
         });
 
         await newMessage.save();
-        await newMessage.populate('sender', 'nombre avatar');
+        await newMessage.populate('sender', 'nombre name avatar');
 
         // Actualizar el último mensaje del chat
         await Chat.findByIdAndUpdate(chatId, {
-          lastMessage: text
+          lastMessage: text,
+          updatedAt: new Date()
         });
+
+        // Obtener nombre (puede estar como 'nombre' o 'name')
+        const senderName = newMessage.sender?.nombre || newMessage.sender?.name || 'Usuario';
 
         // Emitir el mensaje a todos en ese chat
         const messageData = {
@@ -54,12 +59,13 @@ const initializeSocket = (server) => {
             minute: '2-digit' 
           }),
           senderId: newMessage.sender._id,
-          senderName: newMessage.sender.nombre,
+          senderName: senderName,
           senderAvatar: newMessage.sender.avatar
         };
 
+        console.log('📨 Emitiendo mensaje a chat:', chatId);
         io.to(`chat_${chatId}`).emit('receive_message', messageData);
-        console.log('📨 Mensaje enviado al chat:', chatId);
+        console.log('✅ Mensaje enviado al chat:', chatId);
       } catch (error) {
         console.error('❌ Error al enviar mensaje:', error);
         socket.emit('error', { message: 'Error al enviar mensaje' });

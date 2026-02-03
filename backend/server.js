@@ -67,12 +67,7 @@ console.log('✅ CORS configurado con soporte para uploads');
 // ============================================
 // HEADERS ADICIONALES PARA ARCHIVOS
 // ============================================
-app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  next();
-});
+
 
 // ============================================
 // 2. SEGURIDAD - CONFIGURACIÓN AJUSTADA
@@ -96,12 +91,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ============================================
 // Middleware específico para servir uploads con headers CORS correctos
 app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'public, max-age=31536000');
-  res.header('Content-Type', 'image/jpeg'); // Por defecto, se ajustará según el archivo
   next();
 });
+
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {
@@ -188,7 +182,13 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use('/api/', apiLimiter);
+// Excluir /api/avatar del rate limiter
+app.use('/api/', (req, res, next) => {
+  if (req.path.startsWith('/avatar')) {
+    return next();
+  }
+  apiLimiter(req, res, next);
+});
 
 // ============================================
 // 6. SESIONES
@@ -348,20 +348,40 @@ app.get('/test/config', (req, res) => {
     }
   });
 });
+// ============================================
+// PROXY PARA AVATARS (después de línea ~320)
+// ============================================
+app.get('/api/avatar/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const axios = require('axios');
+    
+    const response = await axios.get(
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=100&background=random`,
+      { responseType: 'arraybuffer' }
+    );
+    
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(response.data);
+  } catch (error) {
+    res.status(500).send('Error al cargar avatar');
+  }
+});
 
 // ============================================
 // RUTAS DE GOOGLE OAUTH
 // ============================================
 if (services.passportLoaded) {
-  app.get('/auth/google', 
+  app.get('/api/auth/google', 
     passport.authenticate('google', { 
       scope: ['profile', 'email']
     })
   );
 
-  app.get('/auth/google/callback', 
+  app.get('/api/auth/google/callback', 
     passport.authenticate('google', { 
-      failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`,
+      failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`,
       session: true
     }),
     (req, res) => {
@@ -385,21 +405,21 @@ if (services.passportLoaded) {
         
         const userData = {
           id: req.user._id || req.user.id,
-          nombre: req.user.nombre,
+          nombre: req.user.nombre || req.user.name,
           email: req.user.email,
           avatar: req.user.avatar,
           rol: req.user.role || 'adopter'
         };
         
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const redirectUrl = `${frontendUrl}/Home?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const redirectUrl = `${frontendUrl}/home?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
         
         console.log('🔄 Redirigiendo a:', redirectUrl);
         res.redirect(redirectUrl);
         
       } catch (error) {
         console.error('❌ Error en callback de Google:', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         res.redirect(`${frontendUrl}/login?error=server_error`);
       }
     }
@@ -411,7 +431,7 @@ if (services.passportLoaded) {
         success: true,
         user: {
           id: req.user._id || req.user.id,
-          nombre: req.user.nombre,
+          nombre: req.user.nombre || req.user.name,
           email: req.user.email,
           avatar: req.user.avatar,
           rol: req.user.role || 'adopter'
@@ -425,7 +445,7 @@ if (services.passportLoaded) {
     }
   });
 
-  app.post('/auth/logout', (req, res) => {
+  app.post('/api/auth/logout', (req, res) => {
     const email = req.user?.email || 'Usuario desconocido';
     
     req.logout((err) => {
@@ -453,7 +473,7 @@ if (services.passportLoaded) {
   });
 
 } else {
-  app.get('/auth/google', (req, res) => {
+  app.get('/api/auth/google', (req, res) => {
     res.status(503).json({
       success: false,
       message: 'Google OAuth no disponible. Verifica la configuración.'
@@ -535,7 +555,14 @@ try {
 } catch (error) {
   logger.log.warning('Rutas de favoritos no disponibles');
 }
-
+try {
+  const notificationRoutes = require('../backend/src/routes/Notificationroutes');
+  app.use('/api/notifications', notificationRoutes);
+  logger.log.success('Rutas de notificaciones cargadas');
+} catch (error) {
+  logger.log.warning('Rutas de notificaciones no disponibles');
+  console.error('Error detallado:', error.message);
+}
 // ============================================
 // MANEJO DE ERRORES 404
 // ============================================

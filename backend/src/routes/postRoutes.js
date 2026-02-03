@@ -169,6 +169,7 @@ router.get('/', auth, async (req, res) => {
 
     const posts = await Post.find({ status: 'active' })
       .populate('author', 'nombre email avatar role')
+      .populate('comments.user', 'nombre email avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -229,9 +230,10 @@ router.post('/', auth, upload.single('imagen'), async (req, res) => {
         images: [],
         videos: []
       },
+      comments: [],
       stats: {
         likes: [],
-        comments: 0,
+        commentsCount: 0,
         shares: 0,
         views: 0
       },
@@ -253,8 +255,6 @@ router.post('/', auth, upload.single('imagen'), async (req, res) => {
       try {
         const parsedPetInfo = typeof petInfo === 'string' ? JSON.parse(petInfo) : petInfo;
         console.log('🐾 Info de mascota:', parsedPetInfo);
-        // Si tu modelo tiene un campo para esto, agrégalo aquí
-        // postData.petInfo = parsedPetInfo;
       } catch (e) {
         console.error('❌ Error parsing petInfo:', e);
       }
@@ -301,6 +301,7 @@ router.get('/feed', auth, async (req, res) => {
 
     const posts = await Post.find({ status: 'active' })
       .populate('author', 'nombre email avatar role')
+      .populate('comments.user', 'nombre email avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -386,6 +387,7 @@ router.get('/:postId', auth, async (req, res) => {
     
     const post = await Post.findById(req.params.postId)
       .populate('author', 'nombre email avatar role')
+      .populate('comments.user', 'nombre email avatar')
       .lean();
 
     if (!post) {
@@ -498,6 +500,186 @@ router.delete('/:postId/like', auth, async (req, res) => {
   }
 });
 
+// ===== 6. AGREGAR COMENTARIO =====
+router.post('/:postId/comments', auth, async (req, res) => {
+  try {
+    console.log('💬 Agregando comentario al post:', req.params.postId);
+    console.log('👤 Usuario:', req.userId);
+    console.log('📦 Body:', req.body);
+
+    const { content } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'El comentario no puede estar vacío'
+      });
+    }
+
+    const post = await Post.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Publicación no encontrada'
+      });
+    }
+
+    // Verificar que el post permita comentarios
+    if (post.settings?.allowComments === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Los comentarios están deshabilitados en esta publicación'
+      });
+    }
+
+    // Crear objeto de comentario
+    const newComment = {
+      user: req.userId,
+      content: content.trim(),
+      createdAt: new Date()
+    };
+
+    // Si el modelo tiene comments como array, agregar directamente
+    // Si no existe el array, crearlo
+    if (!post.comments) {
+      post.comments = [];
+    }
+
+    post.comments.push(newComment);
+
+    // Actualizar contador de comentarios en stats
+    if (post.stats) {
+      post.stats.commentsCount = post.comments.length;
+    }
+
+    await post.save();
+
+    // Poblar info del usuario del comentario nuevo
+    // El comentario nuevo es el último del array
+    const savedPost = await Post.findById(req.params.postId)
+      .populate('comments.user', 'nombre email avatar');
+
+    const savedComment = savedPost.comments[savedPost.comments.length - 1];
+
+    console.log('✅ Comentario agregado exitosamente');
+
+    res.status(201).json({
+      success: true,
+      message: 'Comentario agregado exitosamente',
+      data: {
+        comment: savedComment,
+        commentsCount: savedPost.comments.length
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error agregando comentario:', error);
+    console.error('   Mensaje:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error al agregar comentario',
+      error: error.message
+    });
+  }
+});
+
+// ===== 6b. OBTENER COMENTARIOS DE UN POST =====
+router.get('/:postId/comments', auth, async (req, res) => {
+  try {
+    console.log('💬 Obteniendo comentarios del post:', req.params.postId);
+
+    const post = await Post.findById(req.params.postId)
+      .populate('comments.user', 'nombre email avatar')
+      .lean();
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Publicación no encontrada'
+      });
+    }
+
+    console.log(`✅ Comentarios encontrados: ${post.comments?.length || 0}`);
+
+    res.json({
+      success: true,
+      data: {
+        comments: post.comments || [],
+        commentsCount: post.comments?.length || 0
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo comentarios:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener comentarios'
+    });
+  }
+});
+
+// ===== 6c. ELIMINAR COMENTARIO =====
+router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
+  try {
+    console.log('🗑️ Eliminando comentario:', req.params.commentId, 'del post:', req.params.postId);
+
+    const post = await Post.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Publicación no encontrada'
+      });
+    }
+
+    // Buscar el comentario
+    const commentIndex = post.comments.findIndex(
+      c => c._id.toString() === req.params.commentId
+    );
+
+    if (commentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Comentario no encontrado'
+      });
+    }
+
+    // Solo el autor del comentario o el autor del post puede eliminarlo
+    const isCommentAuthor = post.comments[commentIndex].user.toString() === req.userId.toString();
+    const isPostAuthor = post.author.toString() === req.userId.toString();
+
+    if (!isCommentAuthor && !isPostAuthor) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para eliminar este comentario'
+      });
+    }
+
+    post.comments.splice(commentIndex, 1);
+
+    if (post.stats) {
+      post.stats.commentsCount = post.comments.length;
+    }
+
+    await post.save();
+
+    console.log('✅ Comentario eliminado');
+
+    res.json({
+      success: true,
+      message: 'Comentario eliminado exitosamente',
+      data: {
+        commentsCount: post.comments.length
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error eliminando comentario:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar comentario'
+    });
+  }
+});
+
 // 7. ELIMINAR PUBLICACIÓN
 router.delete('/:postId', auth, async (req, res) => {
   try {
@@ -594,13 +776,16 @@ router.put('/:postId', auth, async (req, res) => {
 
 console.log('✅ Rutas de posts configuradas correctamente');
 console.log('   📝 POST   /api/posts - Crear publicación');
-console.log('   📰 GET    /api/posts - TODAS las publicaciones (NUEVO)');
+console.log('   📰 GET    /api/posts - TODAS las publicaciones');
 console.log('   📰 GET    /api/posts/feed - Feed de publicaciones');
 console.log('   👤 GET    /api/posts/user/my-posts - Mis publicaciones');
 console.log('   👥 GET    /api/posts/user/:userId - Posts de usuario');
 console.log('   📄 GET    /api/posts/:postId - Ver publicación');
 console.log('   ❤️  POST   /api/posts/:postId/like - Dar like');
 console.log('   💔 DELETE /api/posts/:postId/like - Quitar like');
+console.log('   💬 POST   /api/posts/:postId/comments - Agregar comentario');
+console.log('   💬 GET    /api/posts/:postId/comments - Ver comentarios');
+console.log('   💬 DELETE /api/posts/:postId/comments/:commentId - Borrar comentario');
 console.log('   🗑️  DELETE /api/posts/:postId - Eliminar');
 console.log('   ✏️  PUT    /api/posts/:postId - Editar');
 

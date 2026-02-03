@@ -45,7 +45,61 @@ const upload = multer({
 
 // ===== RUTAS =====
 
-// GET - Obtener perfil del usuario autenticado
+// GET - Obtener todos los usuarios
+router.get('/', protect, async (req, res) => {
+  try {
+    const users = await User.find()
+      .select('-password') // No enviar contraseñas
+      .sort({ createdAt: -1 }); // Más recientes primero
+    
+    console.log(`✅ ${users.length} usuarios encontrados`);
+    
+    res.json(users);
+  } catch (error) {
+    console.error('❌ Error al obtener usuarios:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error al obtener usuarios' 
+    });
+  }
+});
+
+// GET - Buscar usuarios por nombre
+router.get('/search', protect, async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Parámetro de búsqueda requerido' 
+      });
+    }
+
+    const users = await User.find({
+      _id: { $ne: req.user.id }, // Excluir al usuario actual
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { nombre: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } }
+      ]
+    })
+    .select('-password')
+    .limit(20);
+
+    console.log(`🔍 Búsqueda: "${q}" - ${users.length} resultados`);
+    
+    res.json(users);
+  } catch (error) {
+    console.error('❌ Error al buscar usuarios:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error al buscar usuarios' 
+    });
+  }
+});
+
+// GET - Obtener perfil del usuario autenticado (DEBE IR ANTES DE /:userId)
 router.get('/profile', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -229,6 +283,42 @@ router.delete('/avatar', protect, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Error al eliminar avatar' 
+    });
+  }
+});
+
+// GET - Obtener perfil de un usuario específico por ID (DEBE IR AL FINAL)
+router.get('/:userId', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Usuario no encontrado' 
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        nombre: user.nombre || user.name,
+        email: user.email,
+        avatar: user.avatar,
+        bio: user.bio,
+        telefono: user.telefono || user.phone,
+        ubicacion: user.ubicacion || user.location,
+        rol: user.rol || user.role,
+        verified: user.verified,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error al obtener usuario:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al obtener usuario' 
     });
   }
 });

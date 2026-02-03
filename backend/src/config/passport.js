@@ -1,13 +1,33 @@
+// =============================================
+// CONFIGURACIÓN DE PASSPORT - GOOGLE OAUTH
+// =============================================
+
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
+
+console.log('🔐 Inicializando Passport con Google OAuth...');
+console.log('   Client ID:', process.env.GOOGLE_CLIENT_ID ? '✅ Configurado' : '❌ NO configurado');
+console.log('   Client Secret:', process.env.GOOGLE_CLIENT_SECRET ? '✅ Configurado' : '❌ NO configurado');
+console.log('   Callback URL:', process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/auth/google/callback');
+
+// Verificar que las variables existen
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  console.error('❌ Google OAuth no configurado correctamente');
+  console.error('   Agrega GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el archivo .env');
+  module.exports = {
+    initialize: () => (req, res, next) => next(),
+    session: () => (req, res, next) => next()
+  };
+  return;
+}
 
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5000/auth/google/callback',
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/auth/google/callback', // ✅ CORREGIDO
       proxy: true
     },
     
@@ -32,6 +52,11 @@ passport.use(
         if (user) {
           console.log('✅ Usuario existente encontrado:', user.email);
           console.log('   ID:', user._id);
+          
+          // Actualizar lastLogin
+          user.lastLogin = new Date();
+          await user.save();
+          
           return done(null, user);
         }
 
@@ -43,22 +68,21 @@ passport.use(
                              Math.random().toString(36).slice(-12) + 
                              'Aa1!@#';
 
-        // ✅ CREAR USUARIO - phone es opcional ahora
         user = await User.create({
           name: nombre,
           email: email.toLowerCase(),
           password: randomPassword,
           avatar: picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(nombre)}&background=random`,
-          googleAvatar: picture, // Guardar avatar de Google
-          role: 'adopter', // ✅ Ahora debe funcionar
+          googleAvatar: picture,
+          role: 'adopter',
           authProvider: 'google',
           googleId: profile.id,
-          // ⚠️ NO incluir phone - es opcional
           verified: {
-            email: true, // Google ya verificó el email
+            email: true,
             phone: false,
             shelter: false
-          }
+          },
+          lastLogin: new Date()
         });
 
         console.log('✅ Usuario creado exitosamente');
@@ -66,7 +90,6 @@ passport.use(
         console.log('   Email:', user.email);
         console.log('   Nombre:', user.name);
         console.log('   Rol:', user.role);
-        console.log('   ⚠️ Teléfono: No proporcionado (opcional)');
         
         return done(null, user);
 
@@ -111,5 +134,7 @@ passport.deserializeUser(async (id, done) => {
     done(error, null);
   }
 });
+
+console.log('✅ Passport configurado correctamente');
 
 module.exports = passport;

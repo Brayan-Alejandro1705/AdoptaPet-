@@ -2,6 +2,24 @@ const mongoose = require('mongoose');
 
 console.log('📦 Iniciando creación del modelo Post...');
 
+// ===== ESQUEMA DE COMENTARIO =====
+const commentSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  content: {
+    type: String,
+    trim: true,
+    required: [true, 'El contenido del comentario es obligatorio'],
+    maxlength: [1000, 'El comentario no puede exceder 1000 caracteres']
+  }
+}, {
+  timestamps: true  // agrega createdAt y updatedAt automáticamente
+});
+
+// ===== ESQUEMA DEL POST =====
 const postSchema = new mongoose.Schema({
   // Autor de la publicación
   author: {
@@ -35,13 +53,16 @@ const postSchema = new mongoose.Schema({
     }]
   },
 
+  // ===== COMENTARIOS =====
+  comments: [commentSchema],
+
   // Estadísticas
   stats: {
     likes: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     }],
-    comments: {
+    commentsCount: {
       type: Number,
       default: 0
     },
@@ -103,10 +124,8 @@ postSchema.index({ author: 1, createdAt: -1 });
 postSchema.index({ status: 1, createdAt: -1 });
 postSchema.index({ type: 1 });
 
-// IMPORTANTE: Remover la validación pre-save que causa problemas
 // Permitir posts con solo contenido o solo imagen
 postSchema.pre('validate', function(next) {
-  // Permitir posts vacíos temporalmente para debugging
   next();
 });
 

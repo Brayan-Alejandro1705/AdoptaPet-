@@ -49,7 +49,7 @@ export default function Header() {
 
         if (response.ok) {
           const data = await response.json();
-          setSearchResults(data.data?.users || []);
+          setSearchResults(data || []);
           setShowResults(true);
         }
       } catch (error) {
@@ -73,7 +73,7 @@ export default function Header() {
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/profile', {
+      const response = await fetch('http://127.0.0.1:5000/api/users/profile', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -122,7 +122,7 @@ export default function Header() {
   };
 
   const getAvatarUrl = (user) => {
-    if (!user) return 'https://ui-avatars.com/api/?name=User&size=100&background=random';
+    if (!user) return 'http://localhost:5000/api/avatar/User';
     
     if (user.avatar?.startsWith('http')) {
       return user.avatar;
@@ -133,11 +133,11 @@ export default function Header() {
     }
     
     const name = user.name || user.nombre || 'User';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=100&background=random`;
+    return `http://localhost:5000/api/avatar/${encodeURIComponent(name)}`;
   };
 
   const userName = user?.nombre || user?.name || 'Usuario';
-  const userAvatar = user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=100&background=6366f1`;
+  const userAvatar = user?.avatar || `http://localhost:5000/api/avatar/${encodeURIComponent(userName)}`;
 
   return (
     <header className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
@@ -184,7 +184,7 @@ export default function Header() {
                         alt={result.name || result.nombre}
                         className="w-12 h-12 rounded-full object-cover border-2 border-gray-100"
                         onError={(e) => {
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name || result.nombre || 'User')}&size=100&background=random`;
+                          e.target.src = `http://localhost:5000/api/avatar/${encodeURIComponent(result.name || result.nombre || 'User')}`;
                         }}
                       />
                       <div className="flex-1 min-w-0">
@@ -246,9 +246,8 @@ export default function Header() {
                 className="w-full h-full rounded-full border-2 md:border-3 border-white object-cover"
                 onError={(e) => {
                   console.error('❌ Error al cargar avatar en Header:', userAvatar);
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&size=100&background=6366f1`;
+                  e.target.src = `http://localhost:5000/api/avatar/${encodeURIComponent(userName)}`;
                 }}
-                crossOrigin="anonymous"
               />
             </Link>
           )}
@@ -300,7 +299,7 @@ export default function Header() {
                         alt={result.name || result.nombre}
                         className="w-10 h-10 rounded-full object-cover border-2 border-gray-100"
                         onError={(e) => {
-                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name || result.nombre || 'User')}&size=100&background=random`;
+                          e.target.src = `http://localhost:5000/api/avatar/${encodeURIComponent(result.name || result.nombre || 'User')}`;
                         }}
                       />
                       <div className="flex-1 min-w-0">

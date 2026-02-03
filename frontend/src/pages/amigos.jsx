@@ -1,6 +1,6 @@
 //esta pagina es de amigos
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
 import BottomNav from '../components/layout/BottomNav';
@@ -9,122 +9,173 @@ import ProfileModal from '../components/common/ProfileModal';
 import MessageModal from '../components/common/MessageModal';
 import SearchBar from '../components/common/SearchBar';
 import { Users } from 'lucide-react';
-
-// Datos dummy de amigos
-const DUMMY_FRIENDS = [
-  {
-    id: 1,
-    name: "María García",
-    online: true,
-    lastSeen: "Ahora",
-    mutualFriends: 12,
-    location: "Bogotá, Colombia",
-    friendsSince: "Enero 2023",
-    bio: "Amante de los animales 🐶🐱 Voluntaria en refugios los fines de semana. Me encanta ayudar a encontrar hogares para perritos y gatitos.",
-    interests: ["Mascotas", "Voluntariado", "Fotografía", "Naturaleza"]
-  },
-  {
-    id: 2,
-    name: "Carlos Rodríguez",
-    online: false,
-    lastSeen: "hace 2 horas",
-    mutualFriends: 8,
-    location: "Medellín, Colombia",
-    friendsSince: "Marzo 2023",
-    bio: "Veterinario de profesión y amante de los golden retrievers. Siempre dispuesto a dar consejos sobre el cuidado de mascotas.",
-    interests: ["Veterinaria", "Perros", "Senderismo", "Café"]
-  },
-  {
-    id: 3,
-    name: "Ana Martínez",
-    online: true,
-    lastSeen: "Ahora",
-    mutualFriends: 15,
-    location: "Cali, Colombia",
-    friendsSince: "Febrero 2023",
-    bio: "Rescatista de gatos callejeros. Mi misión es darles una segunda oportunidad a todos los michis que lo necesiten 💕",
-    interests: ["Gatos", "Rescate Animal", "Yoga", "Lectura"]
-  },
-  {
-    id: 4,
-    name: "Luis Fernández",
-    online: false,
-    lastSeen: "hace 1 día",
-    mutualFriends: 5,
-    location: "Barranquilla, Colombia",
-    friendsSince: "Abril 2023",
-    bio: "Entrenador canino profesional. Me especializo en comportamiento y obediencia. ¡Tu perro también puede ser un buen chico!",
-    interests: ["Entrenamiento", "Deportes", "Música", "Viajes"]
-  },
-  {
-    id: 5,
-    name: "Laura Sánchez",
-    online: true,
-    lastSeen: "Ahora",
-    mutualFriends: 20,
-    location: "Bogotá, Colombia",
-    friendsSince: "Diciembre 2022",
-    bio: "Administradora de refugio de animales. Cada día es una nueva aventura salvando vidas peludas 🐾",
-    interests: ["Refugios", "Gestión", "Cocina", "Arte"]
-  },
-  {
-    id: 6,
-    name: "Pedro Gómez",
-    online: false,
-    lastSeen: "hace 3 horas",
-    mutualFriends: 10,
-    location: "Cartagena, Colombia",
-    friendsSince: "Mayo 2023",
-    bio: "Fotógrafo de mascotas. Capturo los mejores momentos de tu mejor amigo. También hago sesiones para adopciones.",
-    interests: ["Fotografía", "Diseño", "Playa", "Tecnología"]
-  },
-  {
-    id: 7,
-    name: "Sofía López",
-    online: true,
-    lastSeen: "Ahora",
-    mutualFriends: 18,
-    location: "Bucaramanga, Colombia",
-    friendsSince: "Junio 2023",
-    bio: "Estudiante de veterinaria y foster mom temporal. Siempre tengo espacio en mi corazón para un peludo más.",
-    interests: ["Estudiante", "Foster", "Baile", "Cine"]
-  },
-  {
-    id: 8,
-    name: "Diego Torres",
-    online: false,
-    lastSeen: "hace 5 horas",
-    mutualFriends: 7,
-    location: "Pereira, Colombia",
-    friendsSince: "Julio 2023",
-    bio: "Organizador de eventos de adopción. Si quieres ser parte del cambio, únete a nuestras jornadas mensuales.",
-    interests: ["Eventos", "Activismo", "Fitness", "Gaming"]
-  }
-];
+import { userService } from '../services/userService';
 
 export default function Amigos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [messageModalFriend, setMessageModalFriend] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Filtrar amigos por búsqueda
-  const filteredFriends = DUMMY_FRIENDS.filter(friend =>
+  // Obtener usuario actual
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // Cargar usuarios al montar el componente
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await userService.getAllUsers();
+      
+      // DEBUGGING: Ver la estructura real de los usuarios
+      console.log('📦 Usuarios RAW del API:', data);
+      if (data && data.length > 0) {
+        console.log('📦 Primer usuario completo:', data[0]);
+        console.log('📦 Estructura del primer usuario:', {
+          _id: data[0]._id,
+          id: data[0].id,
+          name: data[0].name,
+          nombre: data[0].nombre
+        });
+      }
+      
+      // Filtrar para no mostrar al usuario actual
+      const filteredUsers = data.filter(user => user.id !== currentUser.id);
+      
+      // Formatear datos para que coincidan con el componente FriendCard
+      const formattedUsers = filteredUsers.map(user => {
+        const userId = user.id || user._id;
+        
+        // Log individual por usuario para debugging
+        if (!userId) {
+          console.error('⚠️ Usuario sin ID:', user);
+        }
+        
+        return {
+          id: userId,
+          _id: userId, // También incluir _id por compatibilidad
+          name: user.name || user.nombre || 'Usuario sin nombre',
+          online: false, // Puedes implementar esto con Socket.io después
+          lastSeen: 'hace un momento',
+          mutualFriends: 0, // Implementar después si es necesario
+          location: user.location || user.ubicacion?.ciudad || 'Sin ubicación',
+          friendsSince: user.createdAt 
+            ? new Date(user.createdAt).toLocaleDateString('es-ES', { 
+                month: 'long', 
+                year: 'numeric' 
+              })
+            : 'Reciente',
+          bio: user.bio || 'Sin biografía',
+          interests: user.interests || user.intereses || [],
+          avatar: user.avatar
+        };
+      });
+      
+      console.log('✅ Usuarios formateados:', formattedUsers.length);
+      if (formattedUsers.length > 0) {
+        console.log('✅ Primer usuario formateado:', formattedUsers[0]);
+      }
+      
+      setUsers(formattedUsers);
+    } catch (error) {
+      console.error('❌ Error al cargar usuarios:', error);
+      alert('Error al cargar usuarios. Verifica tu conexión.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filtrar usuarios por búsqueda
+  const filteredFriends = users.filter(friend =>
     friend.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Handlers
   const handleViewProfile = (friend) => {
+    console.log('👁️ Abriendo perfil de:', friend);
     setSelectedFriend(friend);
   };
 
   const handleOpenMessage = (friend) => {
+    console.log('💬 Abriendo modal de mensaje para:', friend);
+    console.log('💬 Friend.id:', friend.id);
+    console.log('💬 Friend._id:', friend._id);
     setMessageModalFriend(friend);
   };
 
-  const handleSendMessage = (friend, message) => {
-    console.log(`Mensaje para ${friend.name}: ${message}`);
-    // Aquí irá la lógica para enviar el mensaje
-    alert(`Mensaje enviado a ${friend.name}: "${message}"`);
+  const handleSendMessage = async (friend, message) => {
+    try {
+      console.log(`📨 Enviando mensaje a ${friend.name}: ${message}`);
+      
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        alert('Debes iniciar sesión para enviar mensajes');
+        return;
+      }
+      
+      // 1. Crear o obtener el chat
+      console.log('🔄 Creando/obteniendo chat...');
+      const chatResponse = await fetch('http://127.0.0.1:5000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          participantId: friend.id
+        })
+      });
+      
+      const chatData = await chatResponse.json();
+      
+      if (!chatData.success) {
+        throw new Error(chatData.message || 'Error al crear chat');
+      }
+      
+      const chatId = chatData.data.chat._id;
+      console.log('✅ Chat creado/obtenido:', chatId);
+      
+      // 2. Enviar el mensaje
+      console.log('📤 Enviando mensaje...');
+      const messageResponse = await fetch(`http://127.0.0.1:5000/api/chat/${chatId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          content: message
+        })
+      });
+      
+      const messageData = await messageResponse.json();
+      
+      if (!messageData.success) {
+        throw new Error(messageData.message || 'Error al enviar mensaje');
+      }
+      
+      console.log('✅ Mensaje enviado correctamente');
+      
+      // 3. Cerrar modal
+      setMessageModalFriend(null);
+      
+      // 4. Mostrar confirmación
+      alert(`✅ Mensaje enviado a ${friend.name}!\n\nVe a la sección "Chat" para continuar la conversación.`);
+      
+      // Opcional: Redirigir automáticamente al chat después de 1 segundo
+      // setTimeout(() => {
+      //   window.location.href = '/chat';
+      // }, 1000);
+      
+    } catch (error) {
+      console.error('❌ Error al enviar mensaje:', error);
+      alert(`Error al enviar mensaje: ${error.message}\n\nVerifica tu conexión e intenta de nuevo.`);
+    }
   };
 
   const handleRemoveFriend = (friend) => {
@@ -135,6 +186,17 @@ export default function Amigos() {
       setSelectedFriend(null);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando usuarios...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 md:pb-8">
@@ -158,11 +220,11 @@ export default function Amigos() {
                   <Users className="w-6 h-6 text-white" />
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
-                  Mis Amigos
+                  Buscar Personas
                 </h1>
               </div>
               <p className="text-gray-600 ml-16">
-                {filteredFriends.length} amigo{filteredFriends.length !== 1 ? 's' : ''} en tu lista
+                {filteredFriends.length} persona{filteredFriends.length !== 1 ? 's' : ''} encontrada{filteredFriends.length !== 1 ? 's' : ''}
               </p>
             </div>
 
@@ -171,15 +233,16 @@ export default function Amigos() {
               <SearchBar 
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
+                placeholder="Buscar personas..."
               />
             </div>
 
-            {/* Grid de amigos */}
+            {/* Grid de usuarios */}
             {filteredFriends.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredFriends.map(friend => (
                   <FriendCard 
-                    key={friend.id}
+                    key={friend.id || friend._id}
                     friend={friend}
                     onViewProfile={handleViewProfile}
                     onSendMessage={handleOpenMessage}
@@ -192,17 +255,22 @@ export default function Amigos() {
                 <div className="bg-white rounded-3xl p-12 max-w-md mx-auto shadow-md">
                   <div className="text-6xl mb-4">🔍</div>
                   <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                    No hay amigos
+                    No hay personas
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    No encontramos amigos con ese nombre
+                    {searchTerm 
+                      ? 'No encontramos personas con ese nombre'
+                      : 'No hay usuarios registrados aún'
+                    }
                   </p>
-                  <button 
-                    onClick={() => setSearchTerm('')}
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
-                  >
-                    Limpiar Búsqueda
-                  </button>
+                  {searchTerm && (
+                    <button 
+                      onClick={() => setSearchTerm('')}
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+                    >
+                      Limpiar Búsqueda
+                    </button>
+                  )}
                 </div>
               </div>
             )}

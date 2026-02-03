@@ -3,154 +3,214 @@ import Header from '../components/common/Header.jsx';
 import Sidebar from '../components/common/Sidebar';
 import BottomNav from '../components/layout/BottomNav';
 import { Check, Trash2 } from 'lucide-react';
+import { notificationService } from '../services/notificationService.js';
 
 const Notificaciones = () => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'adoption',
-      icon: '🔔',
-      title: 'Nueva solicitud de adopción',
-      message: 'María García está interesada en adoptar a Luna.',
-      time: 'Hace 5 minutos',
-      timestamp: null,
-      offset: 5 * 60 * 1000,
-      read: false,
-      color: 'yellow',
-    },
-    {
-      id: 2,
-      type: 'adoption',
-      icon: '🔔',
-      title: 'Nueva solicitud de adopción',
-      message: 'Carlos Herrera quiere adoptar a Coco.',
-      time: 'Hace 2 horas',
-      timestamp: null,
-      offset: 2 * 60 * 60 * 1000,
-      read: false,
-      color: 'green',
-    },
-    {
-      id: 3,
-      type: 'adoption',
-      icon: '🔔',
-      title: 'Nueva solicitud de adopción',
-      message: 'Ana López ha mostrado interés en Toby.',
-      time: 'Hace 10 minutos',
-      timestamp: null,
-      offset: 10 * 60 * 1000,
-      read: false,
-      color: 'blue',
-    },
-    {
-      id: 5,
-      type: 'adoption',
-      icon: '❤️',
-      title: 'Nuevo favorito',
-      message: 'Pedro Ramírez agregó a Max a sus favoritos',
-      time: 'Hace 5 horas',
-      timestamp: null,
-      offset: 5 * 60 * 60 * 1000,
-      read: true,
-      color: 'pink',
-    },
-    {
-      id: 6,
-      type: 'message',
-      icon: '📩',
-      title: 'Consulta sobre mascota',
-      message: 'Tienes una nueva consulta pendiente de respuesta',
-      time: 'Hace 1 día',
-      timestamp: null,
-      offset: 24 * 60 * 60 * 1000,
-      read: true,
-      color: 'blue',
-    }
-  ]);
-
-  useEffect(() => {
-    const now = Date.now();
-    setNotifications(prev => {
-      const list = Array.isArray(prev) ? prev : [];
-      return list.map(n => ({
-        ...n,
-        timestamp: n.offset ? now - n.offset : now
-      }));
-    });
-  }, []);
-
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentFilter, setCurrentFilter] = useState('all');
+  const [unreadCount, setUnreadCount] = useState(0);
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     message: '',
     onConfirm: null
   });
 
-  const getFilteredNotifications = () => {
-    if (currentFilter === 'unread') {
-      return notifications.filter(n => !n.read);
-    } else if (currentFilter !== 'all') {
-      return notifications.filter(n => n.type === currentFilter);
+  // Cargar notificaciones al montar el componente
+  useEffect(() => {
+    loadNotifications();
+  }, [currentFilter]);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      
+      const filters = {};
+      if (currentFilter === 'unread') {
+        filters.read = 'false';
+      } else if (currentFilter !== 'all') {
+        filters.type = currentFilter;
+      }
+      
+      const data = await notificationService.getNotifications(1, 50, filters);
+      
+      // Transformar notificaciones del backend al formato del componente
+      const formattedNotifications = data.notifications.map(notif => ({
+        id: notif._id,
+        type: notif.type,
+        icon: getIconForType(notif.type),
+        title: notif.title,
+        message: notif.message,
+        time: formatTimeAgo(notif.createdAt),
+        timestamp: new Date(notif.createdAt).getTime(),
+        read: notif.read,
+        color: getColorForType(notif.type),
+        sender: notif.sender,
+        relatedModel: notif.relatedModel,
+        relatedId: notif.relatedId
+      }));
+      
+      setNotifications(formattedNotifications);
+      setUnreadCount(data.unreadCount);
+      
+      console.log('✅ Notificaciones cargadas:', formattedNotifications.length);
+    } catch (error) {
+      console.error('❌ Error al cargar notificaciones:', error);
+      showToast('Error al cargar notificaciones');
+    } finally {
+      setLoading(false);
     }
-    return notifications;
   };
 
-  const getCounts = () => ({
-    all: notifications.length,
-    unread: notifications.filter(n => !n.read).length,
-    adoption: notifications.filter(n => n.type === 'adoption').length,
-    message: notifications.filter(n => n.type === 'message').length,
-    system: notifications.filter(n => n.type === 'system').length
-  });
-
-  const handleMarkAsRead = (id) => {
-    const updated = notifications.map(n =>
-      n.id === id ? { ...n, read: true } : n
-    );
-    setNotifications(updated);
-    showToast('✓ Notificación marcada como leída');
+  // Helpers para iconos y colores según tipo
+  const getIconForType = (type) => {
+    const icons = {
+      'adoption_request': '🔔',
+      'favorite': '❤️',
+      'message': '📩',
+      'adoption_accepted': '✅',
+      'adoption_rejected': '❌',
+      'system': 'ℹ️'
+    };
+    return icons[type] || '🔔';
   };
 
-  const handleDelete = (id, event) => {
+  const getColorForType = (type) => {
+    const colors = {
+      'adoption_request': 'yellow',
+      'favorite': 'pink',
+      'message': 'blue',
+      'adoption_accepted': 'green',
+      'adoption_rejected': 'red',
+      'system': 'purple'
+    };
+    return colors[type] || 'gray';
+  };
+
+  // Formatear tiempo relativo
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    if (seconds < 60) return 'Hace un momento';
+    if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} minutos`;
+    if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)} horas`;
+    if (seconds < 2592000) return `Hace ${Math.floor(seconds / 86400)} días`;
+    return `Hace ${Math.floor(seconds / 2592000)} meses`;
+  };
+
+  const getFilteredNotifications = () => {
+    return notifications; // Ya vienen filtradas del backend
+  };
+
+  const getCounts = () => {
+    // Recalcular desde todas las notificaciones (sin filtro)
+    return {
+      all: notifications.length,
+      unread: unreadCount,
+      adoption_request: notifications.filter(n => n.type === 'adoption_request').length,
+      message: notifications.filter(n => n.type === 'message').length,
+      system: notifications.filter(n => n.type === 'system').length
+    };
+  };
+
+  const handleMarkAsRead = async (id) => {
+    try {
+      const notification = notifications.find(n => n.id === id);
+      if (notification.read) return; // Ya está leída
+
+      await notificationService.markAsRead(id);
+      
+      // Actualizar estado local
+      setNotifications(notifications.map(n =>
+        n.id === id ? { ...n, read: true } : n
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      showToast('✓ Notificación marcada como leída');
+    } catch (error) {
+      console.error('❌ Error al marcar como leída:', error);
+      showToast('Error al marcar notificación');
+    }
+  };
+
+  const handleDelete = async (id, event) => {
     if (event) event.stopPropagation();
     const notification = notifications.find(n => n.id === id);
 
     setConfirmModal({
       isOpen: true,
       message: `¿Eliminar "${notification.title}"?`,
-      onConfirm: () => {
-        setNotifications(notifications.filter(n => n.id !== id));
-        showToast('🗑️ Notificación eliminada');
-        setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+      onConfirm: async () => {
+        try {
+          await notificationService.deleteNotification(id);
+          
+          // Actualizar estado local
+          setNotifications(notifications.filter(n => n.id !== id));
+          if (!notification.read) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+          
+          showToast('🗑️ Notificación eliminada');
+          setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        } catch (error) {
+          console.error('❌ Error al eliminar:', error);
+          showToast('Error al eliminar notificación');
+          setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        }
       }
     });
   };
 
   const handleMarkAllRead = () => {
-    const unreadCount = notifications.filter(n => !n.read).length;
     if (unreadCount === 0) return showToast('ℹ️ No hay notificaciones sin leer');
 
     setConfirmModal({
       isOpen: true,
       message: `¿Marcar ${unreadCount} como leídas?`,
-      onConfirm: () => {
-        setNotifications(notifications.map(n => ({ ...n, read: true })));
-        showToast('✓ Todas marcadas como leídas');
-        setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+      onConfirm: async () => {
+        try {
+          await notificationService.markAllAsRead();
+          
+          // Actualizar estado local
+          setNotifications(notifications.map(n => ({ ...n, read: true })));
+          setUnreadCount(0);
+          
+          showToast('✓ Todas marcadas como leídas');
+          setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        } catch (error) {
+          console.error('❌ Error al marcar todas:', error);
+          showToast('Error al marcar notificaciones');
+          setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        }
       }
     });
   };
 
   const handleClearAll = () => {
-    if (notifications.length === 0) return showToast('ℹ️ No hay notificaciones');
+    const readNotifications = notifications.filter(n => n.read);
+    if (readNotifications.length === 0) {
+      return showToast('ℹ️ No hay notificaciones leídas para eliminar');
+    }
 
     setConfirmModal({
       isOpen: true,
-      message: `¿Eliminar las ${notifications.length} notificaciones?`,
-      onConfirm: () => {
-        setNotifications([]);
-        showToast('🗑️ Todas eliminadas');
-        setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+      message: `¿Eliminar ${readNotifications.length} notificaciones leídas?`,
+      onConfirm: async () => {
+        try {
+          const count = await notificationService.clearReadNotifications();
+          
+          // Recargar notificaciones
+          await loadNotifications();
+          
+          showToast(`🗑️ ${count} notificaciones eliminadas`);
+          setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        } catch (error) {
+          console.error('❌ Error al limpiar:', error);
+          showToast('Error al limpiar notificaciones');
+          setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+        }
       }
     });
   };
@@ -165,7 +225,7 @@ const Notificaciones = () => {
     setTimeout(() => {
       toast.classList.add('animate-slide-out');
       setTimeout(() => toast.remove(), 300);
-    }, 5000);
+    }, 3000);
   };
 
   const filteredNotifications = getFilteredNotifications();
@@ -177,10 +237,22 @@ const Notificaciones = () => {
       green: 'bg-green-100 text-green-600',
       blue: 'bg-blue-100 text-blue-600',
       yellow: 'bg-yellow-100 text-yellow-600',
-      pink: 'bg-pink-100 text-pink-600'
+      pink: 'bg-pink-100 text-pink-600',
+      red: 'bg-red-100 text-red-600'
     };
     return colors[color] || 'bg-gray-100 text-gray-600';
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando notificaciones...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pb-20 md:pb-8">
@@ -219,7 +291,7 @@ const Notificaciones = () => {
                     className="bg-red-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-red-600 hover:shadow-lg transition-all duration-300 flex items-center gap-2"
                   >
                     <Trash2 className="w-5 h-5" />
-                    Limpiar
+                    Limpiar leídas
                   </button>
                 </div>
               </div>
@@ -229,7 +301,7 @@ const Notificaciones = () => {
                 {[
                   { key: 'all', label: 'Todas', count: counts.all },
                   { key: 'unread', label: 'No leídas', count: counts.unread },
-                  { key: 'adoption', label: 'Adopciones', count: counts.adoption },
+                  { key: 'adoption_request', label: 'Adopciones', count: counts.adoption_request },
                   { key: 'message', label: 'Mensajes', count: counts.message },
                   { key: 'system', label: 'Sistema', count: counts.system }
                 ].map(filter => (
@@ -254,7 +326,10 @@ const Notificaciones = () => {
                 <div className="text-6xl mb-4">📭</div>
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">No hay notificaciones</h3>
                 <p className="text-gray-600">
-                  Cuando recibas nuevas notificaciones, aparecerán aquí
+                  {currentFilter === 'all' 
+                    ? 'Cuando recibas nuevas notificaciones, aparecerán aquí'
+                    : `No hay notificaciones en "${currentFilter === 'unread' ? 'No leídas' : currentFilter}"`
+                  }
                 </p>
               </div>
             ) : (

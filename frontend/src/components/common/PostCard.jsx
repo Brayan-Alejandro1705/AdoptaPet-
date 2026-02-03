@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, MessageCircle, Share2, MoreVertical, Trash2, Edit2 } from 'lucide-react';
 
+// ===== AVATAR FALLBACK LOCAL (sin peticiones externas) =====
+const generateAvatarSVG = (name = 'U') => {
+    const initials = name.trim().split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+    // Colores basados en el nombre para que sea consistente
+    const colors = ['#4F46E5','#7C3AED','#EC4899','#F59E0B','#10B981','#3B82F6','#EF4444','#8B5CF6'];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    const bg = colors[Math.abs(hash) % colors.length];
+
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'>
+        <circle cx='50' cy='50' r='50' fill='${bg}'/>
+        <text x='50' y='62' text-anchor='middle' font-size='38' font-family='Arial,sans-serif' font-weight='bold' fill='#FFFFFF'>${initials}</text>
+    </svg>`;
+
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+};
+
 const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) => {
     // ===== VALIDACIÓN =====
     if (!post) {
@@ -23,53 +40,46 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
 
     // ===== FUNCIÓN HELPER PARA AVATARS =====
     const getAvatarUrl = (user) => {
-        if (!user) return 'https://ui-avatars.com/api/?name=User&size=100&background=random';
-        
-        // Si ya tiene http, usar tal cual
+        if (!user) return generateAvatarSVG('U');
+
         if (user.avatar?.startsWith('http')) {
             return user.avatar;
         }
-        
-        // Si tiene avatar pero sin http, agregar dominio
+
         if (user.avatar) {
             return `http://127.0.0.1:5000${user.avatar}`;
         }
-        
-        // Fallback a avatar generado
+
+        // Fallback local, sin petición externa
         const name = user.name || user.nombre || 'User';
-        return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=100&background=random`;
+        return generateAvatarSVG(name);
     };
 
     // ===== FUNCIÓN HELPER PARA IMÁGENES =====
     const getImageUrl = (imagePath) => {
         if (!imagePath) return null;
-        
-        // Si ya tiene http, usar tal cual
+
         if (imagePath.startsWith('http')) {
             return imagePath;
         }
-        
-        // Si comienza con /, agregar dominio del backend
+
         if (imagePath.startsWith('/')) {
             return `http://localhost:5000${imagePath}`;
         }
-        
-        // Si no tiene /, agregarlo
+
         return `http://localhost:5000/${imagePath}`;
     };
 
     // ===== OBTENER IMÁGENES DEL POST =====
     const getPostImages = () => {
-        // Primero intentar post.media.images (tu estructura actual)
         if (post.media?.images && Array.isArray(post.media.images) && post.media.images.length > 0) {
             return post.media.images;
         }
-        
-        // Fallback a post.images por si acaso
+
         if (post.images && Array.isArray(post.images) && post.images.length > 0) {
             return post.images;
         }
-        
+
         return [];
     };
 
@@ -77,13 +87,11 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
 
     // ===== INICIALIZAR DATOS =====
     useEffect(() => {
-        // Inicializar contadores
         if (post.stats) {
             setLikesCount(post.stats.likesCount || post.stats.likes?.length || 0);
             setCommentsCount(post.stats.commentsCount || 0);
         }
 
-        // Verificar si ya dio like
         if (Array.isArray(post.stats?.likes) && post.stats.likes.length > 0) {
             const currentUserId = currentUser._id || currentUser.id || currentUser;
             const liked = post.stats.likes.some(like => {
@@ -92,13 +100,12 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 return String(likeUserId) === String(currentUserId);
             });
             setIsLiked(liked);
-            
+
             if (!post.stats?.likesCount) {
                 setLikesCount(post.stats.likes.length);
             }
         }
 
-        // Inicializar comentarios
         if (Array.isArray(post.comments)) {
             if (!post.stats?.commentsCount) {
                 setCommentsCount(post.comments.length);
@@ -243,10 +250,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                         alt={post.author?.name || post.author?.nombre || 'Usuario'}
                         className="w-10 h-10 rounded-full object-cover border-2 border-gray-100"
                         onError={(e) => {
-                            console.error('Error cargando avatar del autor:', post.author);
-                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.name || post.author?.nombre || 'User')}&size=100&background=random`;
+                            e.target.onError = null;
+                            const name = post.author?.name || post.author?.nombre || 'U';
+                            e.target.src = generateAvatarSVG(name);
                         }}
-                        crossOrigin="anonymous"
                     />
                     <div>
                         <div className="flex items-center gap-2">
@@ -278,8 +285,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
 
                         {showMenu && (
                             <>
-                                <div 
-                                    className="fixed inset-0 z-10" 
+                                <div
+                                    className="fixed inset-0 z-10"
                                     onClick={() => setShowMenu(false)}
                                 />
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-20 border">
@@ -317,7 +324,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 <p className="text-gray-800 whitespace-pre-wrap break-words">
                     {post.content || 'Sin contenido'}
                 </p>
-                
+
                 {/* Tags */}
                 {Array.isArray(post.tags) && post.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
@@ -333,7 +340,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 )}
             </div>
 
-            {/* ✅ IMÁGENES - CORREGIDO */}
+            {/* IMÁGENES */}
             {postImages.length > 0 && (
                 <div className={`grid gap-1 ${
                     postImages.length === 1 ? 'grid-cols-1' :
@@ -343,8 +350,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 }`}>
                     {postImages.slice(0, 4).map((image, index) => {
                         const imageUrl = getImageUrl(image.url || image);
-                        console.log('🖼️ Mostrando imagen:', imageUrl);
-                        
+
                         return (
                             <div key={index} className="relative overflow-hidden bg-gray-100">
                                 <img
@@ -352,12 +358,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                     alt={`Imagen ${index + 1}`}
                                     className="w-full h-64 object-cover"
                                     onError={(e) => {
-                                        console.error('❌ Error cargando imagen:', imageUrl);
                                         e.target.style.display = 'none';
                                         e.target.parentElement.innerHTML = '<div class="w-full h-64 flex items-center justify-center bg-gray-200 text-gray-500"><span>Error cargando imagen</span></div>';
-                                    }}
-                                    onLoad={() => {
-                                        console.log('✅ Imagen cargada correctamente:', imageUrl);
                                     }}
                                 />
                                 {index === 3 && postImages.length > 4 && (
@@ -414,7 +416,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                             src={getAvatarUrl(currentUser)}
                             alt="Tu avatar"
                             className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                            crossOrigin="anonymous"
+                            onError={(e) => {
+                                e.target.onError = null;
+                                e.target.src = generateAvatarSVG(currentUser?.name || currentUser?.nombre || 'U');
+                            }}
                         />
                         <div className="flex-1 flex gap-2">
                             <input
@@ -443,7 +448,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                         src={getAvatarUrl(comment.user)}
                                         alt={comment.user?.name || comment.user?.nombre || 'Usuario'}
                                         className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                                        crossOrigin="anonymous"
+                                        onError={(e) => {
+                                            e.target.onError = null;
+                                            e.target.src = generateAvatarSVG(comment.user?.name || comment.user?.nombre || 'U');
+                                        }}
                                     />
                                     <div className="flex-1 bg-white rounded-lg px-3 py-2 shadow-sm">
                                         <h4 className="font-semibold text-sm text-gray-900">
