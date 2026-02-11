@@ -82,7 +82,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: {
-            values: ['admin', 'adoptante', 'refugio', 'usuario', 'adopter', 'shelter'],
+            values: ['admin', 'adoptante', 'refugio', 'usuario', 'adopter', 'shelter', 'superadmin'],
             message: '{VALUE} no es un rol válido'
         },
         default: 'adopter',

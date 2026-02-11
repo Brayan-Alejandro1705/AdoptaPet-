@@ -873,5 +873,151 @@ console.log('   💬 GET    /api/posts/:postId/comments - Ver comentarios');
 console.log('   💬 DELETE /api/posts/:postId/comments/:commentId - Borrar comentario');
 console.log('   🗑️  DELETE /api/posts/:postId - Eliminar');
 console.log('   ✏️  PUT    /api/posts/:postId - Editar');
+// ============================================
+// IMPORTAR MIDDLEWARE DE MODERACIÓN
+// ============================================
+const { isAdmin, isSuperAdmin } = require('../middleware/moderationAuth');
+
+// ============================================
+// RUTAS DE MODERACIÓN (SOLO ADMIN/SUPERADMIN)
+// ============================================
+
+// 1. OBTENER TODAS LAS PUBLICACIONES (INCLUYENDO ELIMINADAS) - SOLO ADMIN
+router.get('/admin/all', auth, isAdmin, async (req, res) => {
+  try {
+    console.log('📋 ===== OBTENIENDO TODAS LAS PUBLICACIONES (ADMIN) =====');
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    const filter = req.query.filter || 'all';
+
+    let query = {};
+    if (filter === 'active') query.status = 'active';
+    else if (filter === 'deleted') query.status = 'deleted';
+    else if (filter === 'moderated') query.moderatedBy = { $exists: true, $ne: null };
+
+    const posts = await Post.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('author', 'name nombre email avatar role verified')
+      .populate('moderatedBy', 'name nombre email role')
+      .lean();
+
+    const totalPosts = await Post.countDocuments(query);
+    const activeCount = await Post.countDocuments({ status: 'active' });
+    const deletedCount = await Post.countDocuments({ status: 'deleted' });
+    const moderatedCount = await Post.countDocuments({ 
+      moderatedBy: { $exists: true, $ne: null } 
+    });
+
+    res.json({
+      success: true,
+      data: {
+        posts,
+        stats: {
+          total: totalPosts,
+          active: activeCount,
+          deleted: deletedCount,
+          moderated: moderatedCount
+        },
+        pagination: {
+          page,
+          limit,
+          total: totalPosts,
+          pages: Math.ceil(totalPosts / limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo publicaciones (admin):', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener publicaciones'
+    });
+  }
+});
+
+// 2. MODERAR PUBLICACIÓN - SOLO ADMIN
+router.post('/admin/:postId/moderate', auth, isAdmin, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const post = await Post.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Publicación no encontrada'
+      });
+    }
+
+    post.status = 'deleted';
+    post.moderatedBy = req.userId;
+    post.moderatedAt = new Date();
+    post.moderationReason = reason || 'Eliminado por moderación';
+    await post.save();
+
+    res.json({
+      success: true,
+      message: 'Publicación moderada exitosamente'
+    });
+  } catch (error) {
+    console.error('❌ Error moderando:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al moderar publicación'
+    });
+  }
+});
+
+// 3. RESTAURAR PUBLICACIÓN - SOLO ADMIN
+router.post('/admin/:postId/restore', auth, isAdmin, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Publicación no encontrada'
+      });
+    }
+
+    post.status = 'active';
+    post.restoredBy = req.userId;
+    post.restoredAt = new Date();
+    await post.save();
+
+    res.json({
+      success: true,
+      message: 'Publicación restaurada exitosamente'
+    });
+  } catch (error) {
+    console.error('❌ Error restaurando:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al restaurar publicación'
+    });
+  }
+});
+
+// 4. ELIMINAR PERMANENTEMENTE - SOLO SUPERADMIN
+router.delete('/admin/:postId/permanent', auth, isSuperAdmin, async (req, res) => {
+  try {
+    await Post.findByIdAndDelete(req.params.postId);
+    res.json({
+      success: true,
+      message: 'Publicación eliminada permanentemente'
+    });
+  } catch (error) {
+    console.error('❌ Error eliminando permanentemente:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar publicación'
+    });
+  }
+});
+
+console.log('✅ Rutas de moderación configuradas');
 
 module.exports = router;

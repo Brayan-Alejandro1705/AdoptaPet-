@@ -10,9 +10,9 @@ import Publicar from './pages/publicar';
 import Chat from './pages/Chat';
 import Ajustes from './pages/Ajustes';
 import Amigos from './pages/amigos';
-
-// ✅ NUEVO: importa la página de crear adopción
+import Adminpanel from './pages/AdminPanel';
 import CrearAdopcion from './pages/CrearAdopcion';
+import AIAssistant from './pages/AIAssistant'; // ✅ NUEVO
 
 function App() {
   return (
@@ -21,19 +21,19 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/" element={<Home />} />
-        {/* ✅ Ruta para callback de Google OAuth */}
         <Route path="/Home" element={<Home />} />
         <Route path="/adoptar" element={<Adoptar />} />
-
-        {/* ✅ NUEVA RUTA */}
         <Route path="/adoptar/crear" element={<CrearAdopcion />} />
-
         <Route path="/perfil" element={<Perfil />} />
         <Route path="/notificaciones" element={<Notificaciones />} />
         <Route path="/publicar" element={<Publicar />} />
         <Route path="/mensajes" element={<Chat />} />
         <Route path="/ajustes" element={<Ajustes />} />
         <Route path="/amigos" element={<Amigos />} />
+        <Route path="/admin" element={<Adminpanel />} />
+        
+        {/* ✅ NUEVA RUTA - ASISTENTE IA */}
+        <Route path="/ai-assistant" element={<AIAssistant />} />
       </Routes>
     </BrowserRouter>
   );

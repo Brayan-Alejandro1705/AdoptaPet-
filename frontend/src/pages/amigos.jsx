@@ -7,12 +7,10 @@ import BottomNav from '../components/layout/BottomNav';
 import FriendCard from '../components/common/FriendCard';
 import ProfileModal from '../components/common/ProfileModal';
 import MessageModal from '../components/common/MessageModal';
-import SearchBar from '../components/common/SearchBar';
 import { Users } from 'lucide-react';
 import { userService } from '../services/userService';
 
 export default function Amigos() {
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [messageModalFriend, setMessageModalFriend] = useState(null);
   const [users, setUsers] = useState([]);
@@ -88,11 +86,6 @@ export default function Amigos() {
       setLoading(false);
     }
   };
-
-  // Filtrar usuarios por búsqueda
-  const filteredFriends = users.filter(friend =>
-    friend.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Handlers
   const handleViewProfile = (friend) => {
@@ -224,23 +217,14 @@ export default function Amigos() {
                 </h1>
               </div>
               <p className="text-gray-600 ml-16">
-                {filteredFriends.length} persona{filteredFriends.length !== 1 ? 's' : ''} encontrada{filteredFriends.length !== 1 ? 's' : ''}
+                {users.length} persona{users.length !== 1 ? 's' : ''} encontrada{users.length !== 1 ? 's' : ''}
               </p>
             </div>
 
-            {/* Barra de búsqueda */}
-            <div className="mb-6">
-              <SearchBar 
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                placeholder="Buscar personas..."
-              />
-            </div>
-
             {/* Grid de usuarios */}
-            {filteredFriends.length > 0 ? (
+            {users.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredFriends.map(friend => (
+                {users.map(friend => (
                   <FriendCard 
                     key={friend.id || friend._id}
                     friend={friend}
@@ -258,19 +242,8 @@ export default function Amigos() {
                     No hay personas
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    {searchTerm 
-                      ? 'No encontramos personas con ese nombre'
-                      : 'No hay usuarios registrados aún'
-                    }
+                    No hay usuarios registrados aún
                   </p>
-                  {searchTerm && (
-                    <button 
-                      onClick={() => setSearchTerm('')}
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
-                    >
-                      Limpiar Búsqueda
-                    </button>
-                  )}
                 </div>
               </div>
             )}

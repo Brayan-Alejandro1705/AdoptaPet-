@@ -99,6 +99,52 @@ const postSchema = new mongoose.Schema({
     enum: ['active', 'archived', 'deleted', 'reported'],
     default: 'active'
   },
+  // ⭐⭐⭐ AGREGAR ESTOS CAMPOS ⭐⭐⭐
+
+  // Información de moderación
+  moderatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
+  moderatedAt: {
+    type: Date,
+    default: null
+  },
+
+  moderationReason: {
+    type: String,
+    trim: true,
+    maxlength: [500, 'La razón de moderación no puede exceder 500 caracteres'],
+    default: ''
+  },
+
+  // Información de restauración
+  restoredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
+  restoredAt: {
+    type: Date,
+    default: null
+  },
+
+  // Información de eliminación (usuario normal)
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+
+  // ⭐⭐⭐ FIN DE LOS CAMPOS A AGREGAR ⭐⭐⭐
 
   // Información de adopción (si aplica)
   adoptionInfo: {

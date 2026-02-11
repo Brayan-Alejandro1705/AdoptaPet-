@@ -10,24 +10,17 @@ const path = require('path');
 const fs = require('fs');
 const favoritesRoutes = require("./src/routes/favoritos");
 
-// ============================================
-// INICIALIZACIÓN
-// ============================================
 console.log('🚀 Iniciando Adoptapet Backend v2.0...');
 
 const app = express();
 const server = http.createServer(app);
 
-// Estado de servicios
 const services = {
   mongoConnected: false,
   passportLoaded: false,
   socketLoaded: false
 };
 
-// ============================================
-// CREAR DIRECTORIO DE UPLOADS
-// ============================================
 const uploadsDir = path.join(__dirname, 'uploads/avatars');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -36,9 +29,6 @@ if (!fs.existsSync(uploadsDir)) {
   console.log('✅ Directorio uploads/avatars existe');
 }
 
-// ============================================
-// 1. CORS - CONFIGURACIÓN MEJORADA
-// ============================================
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
@@ -48,11 +38,10 @@ const corsOptions = {
       'http://127.0.0.1:5173'
     ];
     
-    // Permitir requests sin origin (como Postman, mobile apps, etc.)
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(null, true); // Permitir todos en desarrollo
+      callback(null, true);
     }
   },
   credentials: true,
@@ -62,16 +51,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-console.log('✅ CORS configurado con soporte para uploads');
+console.log('✅ CORS configurado');
 
-// ============================================
-// HEADERS ADICIONALES PARA ARCHIVOS
-// ============================================
-
-
-// ============================================
-// 2. SEGURIDAD - CONFIGURACIÓN AJUSTADA
-// ============================================
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
@@ -79,27 +60,17 @@ app.use(helmet({
 }));
 
 app.use(compression());
-
-// ============================================
-// 3. PARSERS
-// ============================================
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ============================================
-// SERVIR ARCHIVOS ESTÁTICOS - MEJORADO
-// ============================================
-// Middleware específico para servir uploads con headers CORS correctos
 app.use('/uploads', (req, res, next) => {
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   res.header('Cache-Control', 'public, max-age=31536000');
   next();
 });
 
-
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   setHeaders: (res, filePath) => {
-    // Establecer el tipo MIME correcto según la extensión
     const ext = path.extname(filePath).toLowerCase();
     const mimeTypes = {
       '.jpg': 'image/jpeg',
@@ -115,12 +86,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
   }
 }));
 
-console.log('✅ Directorio uploads configurado en: /uploads');
-console.log('📂 Ruta física:', path.join(__dirname, 'uploads'));
+console.log('✅ Directorio uploads configurado');
 
-// ============================================
-// 4. PROTECCIÓN NOSQL INJECTION
-// ============================================
 app.use((req, res, next) => {
   const sanitize = (obj) => {
     if (!obj || typeof obj !== 'object') return obj;
@@ -144,16 +111,10 @@ app.use((req, res, next) => {
 
 console.log('✅ Protección NoSQL Injection activada');
 
-// ============================================
-// 5. RATE LIMITING
-// ============================================
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
-  message: { 
-    success: false, 
-    message: 'Demasiadas peticiones, intenta más tarde' 
-  },
+  message: { success: false, message: 'Demasiadas peticiones' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -161,28 +122,20 @@ const apiLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { 
-    success: false, 
-    message: 'Demasiados intentos de login, intenta en 15 minutos' 
-  },
+  message: { success: false, message: 'Demasiados intentos de login' },
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Rate limiter más permisivo para uploads
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50, // 50 uploads cada 15 minutos
-  message: { 
-    success: false, 
-    message: 'Demasiados uploads, intenta más tarde' 
-  },
+  max: 50,
+  message: { success: false, message: 'Demasiados uploads' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// Excluir /api/avatar del rate limiter
 app.use('/api/', (req, res, next) => {
   if (req.path.startsWith('/avatar')) {
     return next();
@@ -190,11 +143,8 @@ app.use('/api/', (req, res, next) => {
   apiLimiter(req, res, next);
 });
 
-// ============================================
-// 6. SESIONES
-// ============================================
 const sessionConfig = {
-  secret: process.env.SESSION_SECRET || 'adoptapet-secret-2024-change-this',
+  secret: process.env.SESSION_SECRET || 'adoptapet-secret-2024',
   resave: false,
   saveUninitialized: false,
   name: 'adoptapet.sid',
@@ -216,9 +166,6 @@ if (process.env.NODE_ENV === 'production' && process.env.MONGO_URI) {
 
 app.use(session(sessionConfig));
 
-// ============================================
-// 7. PASSPORT
-// ============================================
 let passport;
 
 try {
@@ -226,15 +173,11 @@ try {
   app.use(passport.initialize());
   app.use(passport.session());
   services.passportLoaded = true;
-  console.log('✅ Passport cargado correctamente');
+  console.log('✅ Passport cargado');
 } catch (error) {
-  console.error('❌ Error al cargar Passport:', error.message);
-  console.log('⚠️  La app continuará sin Google OAuth');
+  console.error('❌ Error Passport:', error.message);
 }
 
-// ============================================
-// 8. MONGODB
-// ============================================
 (async () => {
   try {
     const mongoose = require('mongoose');
@@ -244,16 +187,12 @@ try {
     const { connectDB } = require('./src/config/database');
     await connectDB();
     services.mongoConnected = true;
-    console.log('✅ MongoDB conectado correctamente');
+    console.log('✅ MongoDB conectado');
   } catch (error) {
-    console.error('❌ Error conectando a MongoDB:', error.message);
-    console.log('⚠️  La app continuará sin base de datos');
+    console.error('❌ Error MongoDB:', error.message);
   }
 })();
 
-// ============================================
-// 9. SOCKET.IO
-// ============================================
 let io;
 
 try {
@@ -261,96 +200,53 @@ try {
   io = initializeSocket(server);
   services.socketLoaded = true;
   app.set('io', io);
-  console.log('✅ Socket.io inicializado correctamente');
+  console.log('✅ Socket.io inicializado');
 } catch (error) {
-  console.error('❌ Error al cargar Socket.io:', error.message);
-  console.log('⚠️  El chat no estará disponible');
+  console.error('❌ Error Socket.io:', error.message);
 }
 
-// ============================================
-// 10. LOGGING
-// ============================================
 const logger = require('./src/utils/logger');
 
 app.use((req, res, next) => {
   const start = Date.now();
-  
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.log.request(req.method, req.path, res.statusCode, duration);
   });
-  
   next();
 });
 
-// ============================================
-// RUTAS DE ESTADO
-// ============================================
 app.get('/health', (req, res) => {
-  const health = {
+  res.json({
     success: true,
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
     services: {
       api: 'operational',
       mongodb: services.mongoConnected ? 'connected' : 'disconnected',
       googleAuth: services.passportLoaded ? 'enabled' : 'disabled',
-      socketio: services.socketLoaded ? 'active' : 'inactive',
-      uploads: fs.existsSync(uploadsDir) ? 'enabled' : 'disabled'
-    },
-    memory: {
-      used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
-      total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
+      socketio: services.socketLoaded ? 'active' : 'inactive'
     }
-  };
-  
-  res.status(200).json(health);
+  });
 });
 
 app.get('/api/info', (req, res) => {
   res.json({
     name: 'Adoptapet API',
     version: '2.0.0',
-    description: 'API para gestión de adopción de mascotas',
-    documentation: '/api/docs',
     endpoints: {
       health: '/health',
       auth: '/api/auth',
       pets: '/api/pets',
       users: '/api/users',
-      applications: '/api/applications',
       chat: '/api/chat',
       posts: '/api/posts',
-      uploads: '/uploads'
+      ai: '/api/ai'
     }
   });
 });
 
-app.get('/test/config', (req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    config: {
-      nodeEnv: process.env.NODE_ENV || 'development',
-      port: process.env.PORT || 5000,
-      passport: services.passportLoaded ? '✅ Cargado' : '❌ NO cargado',
-      mongodb: services.mongoConnected ? '✅ Conectado' : '❌ Desconectado',
-      socketio: services.socketLoaded ? '✅ Activo' : '❌ Inactivo',
-      session: '✅ Configurado',
-      uploads: fs.existsSync(uploadsDir) ? '✅ Habilitado' : '❌ Deshabilitado',
-      uploadPath: uploadsDir,
-      googleClientId: process.env.GOOGLE_CLIENT_ID ? '✅ Configurado' : '❌ NO configurado',
-      googleSecret: process.env.GOOGLE_CLIENT_SECRET ? '✅ Configurado' : '❌ NO configurado',
-      jwtSecret: process.env.JWT_SECRET ? '✅ Configurado' : '❌ NO configurado',
-      mongoUri: process.env.MONGO_URI ? '✅ Configurado' : '❌ NO configurado'
-    }
-  });
-});
-// ============================================
-// PROXY PARA AVATARS (después de línea ~320)
-// ============================================
 app.get('/api/avatar/:name', async (req, res) => {
   try {
     const { name } = req.params;
@@ -365,332 +261,158 @@ app.get('/api/avatar/:name', async (req, res) => {
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(response.data);
   } catch (error) {
-    res.status(500).send('Error al cargar avatar');
+    res.status(500).send('Error avatar');
   }
 });
 
-// ============================================
-// RUTAS DE GOOGLE OAUTH - ✅ CORREGIDAS
-// ============================================
 if (services.passportLoaded) {
   app.get('/api/auth/google', 
-    passport.authenticate('google', { 
-      scope: ['profile', 'email']
-    })
+    passport.authenticate('google', { scope: ['profile', 'email'] })
   );
 
   app.get('/api/auth/google/callback', 
     passport.authenticate('google', { 
-      failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`,
+      failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`,
       session: true
     }),
     (req, res) => {
       try {
-        if (!req.user) {
-          throw new Error('Usuario no autenticado');
-        }
-        
-        console.log('✅ Usuario autenticado:', req.user.email);
+        if (!req.user) throw new Error('Usuario no autenticado');
         
         const jwt = require('jsonwebtoken');
         const token = jwt.sign(
-          { 
-            id: req.user._id || req.user.id, 
-            email: req.user.email,
-            role: req.user.role || 'adopter'
-          },
+          { id: req.user._id, email: req.user.email, role: req.user.role || 'adopter' },
           process.env.JWT_SECRET || 'adoptapet_secreto_super_seguro_2025',
           { expiresIn: '7d' }
         );
         
         const userData = {
-          id: req.user._id || req.user.id,
+          id: req.user._id,
           nombre: req.user.nombre || req.user.name,
           email: req.user.email,
           avatar: req.user.avatar,
           rol: req.user.role || 'adopter'
         };
         
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const redirectUrl = `${frontendUrl}/home?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
-        
-        console.log('🔄 Redirigiendo a:', redirectUrl);
-        res.redirect(redirectUrl);
-        
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        res.redirect(`${frontendUrl}/home?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`);
       } catch (error) {
-        console.error('❌ Error en callback de Google:', error);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         res.redirect(`${frontendUrl}/login?error=server_error`);
       }
     }
   );
-
-  app.get('/api/auth/me', (req, res) => {
-    if (req.isAuthenticated && req.isAuthenticated() && req.user) {
-      res.json({
-        success: true,
-        user: {
-          id: req.user._id || req.user.id,
-          nombre: req.user.nombre || req.user.name,
-          email: req.user.email,
-          avatar: req.user.avatar,
-          rol: req.user.role || 'adopter'
-        }
-      });
-    } else {
-      res.status(401).json({
-        success: false,
-        message: 'No autenticado'
-      });
-    }
-  });
-
-  app.post('/api/auth/logout', (req, res) => {
-    const email = req.user?.email || 'Usuario desconocido';
-    
-    req.logout((err) => {
-      if (err) {
-        console.error('❌ Error al cerrar sesión:', err);
-        return res.status(500).json({ 
-          success: false, 
-          message: 'Error al cerrar sesión' 
-        });
-      }
-      
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('❌ Error al destruir sesión:', err);
-        }
-        
-        console.log('👋 Sesión cerrada:', email);
-        res.clearCookie('adoptapet.sid');
-        res.json({ 
-          success: true, 
-          message: 'Sesión cerrada correctamente' 
-        });
-      });
-    });
-  });
-
-} else {
-  app.get('/api/auth/google', (req, res) => {
-    res.status(503).json({
-      success: false,
-      message: 'Google OAuth no disponible. Verifica la configuración.'
-    });
-  });
-  
-  app.get('/api/auth/me', (req, res) => {
-    res.status(503).json({
-      success: false,
-      message: 'Servicio de autenticación no disponible'
-    });
-  });
 }
 
-// ============================================
-// RUTAS DE AUTENTICACIÓN TRADICIONAL
-// ============================================
 try {
   const authRoutes = require('./src/routes/authRoutes');
   app.use('/api/auth', authLimiter, authRoutes);
-  logger.log.success('Rutas de autenticación tradicional cargadas');
+  logger.log.success('Auth cargado');
 } catch (error) {
-  logger.log.warning('Rutas de autenticación tradicional no disponibles');
+  logger.log.warning('Auth no disponible');
 }
 
-// ============================================
-// RUTAS DE LA APLICACIÓN
-// ============================================
 try {
   const petRoutes = require('./src/routes/petRoutes');
   app.use('/api/pets', petRoutes);
-  logger.log.success('Rutas de mascotas cargadas');
+  logger.log.success('Pets cargado');
 } catch (error) {
-  logger.log.warning('Rutas de mascotas no disponibles');
+  logger.log.warning('Pets no disponible');
 }
 
 try {
   const userRoutes = require('./src/routes/userRoutes');
-  // Aplicar rate limiter específico para uploads de avatars
   app.use('/api/users/avatar', uploadLimiter);
   app.use('/api/users', userRoutes);
-  // También agregar soporte para /profile sin /api
   app.use('/', userRoutes);
-  logger.log.success('Rutas de usuarios cargadas');
+  logger.log.success('Users cargado');
 } catch (error) {
-  logger.log.warning('Rutas de usuarios no disponibles');
-  console.error('Error detallado:', error.message);
+  logger.log.warning('Users no disponible');
 }
 
 try {
   const applicationRoutes = require('./src/routes/applicationRoutes');
   app.use('/api/applications', applicationRoutes);
-  logger.log.success('Rutas de solicitudes cargadas');
+  logger.log.success('Applications cargado');
 } catch (error) {
-  logger.log.warning('Rutas de solicitudes no disponibles');
+  logger.log.warning('Applications no disponible');
 }
 
 try {
   const postRoutes = require('./src/routes/postRoutes');
   app.use('/api/posts', postRoutes);
-  logger.log.success('Rutas de posts cargadas');
+  logger.log.success('Posts cargado');
 } catch (error) {
-  logger.log.warning('Rutas de posts no disponibles');
-  console.error('Error detallado:', error.message);
+  logger.log.warning('Posts no disponible');
 }
 
 try {
   const chatRoutes = require('./src/routes/chatRoutes');
   app.use('/api/chat', chatRoutes);
-  logger.log.success('Rutas de chat cargadas');
+  logger.log.success('Chat cargado');
 } catch (error) {
-  logger.log.warning('Rutas de chat no disponibles');
-  console.error('Error detallado:', error.message);
+  logger.log.warning('Chat no disponible');
 }
 
 try {
   app.use('/api/favoritos', favoritesRoutes);
-  logger.log.success('Rutas de favoritos cargadas');
+  logger.log.success('Favoritos cargado');
 } catch (error) {
-  logger.log.warning('Rutas de favoritos no disponibles');
+  logger.log.warning('Favoritos no disponible');
 }
+
 try {
-  const notificationRoutes = require('./src/routes/notificationRoutes');
+  const notificationRoutes = require('./src/routes/Notificationroutes');
   app.use('/api/notifications', notificationRoutes);
-  logger.log.success('Rutas de notificaciones cargadas');
+  logger.log.success('Notifications cargado');
 } catch (error) {
-  logger.log.warning('Rutas de notificaciones no disponibles');
-  console.error('Error detallado:', error.message);
+  logger.log.warning('Notifications no disponible');
 }
+
 // ============================================
-// MANEJO DE ERRORES 404
+// 🤖 RUTAS DE IA CON GROQ - CRÍTICO
 // ============================================
+try {
+  const aiRoutes = require('./src/routes/aiRoutes');
+  app.use('/api/ai', aiRoutes);
+  logger.log.success('✨ IA cargado con Groq');
+  console.log('   💬 POST /api/ai/chat');
+  console.log('   🔍 POST /api/ai/identify-breed');
+  console.log('   💡 POST /api/ai/advice');
+} catch (error) {
+  logger.log.warning('⚠️  IA no disponible');
+  console.error('❌ Error IA:', error.message);
+  console.error('   Stack:', error.stack);
+}
+
 app.use((req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/auth')) {
     res.status(404).json({
       success: false,
-      message: `Endpoint no encontrado: ${req.method} ${req.path}`,
-      suggestion: 'Verifica la documentación en /api/info'
+      message: `Endpoint no encontrado: ${req.method} ${req.path}`
     });
   } else {
     next();
   }
 });
 
-// ==========================================
-// RUTA DE REDIRECCIÓN POST-LOGIN GOOGLE
-// ==========================================
-app.get('/Home', (req, res) => {
-  const { token, user } = req.query;
-  
-  console.log('🏠 Redirigiendo después del login de Google');
-  console.log('   Token:', token ? '✅' : '❌');
-  console.log('   User:', user ? '✅' : '❌');
-  
-  if (!token || !user) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    return res.redirect(`${frontendUrl}/login?error=missing_credentials`);
-  }
-
-  try {
-    const userData = JSON.parse(decodeURIComponent(user));
-    console.log('✅ Usuario válido:', userData.email);
-    
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const redirectUrl = `${frontendUrl}/home?token=${token}&user=${user}`;
-    
-    console.log('🔄 Redirigiendo a frontend:', redirectUrl);
-    res.redirect(redirectUrl);
-    
-  } catch (error) {
-    console.error('❌ Error:', error.message);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(`${frontendUrl}/login?error=invalid_data`);
-  }
-});
-
-// ============================================
-// MIDDLEWARE DE MANEJO DE ERRORES GLOBAL
-// ============================================
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
   
-  if (process.env.NODE_ENV === 'development') {
-    console.error('   Stack:', err.stack);
-  }
-  
-  if (err.message === 'No permitido por CORS') {
-    return res.status(403).json({
-      success: false,
-      message: 'Acceso denegado por política de CORS',
-      origin: req.headers.origin
-    });
-  }
-  
   if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Error de validación',
-      errors: Object.values(err.errors).map(e => e.message)
-    });
-  }
-  
-  if (err.name === 'CastError') {
-    return res.status(400).json({
-      success: false,
-      message: 'ID inválido'
-    });
-  }
-  
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyPattern)[0];
-    return res.status(400).json({
-      success: false,
-      message: `El ${field} ya está registrado`
-    });
+    return res.status(400).json({ success: false, message: 'Error de validación' });
   }
   
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token inválido'
-    });
+    return res.status(401).json({ success: false, message: 'Token inválido' });
   }
   
-  if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expirado'
-    });
-  }
-  
-  // Error de Multer (upload de archivos)
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({
-      success: false,
-      message: 'El archivo es demasiado grande. Máximo 5MB.'
-    });
-  }
-  
-  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-    return res.status(400).json({
-      success: false,
-      message: 'Campo de archivo inesperado'
-    });
-  }
-  
-  const statusCode = err.statusCode || err.status || 500;
-  res.status(statusCode).json({
+  res.status(err.statusCode || 500).json({
     success: false,
-    message: err.message || 'Error interno del servidor',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: err.message || 'Error interno del servidor'
   });
 });
 
-// ============================================
-// INICIAR SERVIDOR
-// ============================================
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 
@@ -704,56 +426,24 @@ server.listen(PORT, HOST, () => {
     socketLoaded: services.socketLoaded
   });
   
-  console.log('\n📂 Uploads configurado:');
-  console.log(`   • URL: http://localhost:${PORT}/uploads`);
-  console.log(`   • Directorio: ${uploadsDir}`);
+  console.log('\n🤖 IA Groq:');
+  console.log(`   • API Key: ${process.env.GROQ_API_KEY ? '✅' : '❌'}`);
+  console.log(`   • Endpoint: http://localhost:${PORT}/api/ai/chat`);
 });
 
-// ============================================
-// CIERRE GRACEFUL
-// ============================================
 const gracefulShutdown = (signal) => {
   logger.showShutdown(signal);
-  
   server.close(async () => {
-    logger.log.success('Servidor HTTP cerrado');
-    
-    if (services.socketLoaded && io) {
-      io.close(() => {
-        logger.log.success('Socket.io cerrado');
-      });
-    }
-    
+    if (io) io.close();
     if (services.mongoConnected) {
-      try {
-        const mongoose = require('mongoose');
-        await mongoose.connection.close();
-        logger.log.success('MongoDB desconectado');
-      } catch (error) {
-        logger.log.error('Error al cerrar MongoDB', error);
-      }
+      const mongoose = require('mongoose');
+      await mongoose.connection.close();
     }
-    
-    console.log('👋 Adiós!\n');
     process.exit(0);
   });
-  
-  setTimeout(() => {
-    logger.log.warning('Forzando cierre después de timeout');
-    process.exit(1);
-  }, 10000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  gracefulShutdown('UNCAUGHT_EXCEPTION');
-});
 
 module.exports = app;

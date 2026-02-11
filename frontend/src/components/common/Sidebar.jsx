@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Sparkles } from 'lucide-react'; // ✅ Importar icono
 
 const Sidebar = () => {
   const location = useLocation();
@@ -8,10 +9,11 @@ const Sidebar = () => {
     { path: '/', label: 'Inicio', icon: '🏠' },
     { path: '/adoptar', label: 'Adoptar', icon: '🐶' },
     { path: '/publicar', label: 'Publicar', icon: '📝' },
-
-    // ✅ NUEVO
     { path: '/adoptar/crear', label: 'Crear adopción', icon: '🐾' },
-
+    
+    // ✅ NUEVO - ASISTENTE IA
+    { path: '/ai-assistant', label: 'Asistente IA', icon: '🤖', gradient: true },
+    
     { path: '/amigos', label: 'Amigos', icon: '👥' },
     { path: '/ajustes', label: 'Ajustes', icon: '⚙️' }
   ];
@@ -27,6 +29,32 @@ const Sidebar = () => {
       <nav className="flex flex-col space-y-3">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
+          
+          // ✅ Estilo especial para IA
+          if (item.gradient) {
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium relative overflow-hidden ${
+                  isActive
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold shadow-lg'
+                    : 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 hover:from-purple-500 hover:to-pink-500 hover:text-white'
+                }`}
+              >
+                {/* Efecto de brillo */}
+                {!isActive && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-20 animate-pulse"></div>
+                )}
+                <span className="relative z-10">{item.icon} {item.label}</span>
+                {!isActive && (
+                  <Sparkles className="w-4 h-4 ml-auto animate-pulse" />
+                )}
+              </Link>
+            );
+          }
+          
+          // Estilo normal para otros items
           return (
             <Link
               key={item.path}
