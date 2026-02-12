@@ -1,11 +1,11 @@
 export default function ChatList({ chats, selectedChat, onSelectChat }) {
   return (
-    <aside className="flex flex-col bg-white rounded-xl shadow-lg overflow-hidden h-full w-full min-w-0">
-      <div className="p-4 border-b bg-gradient-to-r from-purple-500 to-pink-500 flex-shrink-0">
+    <aside className="flex flex-col bg-white rounded-xl shadow-lg h-full w-full min-w-0">
+      
+      <div className="p-4 border-b bg-gradient-to-r from-purple-500 to-pink-500">
         <h2 className="text-lg font-semibold text-white">Mensajes</h2>
       </div>
 
-      {/* ✅ flex-1 + overflow para que NO crezca el body */}
       <div className="flex-1 overflow-y-auto min-w-0">
         {chats.map(chat => (
           <div
@@ -37,11 +37,14 @@ export default function ChatList({ chats, selectedChat, onSelectChat }) {
                   </span>
                 )}
               </div>
-              <p className="text-gray-500 text-sm truncate">{chat.lastMessage}</p>
+              <p className="text-gray-500 text-sm truncate">
+                {chat.lastMessage}
+              </p>
             </div>
           </div>
         ))}
       </div>
+
     </aside>
   );
 }

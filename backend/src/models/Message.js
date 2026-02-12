@@ -18,14 +18,25 @@ const messageSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+
+  // ✅ NUEVO: Estado del mensaje tipo WhatsApp
+  status: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent'
+  },
+
+  // 🔹 Opcional: mantenemos read por compatibilidad si lo usabas
   read: {
     type: Boolean,
     default: false
   }
+
 }, {
   timestamps: true
 });
 
+// Índice para rendimiento
 messageSchema.index({ chat: 1, createdAt: -1 });
 
 console.log('💬 Iniciando creación del modelo Message...');

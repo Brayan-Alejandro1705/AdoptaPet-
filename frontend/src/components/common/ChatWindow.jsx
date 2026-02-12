@@ -76,7 +76,7 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
               >
                 {/* ✅ Bubble corregida: sin absolute, sin paddingRight fijo */}
                 <div
-                  className={`rounded-lg shadow-sm ${isMe ? 'bg-[#d9fdd3]' : 'bg-white'}`}
+                  className={`rounded-lg shadow-sm ${isMe ? 'bg-purple-400' : 'bg-white'}`}
                   style={{
                     maxWidth: 'calc(100% - 32px)',
                     width: 'fit-content',
@@ -137,7 +137,7 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
           className={`
             p-3 rounded-full transition-all duration-200 flex-shrink-0
             ${newMessage.trim()
-              ? 'bg-[#25d366] hover:bg-[#20bd5a] text-white shadow-md'
+              ? 'bg-blue-400 hover:bg-blue-500 text-white shadow-md'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }
           `}

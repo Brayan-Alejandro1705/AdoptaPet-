@@ -1,39 +1,47 @@
 // frontend/src/hooks/useSocket.js
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 
 const SOCKET_URL = 'http://localhost:5000';
 
 export const useSocket = () => {
-  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    // Crear conexión socket
-    socketRef.current = io(SOCKET_URL, {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const currentUserId = user?.id || user?._id;
+
+    const s = io(SOCKET_URL, {
       transports: ['websocket'],
       autoConnect: true
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('✅ Conectado a Socket.io:', socketRef.current.id);
+    s.on('connect', () => {
+      console.log('✅ Conectado a Socket.io:', s.id);
+
+      if (currentUserId) {
+        s.emit('register', String(currentUserId));
+        console.log('🟢 register enviado:', String(currentUserId));
+      } else {
+        console.warn('⚠️ No pude registrar presencia: user.id/user._id no existe');
+      }
     });
 
-    socketRef.current.on('disconnect', () => {
+    s.on('disconnect', () => {
       console.log('❌ Desconectado de Socket.io');
     });
 
-    socketRef.current.on('error', (error) => {
-      console.error('❌ Error en Socket.io:', error);
+    s.on('connect_error', (err) => {
+      console.error('❌ connect_error Socket.io:', err.message);
     });
 
-    // Limpiar al desmontar
+    setSocket(s);
+
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        console.log('🔌 Socket desconectado');
-      }
+      s.disconnect();
+      console.log('🔌 Socket desconectado');
     };
   }, []);
 
-  return socketRef.current;
+  return socket;
 };
