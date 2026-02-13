@@ -27,6 +27,16 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
     }
   };
 
+  // ✅ helper: determinar si un mensaje fue leído
+  const isMessageRead = (message) => {
+    // soporta varias formas: status, readAt, read boolean
+    if (!message) return false;
+    if (message.status === 'read') return true;
+    if (message.readAt) return true;
+    if (message.read === true) return true;
+    return false;
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 bg-white shadow-lg rounded-xl overflow-hidden">
       {/* Header */}
@@ -68,15 +78,16 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
         <div className="py-2 px-4">
           {messages.map((message) => {
             const isMe = message.sender === 'me';
+            const read = isMe ? isMessageRead(message) : false;
 
             return (
               <div
                 key={message.id}
                 className={`flex mb-1 ${isMe ? 'justify-end' : 'justify-start'}`}
               >
-                {/* ✅ Bubble corregida: sin absolute, sin paddingRight fijo */}
+                {/* ✅ Bubble */}
                 <div
-                  className={`rounded-lg shadow-sm ${isMe ? 'bg-purple-400' : 'bg-white'}`}
+                  className={`rounded-lg shadow-sm ${isMe ? 'bg-purple-200' : 'bg-white'}`}
                   style={{
                     maxWidth: 'calc(100% - 32px)',
                     width: 'fit-content',
@@ -96,11 +107,13 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
                         {message.time}
                       </span>
 
+                      {/* ✅ Checks con "visto" púrpura */}
                       {isMe && (
                         <svg
-                          className="w-4 h-4 text-gray-500"
+                          className={`w-4 h-4 ${read ? 'text-purple-800' : 'text-gray-500'}`}
                           viewBox="0 0 16 15"
                           fill="none"
+                          aria-label={read ? 'Leído' : 'Enviado'}
                         >
                           <path
                             d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.048a.366.366 0 0 0-.064-.512zm-4.1 0l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.77a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .006.514l3.255 3.185a.32.32 0 0 0 .484-.033l6.272-8.048a.365.365 0 0 0-.063-.51z"

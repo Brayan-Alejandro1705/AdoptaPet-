@@ -2,10 +2,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { notificationService } from '../../services/notificationService';
 
-export default function Header({ chatUnreadCount = 0 }) {
+export default function Header() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Notificaciones
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // ✅ NUEVO: contador de chats no leídos (badge mensajes)
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
   const navigate = useNavigate();
 
   // Estados para el buscador
@@ -15,12 +21,18 @@ export default function Header({ chatUnreadCount = 0 }) {
   const [searchLoading, setSearchLoading] = useState(false);
   const searchRef = useRef(null);
 
+  const API_BASE = 'http://localhost:5000';
+
   useEffect(() => {
     cargarUsuario();
     cargarContadorNotificaciones();
+    cargarContadorChatsNoLeidos();
 
-    // Actualizar contador cada 30 segundos
-    const interval = setInterval(cargarContadorNotificaciones, 30000);
+    // Actualizar contadores cada 15s (puedes cambiarlo a 30s)
+    const interval = setInterval(() => {
+      cargarContadorNotificaciones();
+      cargarContadorChatsNoLeidos();
+    }, 15000);
 
     return () => clearInterval(interval);
   }, []);
@@ -50,7 +62,7 @@ export default function Header({ chatUnreadCount = 0 }) {
       try {
         const token = localStorage.getItem('token');
         const response = await fetch(
-          `http://localhost:5000/api/users/search?q=${encodeURIComponent(searchQuery)}`,
+          `${API_BASE}/api/users/search?q=${encodeURIComponent(searchQuery)}`,
           {
             headers: {
               Authorization: `Bearer ${token}`
@@ -86,6 +98,33 @@ export default function Header({ chatUnreadCount = 0 }) {
     }
   };
 
+  // ✅ NUEVO: contador para badge de mensajes
+  const cargarContadorChatsNoLeidos = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setChatUnreadCount(0);
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/api/chat/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        setChatUnreadCount(0);
+        return;
+      }
+
+      const data = await res.json();
+      setChatUnreadCount(data?.count || 0);
+      console.log('💬 Contador mensajes no leídos:', data?.count || 0);
+    } catch (e) {
+      console.error('❌ Error al cargar contador de chats:', e);
+      setChatUnreadCount(0);
+    }
+  };
+
   const cargarUsuario = async () => {
     const token = localStorage.getItem('token');
 
@@ -95,7 +134,7 @@ export default function Header({ chatUnreadCount = 0 }) {
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/users/profile', {
+      const response = await fetch(`${API_BASE}/api/users/profile`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -106,7 +145,7 @@ export default function Header({ chatUnreadCount = 0 }) {
         const userData = data.user || data;
 
         if (userData.avatar && !userData.avatar.startsWith('http')) {
-          userData.avatar = `http://127.0.0.1:5000${userData.avatar}`;
+          userData.avatar = `${API_BASE}${userData.avatar}`;
         }
 
         console.log('👤 Usuario cargado en Header:', userData);
@@ -124,7 +163,7 @@ export default function Header({ chatUnreadCount = 0 }) {
           const userData = JSON.parse(storedUser);
 
           if (userData.avatar && !userData.avatar.startsWith('http')) {
-            userData.avatar = `http://127.0.0.1:5000${userData.avatar}`;
+            userData.avatar = `${API_BASE}${userData.avatar}`;
           }
 
           setUser(userData);
@@ -148,19 +187,19 @@ export default function Header({ chatUnreadCount = 0 }) {
   };
 
   const getAvatarUrl = (user) => {
-    if (!user) return 'http://localhost:5000/api/avatar/User';
+    if (!user) return `${API_BASE}/api/avatar/User`;
 
     if (user.avatar?.startsWith('http')) return user.avatar;
 
-    if (user.avatar) return `http://localhost:5000${user.avatar}`;
+    if (user.avatar) return `${API_BASE}${user.avatar}`;
 
     const name = user.name || user.nombre || 'User';
-    return `http://localhost:5000/api/avatar/${encodeURIComponent(name)}`;
+    return `${API_BASE}/api/avatar/${encodeURIComponent(name)}`;
   };
 
   const userName = user?.nombre || user?.name || 'Usuario';
   const userAvatar =
-    user?.avatar || `http://localhost:5000/api/avatar/${encodeURIComponent(userName)}`;
+    user?.avatar || `${API_BASE}/api/avatar/${encodeURIComponent(userName)}`;
 
   return (
     <header className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
@@ -211,7 +250,7 @@ export default function Header({ chatUnreadCount = 0 }) {
                         alt={result.name || result.nombre}
                         className="w-12 h-12 rounded-full object-cover border-2 border-gray-100"
                         onError={(e) => {
-                          e.target.src = `http://localhost:5000/api/avatar/${encodeURIComponent(
+                          e.target.src = `${API_BASE}/api/avatar/${encodeURIComponent(
                             result.name || result.nombre || 'User'
                           )}`;
                         }}
@@ -242,7 +281,7 @@ export default function Header({ chatUnreadCount = 0 }) {
 
         {/* Icons */}
         <div className="flex items-center gap-2 md:gap-4">
-          {/* ✅ MENSAJES (badge por CHATS sin leer) */}
+          {/* ✅ MENSAJES (badge púrpura) */}
           <Link
             to="/mensajes"
             className="relative w-10 h-10 md:w-11 md:h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 active:scale-95 transition-all cursor-pointer"
@@ -263,7 +302,7 @@ export default function Header({ chatUnreadCount = 0 }) {
             </svg>
 
             {chatUnreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow-md">
+              <span className="absolute -top-1 -right-1 bg-purple-700 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow-md">
                 {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
               </span>
             )}
@@ -308,7 +347,7 @@ export default function Header({ chatUnreadCount = 0 }) {
                 className="w-full h-full rounded-full border-2 md:border-3 border-white object-cover"
                 onError={(e) => {
                   console.error('❌ Error al cargar avatar en Header:', userAvatar);
-                  e.target.src = `http://localhost:5000/api/avatar/${encodeURIComponent(userName)}`;
+                  e.target.src = `${API_BASE}/api/avatar/${encodeURIComponent(userName)}`;
                 }}
               />
             </Link>
@@ -361,7 +400,7 @@ export default function Header({ chatUnreadCount = 0 }) {
                         alt={result.name || result.nombre}
                         className="w-10 h-10 rounded-full object-cover border-2 border-gray-100"
                         onError={(e) => {
-                          e.target.src = `http://localhost:5000/api/avatar/${encodeURIComponent(
+                          e.target.src = `${API_BASE}/api/avatar/${encodeURIComponent(
                             result.name || result.nombre || 'User'
                           )}`;
                         }}

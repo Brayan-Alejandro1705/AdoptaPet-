@@ -24,7 +24,7 @@ export default function ChatList({ chats, selectedChat, onSelectChat }) {
                 className="w-12 h-12 rounded-full object-cover"
               />
               {chat.online && (
-                <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+                <span className="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 border-2 border-white rounded-full" />
               )}
             </div>
 
@@ -32,7 +32,7 @@ export default function ChatList({ chats, selectedChat, onSelectChat }) {
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold text-gray-800 truncate">{chat.name}</p>
                 {chat.unread > 0 && (
-                  <span className="shrink-0 bg-purple-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="shrink-0 bg-purple-300 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                     {chat.unread}
                   </span>
                 )}

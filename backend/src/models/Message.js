@@ -8,25 +8,47 @@ const messageSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
+
+  // ✅ NO required para no romper tu chat actual
+  // (cuando actualices tu envío, ya lo puedes volver required)
+  receiver: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+    index: true
+  },
+
   text: {
     type: String,
     required: true,
     trim: true
   },
 
-  // ✅ NUEVO: Estado del mensaje tipo WhatsApp
+  // ✅ Estado del mensaje tipo WhatsApp
   status: {
     type: String,
     enum: ['sent', 'delivered', 'read'],
-    default: 'sent'
+    default: 'sent',
+    index: true
   },
 
-  // 🔹 Opcional: mantenemos read por compatibilidad si lo usabas
+  deliveredAt: {
+    type: Date,
+    default: null
+  },
+
+  readAt: {
+    type: Date,
+    default: null
+  },
+
+  // 🔹 Compatibilidad con tu lógica actual
   read: {
     type: Boolean,
     default: false
@@ -36,12 +58,23 @@ const messageSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Índice para rendimiento
-messageSchema.index({ chat: 1, createdAt: -1 });
+// ✅ Mantener compatibilidad: si tu código antiguo marca read=true,
+// también dejamos status/readAt consistentes.
+messageSchema.pre('save', function (next) {
+  if (this.read === true && !this.readAt) {
+    this.readAt = new Date();
+  }
+  if (this.readAt) {
+    this.status = 'read';
+    this.read = true;
+  }
+  next();
+});
 
-console.log('💬 Iniciando creación del modelo Message...');
+// Índices para rendimiento
+messageSchema.index({ chat: 1, createdAt: -1 });
+messageSchema.index({ receiver: 1, status: 1 });
+
 const Message = mongoose.model('Message', messageSchema);
-console.log('✅ Modelo Message creado exitosamente');
-console.log('📋 Collection en MongoDB: messages');
 
 module.exports = Message;

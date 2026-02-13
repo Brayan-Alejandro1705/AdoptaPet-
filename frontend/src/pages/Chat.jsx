@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { chatService } from '../services/chatService';
 import Header from '../components/common/Header';
@@ -29,16 +29,8 @@ export default function Chat() {
 
   const getChatId = (c) => String(c?.id || c?._id || '');
 
-  /**
-   * ✅ IMPORTANTÍSIMO:
-   * - Primero intenta participants/users/members
-   * - Luego intenta campos directos
-   * - Y por último usa __otherUserId (lo llenamos con mensajes)
-   */
   const getOtherUserId = (chat) => {
     if (!chat) return null;
-
-    // ✅ si ya lo detectamos antes desde mensajes
     if (chat.__otherUserId) return String(chat.__otherUserId);
 
     const arrays = [chat.participants, chat.users, chat.members];
@@ -56,25 +48,82 @@ export default function Chat() {
     return null;
   };
 
-  /**
-   * ✅ Marca online/offline para un chat (si conocemos otherId)
-   */
   const applyOnlineToChat = (chat, onlineSet) => {
     const otherId = getOtherUserId(chat);
     return { ...chat, online: otherId ? onlineSet.has(otherId) : false };
   };
+
+  /**
+   * ✅ VISTO REAL POR SOCKET
+   */
+  const markChatAsRead = useCallback(
+    (chatId) => {
+      if (!socket || !chatId || !currentUserId) return;
+      socket.emit('mark_read', { chatId: String(chatId), readerId: String(currentUserId) });
+    },
+    [socket, currentUserId]
+  );
+
+  /**
+   * ✅ UI inmediata: si estoy viendo el chat, marco localmente los mensajes del otro como leídos
+   */
+  const markIncomingAsReadLocally = useCallback(() => {
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.sender === 'other' && m.status !== 'read' && !m.readAt) {
+          return { ...m, status: 'read', readAt: new Date().toISOString() };
+        }
+        return m;
+      })
+    );
+  }, []);
 
   useEffect(() => {
     loadChats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ Mensajes: join + receive
+  /**
+   * ✅ Cuando el otro usuario leyó, el backend emite messages_read
+   * Eso hace que mis mensajes (sender === 'me') se vuelvan read => ✔✔ púrpura
+   */
+  useEffect(() => {
+    const handler = (e) => {
+      const payload = e.detail || {};
+      const chatId = String(payload.chatId || '');
+      if (!chatId) return;
+
+      if (!selectedChat || getChatId(selectedChat) !== chatId) return;
+
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.sender === 'me') {
+            return {
+              ...m,
+              status: 'read',
+              readAt: payload.readAt || new Date().toISOString()
+            };
+          }
+          return m;
+        })
+      );
+    };
+
+    window.addEventListener('chat_messages_read', handler);
+    return () => window.removeEventListener('chat_messages_read', handler);
+  }, [selectedChat]);
+
+  // ✅ Join chat + recibir mensajes
   useEffect(() => {
     if (!socket || !selectedChat) return;
 
     const chatId = getChatId(selectedChat);
+
     socket.emit('join_chat', chatId);
+
+    // ✅ al abrir chat => visto
+    markChatAsRead(chatId);
+    markIncomingAsReadLocally();
 
     const handleNewMessage = (message) => {
       const senderId = String(message.senderId || message.sender?._id || message.sender?.id || '');
@@ -87,7 +136,7 @@ export default function Chat() {
 
       setMessages((prev) => [...prev, formattedMessage]);
 
-      // ✅ si llega mensaje del otro, detectamos su id y lo guardamos en el chat
+      // ✅ si llega del otro, guardamos __otherUserId
       if (senderId && senderId !== currentUserId) {
         setChats((prev) =>
           prev.map((c) => {
@@ -102,11 +151,19 @@ export default function Chat() {
         });
       }
 
+      // ✅ actualiza lastMessage
       setChats((prev) =>
-        prev.map((c) =>
-          getChatId(c) === chatId ? { ...c, lastMessage: message.text } : c
-        )
+        prev.map((c) => (getChatId(c) === chatId ? { ...c, lastMessage: message.text } : c))
       );
+
+      // ✅ si estoy viendo este chat y el mensaje es del otro => visto automático
+      const esDelOtro = senderId && senderId !== currentUserId;
+      const chatAbierto = selectedChat && getChatId(selectedChat) === chatId;
+
+      if (chatAbierto && esDelOtro) {
+        markChatAsRead(chatId);
+        markIncomingAsReadLocally();
+      }
     };
 
     socket.on('receive_message', handleNewMessage);
@@ -114,7 +171,7 @@ export default function Chat() {
     return () => {
       socket.off('receive_message', handleNewMessage);
     };
-  }, [socket, selectedChat, currentUserId]);
+  }, [socket, selectedChat, currentUserId, markChatAsRead, markIncomingAsReadLocally]);
 
   // ✅ Presencia online/offline
   useEffect(() => {
@@ -122,46 +179,26 @@ export default function Chat() {
 
     const handleOnlineUsers = ({ userIds }) => {
       const onlineSet = new Set((userIds || []).map((u) => String(u)));
-
       setChats((prev) => prev.map((c) => applyOnlineToChat(c, onlineSet)));
-
-      setSelectedChat((prev) => {
-        if (!prev) return prev;
-        return applyOnlineToChat(prev, onlineSet);
-      });
+      setSelectedChat((prev) => (prev ? applyOnlineToChat(prev, onlineSet) : prev));
     };
 
     const handleUserOnline = ({ userId }) => {
       const uid = String(userId);
-
-      setChats((prev) =>
-        prev.map((c) => (getOtherUserId(c) === uid ? { ...c, online: true } : c))
-      );
-
-      setSelectedChat((prev) => {
-        if (!prev) return prev;
-        return getOtherUserId(prev) === uid ? { ...prev, online: true } : prev;
-      });
+      setChats((prev) => prev.map((c) => (getOtherUserId(c) === uid ? { ...c, online: true } : c)));
+      setSelectedChat((prev) => (prev && getOtherUserId(prev) === uid ? { ...prev, online: true } : prev));
     };
 
     const handleUserOffline = ({ userId }) => {
       const uid = String(userId);
-
-      setChats((prev) =>
-        prev.map((c) => (getOtherUserId(c) === uid ? { ...c, online: false } : c))
-      );
-
-      setSelectedChat((prev) => {
-        if (!prev) return prev;
-        return getOtherUserId(prev) === uid ? { ...prev, online: false } : prev;
-      });
+      setChats((prev) => prev.map((c) => (getOtherUserId(c) === uid ? { ...c, online: false } : c)));
+      setSelectedChat((prev) => (prev && getOtherUserId(prev) === uid ? { ...prev, online: false } : prev));
     };
 
     socket.on('online_users', handleOnlineUsers);
     socket.on('user_online', handleUserOnline);
     socket.on('user_offline', handleUserOffline);
 
-    // ✅ pedir lista inicial
     socket.emit('get_online_users');
 
     return () => {
@@ -175,17 +212,18 @@ export default function Chat() {
   const loadChats = async () => {
     try {
       const data = await chatService.getChats();
-
-      const normalized = (data || []).map((c) => ({
-        ...c,
-        online: !!c.online
-      }));
-
+      const normalized = (data || []).map((c) => ({ ...c, online: !!c.online }));
       setChats(normalized);
 
       if (normalized.length > 0) {
-        setSelectedChat(normalized[0]);
-        await loadMessages(getChatId(normalized[0]), normalized[0]);
+        const first = normalized[0];
+        setSelectedChat(first);
+        const firstChatId = getChatId(first);
+        await loadMessages(firstChatId, first);
+
+        // ✅ abrir primer chat => visto
+        markChatAsRead(firstChatId);
+        markIncomingAsReadLocally();
       }
 
       socket?.emit('get_online_users');
@@ -196,10 +234,6 @@ export default function Chat() {
     }
   };
 
-  /**
-   * ✅ loadMessages ahora también detecta el otherUserId
-   * incluso si tu chat NO trae participants.
-   */
   const loadMessages = async (chatId, chatObj = null) => {
     try {
       const data = await chatService.getMessages(chatId);
@@ -215,15 +249,16 @@ export default function Chat() {
 
       setMessages(formatted);
 
-      // ✅ Detectar otherUserId desde mensajes (primer mensaje que no sea mío)
+      // ✅ visto al cargar
+      markChatAsRead(chatId);
+      markIncomingAsReadLocally();
+
+      // detectar otherUserId desde mensajes
       const otherFromMessages = formatted.find((m) => m.senderId && m.senderId !== currentUserId)?.senderId;
 
       if (otherFromMessages) {
-        // ✅ guardarlo en chats + selectedChat
         setChats((prev) =>
-          prev.map((c) =>
-            getChatId(c) === chatId ? { ...c, __otherUserId: otherFromMessages } : c
-          )
+          prev.map((c) => (getChatId(c) === chatId ? { ...c, __otherUserId: otherFromMessages } : c))
         );
 
         setSelectedChat((prev) => {
@@ -232,7 +267,6 @@ export default function Chat() {
           return { ...base, __otherUserId: otherFromMessages };
         });
 
-        // ✅ volver a pedir online_users para aplicar online instantáneo
         socket?.emit('get_online_users');
       }
     } catch (error) {
@@ -253,7 +287,14 @@ export default function Chat() {
   const handleSelectChat = async (chat) => {
     setSelectedChat(chat);
     setShowChatList(false);
-    await loadMessages(getChatId(chat), chat);
+
+    const chatId = getChatId(chat);
+    await loadMessages(chatId, chat);
+
+    // ✅ visto al seleccionar
+    markChatAsRead(chatId);
+    markIncomingAsReadLocally();
+
     socket?.emit('get_online_users');
   };
 
@@ -261,7 +302,7 @@ export default function Chat() {
     return (
       <div className="h-screen bg-[#efeae2] overflow-hidden flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-00 mx-auto" />
           <p className="mt-4 text-gray-600">Cargando chats...</p>
         </div>
       </div>
@@ -319,11 +360,7 @@ export default function Chat() {
                     h-full min-h-0
                   `}
                 >
-                  <ChatList
-                    chats={chats}
-                    selectedChat={selectedChat}
-                    onSelectChat={handleSelectChat}
-                  />
+                  <ChatList chats={chats} selectedChat={selectedChat} onSelectChat={handleSelectChat} />
                 </div>
 
                 <div

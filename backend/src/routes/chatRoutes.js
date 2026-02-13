@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 // Middleware de autenticación
 const authenticate = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
-  
+
   if (!token) {
     return res.status(401).json({ error: 'No autorizado' });
   }
@@ -23,30 +23,54 @@ const authenticate = (req, res, next) => {
   }
 };
 
+// ✅ Helper: obtener el otro participante del chat
+const getOtherUserIdFromChat = (chat, myUserId) => {
+  if (!chat?.participants?.length) return null;
+  const other = chat.participants.find(p => p.toString() !== myUserId.toString());
+  return other ? other.toString() : null;
+};
+
+// ✅ NUEVO: GET /api/chat/unread-count - contador global (badge)
+router.get('/unread-count', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const count = await Message.countDocuments({
+      receiver: userId,
+      readAt: null
+    });
+
+    return res.json({ ok: true, count });
+  } catch (error) {
+    console.error('❌ Error unread-count:', error);
+    return res.status(500).json({ ok: false, count: 0, message: error.message });
+  }
+});
+
 // GET /api/chat - Obtener todos los chats del usuario
 router.get('/', authenticate, async (req, res) => {
   try {
     const userId = req.userId;
     console.log('📥 Obteniendo chats para usuario:', userId);
-    
+
     // Verificar que el usuario existe
     const currentUser = await User.findById(userId);
     if (!currentUser) {
       console.log('❌ Usuario no encontrado:', userId);
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    
+
     console.log('✅ Usuario autenticado:', currentUser.name);
-    
+
     const chats = await Chat.find({
       participants: userId
     })
-    .populate({
-      path: 'participants',
-      select: 'name email avatar bio'
-    })
-    .sort({ updatedAt: -1 })
-    .lean();
+      .populate({
+        path: 'participants',
+        select: 'name email avatar bio'
+      })
+      .sort({ updatedAt: -1 })
+      .lean();
 
     console.log(`📦 Chats encontrados: ${chats.length}`);
 
@@ -55,10 +79,29 @@ router.get('/', authenticate, async (req, res) => {
       return res.json([]);
     }
 
+    // ✅ NUEVO: Traer no leídos por chat (opcional pero útil)
+    // Contamos mensajes no leídos por chat donde receiver = userId
+    const unreadByChatAgg = await Message.aggregate([
+      {
+        $match: {
+          receiver: new (require('mongoose')).Types.ObjectId(userId),
+          readAt: null
+        }
+      },
+      {
+        $group: {
+          _id: '$chat',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const unreadMap = new Map(unreadByChatAgg.map(x => [x._id.toString(), x.count]));
+
     const formattedChats = chats.map((chat, index) => {
       console.log(`📋 Procesando chat ${index + 1}:`, chat._id);
       console.log('👥 Participantes:', chat.participants?.map(p => p?.name || 'Sin nombre'));
-      
+
       // Buscar el otro participante
       const otherUser = chat.participants?.find(p => {
         if (!p || !p._id) {
@@ -69,17 +112,17 @@ router.get('/', authenticate, async (req, res) => {
         const currentUserId = userId.toString();
         return participantId !== currentUserId;
       });
-      
+
       if (!otherUser) {
         console.warn('⚠️ No se encontró otro participante en el chat:', chat._id);
         return null;
       }
-      
+
       console.log('👤 Otro usuario encontrado:', otherUser.name);
-      
+
       // Obtener nombre
       const userName = otherUser.name || 'Usuario Desconocido';
-      
+
       // Asegurar que el avatar tenga la URL completa
       let avatarUrl = otherUser.avatar;
       if (!avatarUrl) {
@@ -87,7 +130,9 @@ router.get('/', authenticate, async (req, res) => {
       } else if (!avatarUrl.startsWith('http')) {
         avatarUrl = `http://localhost:5000${avatarUrl}`;
       }
-      
+
+      const unread = unreadMap.get(chat._id.toString()) || 0;
+
       return {
         id: chat._id.toString(),
         _id: chat._id.toString(),
@@ -95,11 +140,11 @@ router.get('/', authenticate, async (req, res) => {
         avatar: avatarUrl,
         lastMessage: chat.lastMessage || 'Sin mensajes',
         online: false,
-        unread: 0,
+        unread, // ✅ ahora sí real
         petRelated: chat.petRelated,
         updatedAt: chat.updatedAt
       };
-    }).filter(Boolean); // Filtrar nulls
+    }).filter(Boolean);
 
     console.log(`✅ Enviando ${formattedChats.length} chats formateados`);
     res.json(formattedChats);
@@ -108,8 +153,8 @@ router.get('/', authenticate, async (req, res) => {
     console.error('❌ Stack:', error.stack);
     console.error('❌ Nombre del error:', error.name);
     console.error('❌ Mensaje:', error.message);
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       error: 'Error al obtener chats',
       message: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -118,6 +163,7 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET /api/chat/:chatId/messages - Obtener mensajes de un chat
+// ✅ Además: marca como leído automáticamente lo que el usuario recibió en ese chat
 router.get('/:chatId/messages', authenticate, async (req, res) => {
   try {
     const { chatId } = req.params;
@@ -135,6 +181,13 @@ router.get('/:chatId/messages', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'No tienes acceso a este chat' });
     }
 
+    // ✅ NUEVO: marcar como leído todos los mensajes recibidos por userId en este chat
+    const now = new Date();
+    await Message.updateMany(
+      { chat: chatId, receiver: userId, readAt: null },
+      { $set: { read: true, readAt: now, status: 'read' } }
+    );
+
     const messages = await Message.find({ chat: chatId })
       .populate({
         path: 'sender',
@@ -146,7 +199,7 @@ router.get('/:chatId/messages', authenticate, async (req, res) => {
     const formattedMessages = messages.map(msg => {
       const senderName = msg.sender?.name || 'Usuario';
       const senderId = msg.sender?._id?.toString();
-      
+
       return {
         id: msg._id.toString(),
         text: msg.text,
@@ -157,7 +210,13 @@ router.get('/:chatId/messages', authenticate, async (req, res) => {
         sender: senderId === userId ? 'me' : 'other',
         senderId: senderId,
         senderName: senderName,
-        senderAvatar: msg.sender?.avatar
+        senderAvatar: msg.sender?.avatar,
+
+        // ✅ NUEVO: para que tu frontend pinte checks
+        status: msg.status || 'sent',
+        readAt: msg.readAt || null,
+        deliveredAt: msg.deliveredAt || null,
+        receiver: msg.receiver ? msg.receiver.toString() : null
       };
     });
 
@@ -166,7 +225,7 @@ router.get('/:chatId/messages', authenticate, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al obtener mensajes:', error);
     console.error('❌ Stack:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al obtener mensajes',
       message: error.message
     });
@@ -179,7 +238,7 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
     const { chatId } = req.params;
     const { text } = req.body;
     const userId = req.userId;
-    
+
     console.log('📤 Enviando mensaje en chat:', chatId);
     console.log('📝 Texto del mensaje:', text);
     console.log('👤 Remitente:', userId);
@@ -200,11 +259,19 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'No tienes acceso a este chat' });
     }
 
-    // Crear el mensaje
+    // ✅ PASO 0: determinar el receptor (receiver) automáticamente
+    const otherUserId = getOtherUserIdFromChat(chat, userId);
+    if (!otherUserId) {
+      return res.status(400).json({ error: 'No se pudo determinar el receptor' });
+    }
+
+    // Crear el mensaje (con receiver y status)
     const message = new Message({
       chat: chatId,
       sender: userId,
-      text: text.trim()
+      receiver: otherUserId, // ✅ CLAVE para visto/contador
+      text: text.trim(),
+      status: 'sent'
     });
 
     await message.save();
@@ -234,7 +301,13 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
       sender: 'me',
       senderId: message.sender._id.toString(),
       senderName: senderName,
-      senderAvatar: message.sender.avatar
+      senderAvatar: message.sender.avatar,
+
+      // ✅ NUEVO: checks
+      status: message.status,
+      readAt: message.readAt || null,
+      deliveredAt: message.deliveredAt || null,
+      receiver: message.receiver ? message.receiver.toString() : null
     };
 
     console.log('✅ Mensaje enviado exitosamente');
@@ -242,10 +315,36 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al enviar mensaje:', error);
     console.error('❌ Stack:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al enviar mensaje',
       message: error.message
     });
+  }
+});
+
+// ✅ NUEVO: POST /api/chat/:chatId/read - marcar leído (si quieres llamarlo desde React o Socket)
+router.post('/:chatId/read', authenticate, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.userId;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
+
+    const hasAccess = chat.participants.some(p => p.toString() === userId);
+    if (!hasAccess) return res.status(403).json({ error: 'No tienes acceso a este chat' });
+
+    const now = new Date();
+
+    const result = await Message.updateMany(
+      { chat: chatId, receiver: userId, readAt: null },
+      { $set: { read: true, readAt: now, status: 'read' } }
+    );
+
+    return res.json({ ok: true, modified: result.modifiedCount || 0, readAt: now });
+  } catch (error) {
+    console.error('❌ Error marcando leído:', error);
+    return res.status(500).json({ ok: false, message: error.message });
   }
 });
 
@@ -295,7 +394,7 @@ router.post('/', authenticate, async (req, res) => {
 
     const otherParticipant = chat.participants.find(p => p._id.toString() !== userId);
     const userName = otherParticipant?.name || 'Usuario';
-    
+
     let avatarUrl = otherParticipant?.avatar;
     if (!avatarUrl) {
       avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
@@ -315,7 +414,7 @@ router.post('/', authenticate, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al crear chat:', error);
     console.error('❌ Stack:', error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al crear chat',
       message: error.message
     });
