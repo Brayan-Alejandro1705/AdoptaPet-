@@ -109,6 +109,15 @@ exports.login = async (req, res) => {
       });
     }
 
+    // ✅ BLOQUEO si la cuenta no está activa
+    if (user.status !== 'active') {
+      console.log(`🚫 Login bloqueado: status=${user.status} email=${user.email}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Tu cuenta está desactivada'
+      });
+    }
+
     console.log('✅ Usuario encontrado:', email);
     console.log('🔑 Tiene password?', !!user.password);
 
@@ -221,6 +230,13 @@ exports.googleCallback = async (req, res) => {
     if (!user) {
       console.error('❌ No hay usuario en req.user');
       return res.redirect('http://127.0.0.1:5000/login.html?error=auth_failed');
+    }
+
+    // ✅ BLOQUEO si la cuenta no está activa (Google también)
+    if (user.status && user.status !== 'active') {
+      console.log(`🚫 Google login bloqueado: status=${user.status} email=${user.email}`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://127.0.0.1:5000';
+      return res.redirect(`${frontendUrl}/login.html?error=account_inactive`);
     }
 
     console.log('✅ Usuario autenticado:', user.email);

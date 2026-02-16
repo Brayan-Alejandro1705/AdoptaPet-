@@ -300,6 +300,18 @@ const userSchema = new mongoose.Schema({
         default: 'active',
         index: true
     },
+
+    // =============================================
+    // ✅ NUEVO: AJUSTES DE NOTIFICACIONES (MODAL)
+    // =============================================
+    // Esto corresponde a: Likes, Comentarios, Nuevos seguidores, Menciones, Mensajes
+    notificationSettings: {
+        likes: { type: Boolean, default: true },
+        comments: { type: Boolean, default: true },
+        followers: { type: Boolean, default: true },
+        mentions: { type: Boolean, default: true },
+        messages: { type: Boolean, default: true }
+    },
     
     // =============================================
     // NOTIFICACIONES Y PRIVACIDAD
