@@ -490,6 +490,16 @@ try {
   console.error('Error detallado:', error.message);
 }
 
+// ✅✅✅ NUEVO: RUTAS DE SOLICITUDES DE AMISTAD
+try {
+  const friendRequestRoutes = require('./src/routes/friendRequestRoutes');
+  app.use('/api/friend-requests', friendRequestRoutes);
+  logger.log.success('Rutas de solicitudes de amistad cargadas');
+} catch (error) {
+  logger.log.warning('Rutas de solicitudes de amistad no disponibles');
+  console.error('Error detallado:', error.message);
+}
+
 try {
   const applicationRoutes = require('./src/routes/applicationRoutes');
   app.use('/api/applications', applicationRoutes);

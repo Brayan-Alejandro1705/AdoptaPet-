@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Share2, MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreVertical, Trash2, Edit2, Star } from 'lucide-react';
 
 // ===== AVATAR FALLBACK LOCAL (sin peticiones externas) =====
 const generateAvatarSVG = (name = 'U') => {
@@ -37,6 +37,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
     }
 
     // ===== ESTADO =====
+    const [isFavorite, setIsFavorite] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [commentText, setCommentText] = useState('');
     const [showMenu, setShowMenu] = useState(false);
@@ -119,6 +120,31 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
         }
     }, [post, currentUser]);
 
+    // ===== VERIFICAR SI EL POST ESTÁ EN FAVORITOS =====
+    useEffect(() => {
+        const checkFavorite = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token || !post._id) return;
+
+                const response = await fetch(`http://127.0.0.1:5000/api/favoritos/check/${post._id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    setIsFavorite(data.isFavorite);
+                }
+            } catch (error) {
+                console.error('Error verificando favorito:', error);
+            }
+        };
+
+        checkFavorite();
+    }, [post._id]);
+
     // ===== UTILIDADES =====
     const formatTimeAgo = (date) => {
         if (!date) return 'hace un momento';
@@ -152,6 +178,34 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
     const isOwner = String(authorId) === String(currentUserId);
 
     // ===== HANDLERS =====
+    const handleFavorite = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('Debes iniciar sesión');
+                return;
+            }
+
+            const method = isFavorite ? 'DELETE' : 'POST';
+            const response = await fetch(`http://127.0.0.1:5000/api/favoritos/${post._id}`, {
+                method,
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setIsFavorite(!isFavorite);
+                alert(isFavorite ? '💔 Quitado de favoritos' : '⭐ Agregado a favoritos');
+            }
+        } catch (error) {
+            console.error('Error con favorito:', error);
+            alert('Error al procesar favorito');
+        }
+    };
+
     const handleLike = async () => {
         try {
             const token = localStorage.getItem('token');
@@ -280,49 +334,65 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                     </div>
                 </div>
 
-                {isOwner && (
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowMenu(!showMenu)}
-                            className="p-2 hover:bg-gray-100 rounded-full transition"
-                        >
-                            <MoreVertical className="w-5 h-5 text-gray-600" />
-                        </button>
+                {/* Menú de 3 puntos - SIEMPRE visible */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowMenu(!showMenu)}
+                        className="p-2 hover:bg-gray-100 rounded-full transition"
+                    >
+                        <MoreVertical className="w-5 h-5 text-gray-600" />
+                    </button>
 
-                        {showMenu && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-10"
-                                    onClick={() => setShowMenu(false)}
-                                />
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-20 border">
-                                    {onEdit && (
+                    {showMenu && (
+                        <>
+                            <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setShowMenu(false)}
+                            />
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-20 border">
+                                {/* Favorito - SIEMPRE visible */}
+                                <button
+                                    onClick={() => {
+                                        setShowMenu(false);
+                                        handleFavorite();
+                                    }}
+                                    className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm"
+                                >
+                                    <span className="text-lg">{isFavorite ? '⭐' : '☆'}</span>
+                                    {isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                                </button>
+
+                                {/* Editar y Eliminar - SOLO si eres el dueño */}
+                                {isOwner && (
+                                    <>
+                                        {onEdit && (
+                                            <button
+                                                onClick={() => {
+                                                    setShowMenu(false);
+                                                    onEdit(post);
+                                                }}
+                                                className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm border-t"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                                Editar
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => {
                                                 setShowMenu(false);
-                                                onEdit(post);
+                                                handleDelete();
                                             }}
-                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm"
+                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-red-600 text-sm"
                                         >
-                                            <Edit2 className="w-4 h-4" />
-                                            Editar
+                                            <Trash2 className="w-4 h-4" />
+                                            Eliminar
                                         </button>
-                                    )}
-                                    <button
-                                        onClick={() => {
-                                            setShowMenu(false);
-                                            handleDelete();
-                                        }}
-                                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-red-600 text-sm"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        Eliminar
-                                    </button>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
+                                    </>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* Content */}

@@ -37,7 +37,7 @@ const allowedOrigins = process.env.FRONTEND_URL
       'http://localhost:3000',      // React
       'http://127.0.0.1:3000',      // Live Server
       'http://localhost:8080',      // Webpack
-      'http://localhost:5173',      // Vite
+      'http://localhost:3000',      // Vite
     ];
 
 app.use(cors({

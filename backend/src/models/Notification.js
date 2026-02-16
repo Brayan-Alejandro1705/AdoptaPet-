@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
+// ============================================================================
+// SCHEMA DEFINITION
+// ============================================================================
+
 const notificationSchema = new mongoose.Schema({
+  
+  // --------------------------------------------------------------------------
+  // USER REFERENCES
+  // --------------------------------------------------------------------------
+  
   // Usuario que recibe la notificación
   recipient: {
     type: mongoose.Schema.Types.ObjectId,
@@ -15,30 +24,49 @@ const notificationSchema = new mongoose.Schema({
     ref: 'User'
   },
   
-  // Tipo de notificación - ✅ ACTUALIZADO
+  // --------------------------------------------------------------------------
+  // NOTIFICATION TYPE
+  // --------------------------------------------------------------------------
+  
   type: {
     type: String,
     enum: [
-      'like',              // ⭐ AGREGADO
-      'comment',           // ⭐ AGREGADO
-      'mention',           // ⭐ AGREGADO
-      'favorite',          
+      // Social interactions
+      'like',
+      'comment',
+      'mention',
+      'follow',
+      'friend_request',       // ✅ AGREGADO
+      'friend_accept',        // ✅ AGREGADO
+      
+      // Adoption related
       'adoption',
-      'adoption_request',  
-      'adoption_accepted', 
-      'adoption_rejected', 
+      'adoption_request',
+      'adoption_accepted',
+      'adoption_rejected',
+      'favorite',
+      
+      // Communication
       'message',
-      'new_post',          
+      
+      // Content
+      'new_post',
+      
+      // System
       'system',
       'connection'
     ],
     required: true
   },
   
+  // --------------------------------------------------------------------------
+  // NOTIFICATION CONTENT
+  // --------------------------------------------------------------------------
+  
   // Título de la notificación
   title: {
     type: String,
-    required: true
+    required: false           // ✅ CAMBIADO A OPCIONAL
   },
   
   // Mensaje de la notificación
@@ -46,6 +74,10 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  
+  // --------------------------------------------------------------------------
+  // UI STYLING
+  // --------------------------------------------------------------------------
   
   // Icono/emoji para la notificación
   icon: {
@@ -60,11 +92,20 @@ const notificationSchema = new mongoose.Schema({
     default: 'purple'
   },
   
+  // --------------------------------------------------------------------------
+  // STATUS
+  // --------------------------------------------------------------------------
+  
   // Si fue leída
   read: {
     type: Boolean,
-    default: false
+    default: false,
+    index: true
   },
+  
+  // --------------------------------------------------------------------------
+  // RELATED REFERENCES
+  // --------------------------------------------------------------------------
   
   // Referencia relacionada (mascota, chat, post, etc.)
   relatedId: {
@@ -73,20 +114,43 @@ const notificationSchema = new mongoose.Schema({
   
   relatedModel: {
     type: String,
-    enum: ['Pet', 'Chat', 'User', 'Application', 'Post'] // ⭐ AGREGADO 'Post'
+    enum: ['Pet', 'Chat', 'User', 'Application', 'Post']
   },
   
+  // --------------------------------------------------------------------------
+  // ACTIONS
+  // --------------------------------------------------------------------------
+  
   // URL de acción (opcional)
-  actionUrl: String
+  actionUrl: {
+    type: String
+  }
 
 }, {
   timestamps: true
 });
 
-// Índices para mejorar el rendimiento
+// ============================================================================
+// INDEXES
+// ============================================================================
+
+// Índice compuesto para consultas por usuario y fecha
 notificationSchema.index({ recipient: 1, createdAt: -1 });
+
+// Índice compuesto para filtrar notificaciones no leídas
 notificationSchema.index({ recipient: 1, read: 1 });
 
-console.log('📬 Modelo Notification actualizado con soporte para likes y comentarios');
+// ============================================================================
+// LOGGING
+// ============================================================================
+
+console.log('📬 Modelo Notification actualizado:');
+console.log('   ✅ Soporte para friend_request y friend_accept');
+console.log('   ✅ Campo title ahora es opcional');
+console.log('   ✅ Tipos de notificación organizados por categoría');
+
+// ============================================================================
+// EXPORT
+// ============================================================================
 
 module.exports = mongoose.model('Notification', notificationSchema);

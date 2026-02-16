@@ -247,10 +247,21 @@ const userSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     }],
+
+    // ✅ NUEVO: Lista de amigos (amistades aceptadas)
+    friends: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
     
     favoritesPets: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Pet'
+        ref: 'Post'
+    }],
+    
+    favoritesPosts: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post'
     }],
     
     // =============================================
@@ -569,6 +580,9 @@ userSchema.index({ email: 1, status: 1 });
 userSchema.index({ role: 1, 'verified.shelter': 1 });
 userSchema.index({ 'location.city': 1, role: 1 });
 userSchema.index({ googleId: 1 }, { sparse: true });
+
+// ✅ (Opcional) índice para consultas por amigos
+userSchema.index({ friends: 1 });
 
 // =============================================
 // CREAR Y EXPORTAR MODELO

@@ -8,7 +8,7 @@ export default function FloatingAIChat() {
     {
       id: 1,
       sender: 'ai',
-      text: '¡Hola! Soy Simon BOT 🐾\n\n¿En qué puedo ayudarte hoy?',
+      text: '¡Hola! 👋 Soy VetAssist, tu asistente veterinario de confianza 🐾\n\n¿En qué puedo ayudarte hoy?',
       timestamp: new Date()
     }
   ]);
@@ -206,13 +206,13 @@ export default function FloatingAIChat() {
                   {/* 🐶 Imagen del perro */}
                   <img 
                     src="/robot-dog.png" 
-                    alt="Simon BOT" 
+                    alt="VetAssist" 
                     className="w-full h-full object-contain"
                   />
                 </div>
                 <div>
-                  <h3 className="text-white font-bold text-sm">Simon BOT</h3>
-                  <p className="text-orange-100 text-xs">Asistente veterinario</p>
+                  <h3 className="text-white font-bold text-sm">VetAssist IA</h3>
+                  <p className="text-orange-100 text-xs">Tu asistente veterinario</p>
                 </div>
               </div>
               
@@ -371,7 +371,7 @@ export default function FloatingAIChat() {
         {/* 🐶 Solo la imagen del perro */}
         <img 
           src="/robot-dog.png" 
-          alt="Simon BOT" 
+          alt="VetAssist" 
           className="w-full h-full object-contain drop-shadow-2xl"
         />
         
@@ -384,7 +384,7 @@ export default function FloatingAIChat() {
       </button>
 
       {/* Estilos adicionales para animaciones */}
-      <style jsx>{`
+      <style>{`
         .delay-100 {
           animation-delay: 0.1s;
         }

@@ -81,7 +81,7 @@ const emitUnreadCountToUser = async (userId) => {
 const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: ['http://localhost:3000', 'http://localhost:5173'],
+      origin: ['http://localhost:3000', 'http://localhost:3000'],
       methods: ['GET', 'POST'],
       credentials: true
     }
