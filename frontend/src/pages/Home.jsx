@@ -1,230 +1,211 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import Header from '../components/common/Header';
+import Sidebar from '../components/common/Sidebar';
+import RightSidebar from '../components/common/RightSidebar';
+import BottomNav from '../components/layout/BottomNav';
+import PostCard from '../components/common/PostCard';
+import PostModal from '../components/common/PostModal';
+import FeaturedPetsMobile from '../components/common/FeaturedPetsMobile';
 
-export default function VerifyEmail() {
+export default function Home() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState(['', '', '', '', '', '']);
-  const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  
+  // ✅ NUEVO: Estados para las publicaciones del backend
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
+  // ✅ CAPTURAR TOKEN Y USUARIO DE GOOGLE OAUTH
   useEffect(() => {
-    const emailParam = searchParams.get('email');
-    if (emailParam) {
-      setEmail(emailParam);
-    } else {
+    const token = searchParams.get('token');
+    const userStr = searchParams.get('user');
+
+    if (token && userStr) {
       try {
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (user?.email) setEmail(user.email);
-      } catch (e) {
-        console.error('No se pudo obtener el email');
+        const userData = JSON.parse(decodeURIComponent(userStr));
+        
+        // Guardar en localStorage
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        console.log('✅ Usuario autenticado con Google:', userData);
+        
+        // Limpiar la URL (eliminar token y user de la URL)
+        navigate('/Home', { replace: true });
+        
+      } catch (error) {
+        console.error('❌ Error al procesar datos de autenticación:', error);
       }
     }
-  }, [searchParams]);
+  }, [searchParams, navigate]);
 
-  const handleCodeChange = (index, value) => {
-    if (value.length > 1) return;
-    if (!/^[0-9]*$/.test(value)) return;
-
-    const newCode = [...code];
-    newCode[index] = value;
-    setCode(newCode);
-
-    if (value && index < 5) {
-      document.getElementById(`code-${index + 1}`)?.focus();
+  // ✅ NUEVO: Obtener usuario actual
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const userData = JSON.parse(userStr);
+        setCurrentUser(userData);
+      } catch (error) {
+        console.error('Error al obtener usuario:', error);
+      }
     }
-  };
+  }, []);
 
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !code[index] && index > 0) {
-      document.getElementById(`code-${index - 1}`)?.focus();
-    }
-  };
-
-  const handlePaste = (e) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 6);
-    if (!/^[0-9]*$/.test(pastedData)) return;
-
-    const newCode = pastedData.split('');
-    while (newCode.length < 6) newCode.push('');
-    setCode(newCode);
-
-    const focusIndex = pastedData.length === 6 ? 5 : pastedData.length;
-    document.getElementById(`code-${focusIndex}`)?.focus();
-  };
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    const fullCode = code.join('');
-
-    if (fullCode.length !== 6) {
-      setError('Por favor ingresa el código completo');
-      return;
-    }
-
-    if (!email) {
-      setError('No se encontró el email. Vuelve a registrarte.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setMessage('');
-
-    try {
-      const response = await fetch('http://localhost:5000/api/auth/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code: fullCode })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // ✅ Guardar token y usuario en localStorage
-        if (data.token) localStorage.setItem('token', data.token);
-        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
-
-        setMessage('✅ ¡Verificado! Bienvenido a AdoptaPet 🐾');
-
-        // ✅ Ir directo al home, sin pasar por login
-        setTimeout(() => navigate('/'), 1000);
-
-      } else {
-        setError('❌ ' + data.message);
-        if (data.expired) {
-          setTimeout(() => setError(''), 3000);
+  // ✅ NUEVO: Cargar publicaciones del backend
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          setError('Debes iniciar sesión para ver las publicaciones');
+          setLoading(false);
+          return;
         }
+
+        const response = await fetch('http://localhost:5000/api/posts', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          console.log('✅ Publicaciones cargadas:', data.data.posts);
+          setPosts(data.data.posts || []);
+        } else {
+          setError(data.message || 'Error al cargar publicaciones');
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar publicaciones:', error);
+        setError('Error de conexión con el servidor');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error:', err);
-      setError('Error de conexión. Inténtalo de nuevo.');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    fetchPosts();
+  }, []); // Se ejecuta una vez al montar el componente
+
+  // ✅ NUEVO: Handlers para PostCard
+  const handleDelete = (postId) => {
+    setPosts(posts.filter(post => post._id !== postId));
   };
 
-  const handleResend = async () => {
-    if (!email) {
-      setError('Email no proporcionado');
-      return;
-    }
-
-    setResending(true);
-    setError('');
-    setMessage('');
-
-    try {
-      const response = await fetch('http://localhost:5000/api/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage('📧 Código reenviado. Revisa tu correo.');
-        setCode(['', '', '', '', '', '']);
-        document.getElementById('code-0')?.focus();
-      } else {
-        setError(data.message);
+  const handleLike = (postId, isLiked) => {
+    setPosts(posts.map(post => {
+      if (post._id === postId) {
+        return {
+          ...post,
+          stats: {
+            ...post.stats,
+            likesCount: isLiked 
+              ? (post.stats?.likesCount || 0) + 1 
+              : (post.stats?.likesCount || 1) - 1
+          }
+        };
       }
-    } catch (err) {
-      setError('Error al reenviar código');
-    } finally {
-      setResending(false);
-    }
+      return post;
+    }));
+  };
+
+  const handleComment = (postId, comment) => {
+    setPosts(posts.map(post => {
+      if (post._id === postId) {
+        return {
+          ...post,
+          comments: [...(post.comments || []), comment],
+          stats: {
+            ...post.stats,
+            commentsCount: (post.stats?.commentsCount || 0) + 1
+          }
+        };
+      }
+      return post;
+    }));
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-3xl shadow-2xl p-8">
-
-          <div className="text-center mb-8">
-            <div className="text-6xl mb-4">📧</div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Verifica tu email</h1>
-            <p className="text-gray-600">Hemos enviado un código de 6 dígitos a</p>
-            <p className="text-purple-600 font-semibold mt-1">{email || 'tu correo electrónico'}</p>
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 pb-20 md:pb-8">
+      <Header />
+      
+      <div className="max-w-7xl mx-auto pt-4 md:pt-6 px-3 md:px-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
+          
+          <div className="hidden md:block md:col-span-3">
+            <Sidebar onOpenModal={() => setIsModalOpen(true)} />
           </div>
 
-          <form onSubmit={handleVerify} className="space-y-6">
-            <div className="flex justify-center gap-2">
-              {code.map((digit, index) => (
-                <input
-                  key={index}
-                  id={`code-${index}`}
-                  type="text"
-                  maxLength="1"
-                  value={digit}
-                  onChange={(e) => handleCodeChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  onPaste={index === 0 ? handlePaste : undefined}
-                  className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition-all"
-                  disabled={loading}
-                />
-              ))}
-            </div>
+          <main className="col-span-1 md:col-span-6 space-y-4 md:space-y-6">
+            
+            {/* ✅ NUEVO: Estado de carga */}
+            {loading && (
+              <div className="bg-white rounded-lg shadow-md p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+                <p className="text-gray-600">Cargando publicaciones...</p>
+              </div>
+            )}
 
+            {/* ✅ NUEVO: Estado de error */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <p className="font-semibold">⚠️ Error</p>
+                <p className="text-sm">{error}</p>
               </div>
             )}
 
-            {message && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                {message}
+            {/* ✅ NUEVO: Mostrar publicaciones del backend */}
+            {!loading && !error && posts.length === 0 && (
+              <div className="bg-white rounded-lg shadow-md p-12 text-center">
+                <div className="text-6xl mb-4">📝</div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                  No hay publicaciones aún
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Sé el primero en compartir algo con la comunidad
+                </p>
+                <button 
+                  onClick={() => navigate('/publicar')}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all"
+                >
+                  Crear publicación
+                </button>
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading || code.join('').length !== 6}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold text-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:shadow-lg"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Verificando...
-                </span>
-              ) : (
-                'Verificar código'
-              )}
-            </button>
-          </form>
+            {/* ✅ ACTUALIZADO: Mostrar publicaciones reales */}
+            {!loading && !error && posts.length > 0 && posts.map(post => (
+              <PostCard 
+                key={post._id} 
+                post={post}
+                currentUser={currentUser}
+                onDelete={handleDelete}
+                onLike={handleLike}
+                onComment={handleComment}
+              />
+            ))}
+            
+            <FeaturedPetsMobile />
+          </main>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm mb-2">¿No recibiste el código?</p>
-            <button
-              onClick={handleResend}
-              disabled={resending}
-              className="text-purple-600 font-semibold hover:text-purple-700 disabled:opacity-50 text-sm"
-            >
-              {resending ? 'Reenviando...' : 'Reenviar código'}
-            </button>
+          <div className="hidden md:block md:col-span-3">
+            <RightSidebar />
           </div>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => navigate('/login')}
-              className="text-gray-500 hover:text-gray-700 text-sm"
-            >
-              ← Volver al login
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>⏰ El código expira en 15 minutos</p>
-          <p className="mt-2">🔒 Revisa también tu carpeta de spam</p>
+          
         </div>
       </div>
+
+      <BottomNav onOpenModal={() => setIsModalOpen(true)} />
+      <PostModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

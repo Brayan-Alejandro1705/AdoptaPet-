@@ -12,24 +12,19 @@ export default function VerifyEmail() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // ✅ CORREGIDO: Obtener email desde query param o localStorage como fallback
     const emailParam = searchParams.get('email');
     if (emailParam) {
       setEmail(emailParam);
     } else {
-      // Fallback: intentar obtener desde localStorage
       try {
         const user = JSON.parse(localStorage.getItem('user'));
-        if (user?.email) {
-          setEmail(user.email);
-        }
+        if (user?.email) setEmail(user.email);
       } catch (e) {
         console.error('No se pudo obtener el email del localStorage');
       }
     }
   }, [searchParams]);
 
-  // Manejar cambio en inputs de código
   const handleCodeChange = (index, value) => {
     if (value.length > 1) return;
     if (!/^[0-9]*$/.test(value)) return;
@@ -38,20 +33,17 @@ export default function VerifyEmail() {
     newCode[index] = value;
     setCode(newCode);
 
-    // Auto-focus al siguiente input
     if (value && index < 5) {
       document.getElementById(`code-${index + 1}`)?.focus();
     }
   };
 
-  // Manejar backspace
   const handleKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !code[index] && index > 0) {
       document.getElementById(`code-${index - 1}`)?.focus();
     }
   };
 
-  // Pegar código desde portapapeles
   const handlePaste = (e) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').slice(0, 6);
@@ -61,7 +53,6 @@ export default function VerifyEmail() {
     while (newCode.length < 6) newCode.push('');
     setCode(newCode);
 
-    // Focus al último dígito
     if (pastedData.length === 6) {
       document.getElementById('code-5')?.focus();
     } else {
@@ -69,7 +60,6 @@ export default function VerifyEmail() {
     }
   };
 
-  // Verificar código
   const handleVerify = async (e) => {
     e.preventDefault();
     const fullCode = code.join('');
@@ -89,33 +79,28 @@ export default function VerifyEmail() {
     setMessage('');
 
     try {
-      // ✅ CORREGIDO: Usar localhost en vez de 127.0.0.1
       const response = await fetch('http://localhost:5000/api/auth/verify-email', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: email,
-          code: fullCode
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code: fullCode })
       });
 
       const data = await response.json();
 
       if (data.success) {
+        // ✅ Guardar token y usuario para quedar autenticado
+        if (data.token) localStorage.setItem('token', data.token);
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+
         setMessage('✅ ' + data.message);
-        
-        setTimeout(() => {
-          navigate('/login?verified=true');
-        }, 2000);
+
+        // ✅ Ir al Home directo
+        setTimeout(() => navigate('/'), 1000);
+
       } else {
         setError('❌ ' + data.message);
-        
         if (data.expired) {
-          setTimeout(() => {
-            setError('');
-          }, 3000);
+          setTimeout(() => setError(''), 3000);
         }
       }
     } catch (err) {
@@ -126,7 +111,6 @@ export default function VerifyEmail() {
     }
   };
 
-  // Reenviar código
   const handleResend = async () => {
     if (!email) {
       setError('Email no proporcionado');
@@ -138,12 +122,9 @@ export default function VerifyEmail() {
     setMessage('');
 
     try {
-      // ✅ CORREGIDO: Usar localhost en vez de 127.0.0.1
       const response = await fetch('http://localhost:5000/api/auth/resend-verification', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
 
@@ -167,25 +148,16 @@ export default function VerifyEmail() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Card principal */}
         <div className="bg-white rounded-3xl shadow-2xl p-8">
-          {/* Logo e iconos */}
+
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">📧</div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Verifica tu email
-            </h1>
-            <p className="text-gray-600">
-              Hemos enviado un código de 6 dígitos a
-            </p>
-            <p className="text-purple-600 font-semibold mt-1">
-              {email || 'tu correo electrónico'}
-            </p>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Verifica tu email</h1>
+            <p className="text-gray-600">Hemos enviado un código de 6 dígitos a</p>
+            <p className="text-purple-600 font-semibold mt-1">{email || 'tu correo electrónico'}</p>
           </div>
 
-          {/* Formulario */}
           <form onSubmit={handleVerify} className="space-y-6">
-            {/* Inputs del código */}
             <div className="flex justify-center gap-2">
               {code.map((digit, index) => (
                 <input
@@ -203,7 +175,6 @@ export default function VerifyEmail() {
               ))}
             </div>
 
-            {/* Mensajes */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -216,7 +187,6 @@ export default function VerifyEmail() {
               </div>
             )}
 
-            {/* Botón verificar */}
             <button
               type="submit"
               disabled={loading || code.join('').length !== 6}
@@ -233,11 +203,8 @@ export default function VerifyEmail() {
             </button>
           </form>
 
-          {/* Reenviar código */}
           <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm mb-2">
-              ¿No recibiste el código?
-            </p>
+            <p className="text-gray-600 text-sm mb-2">¿No recibiste el código?</p>
             <button
               onClick={handleResend}
               disabled={resending}
@@ -247,7 +214,6 @@ export default function VerifyEmail() {
             </button>
           </div>
 
-          {/* Volver al login */}
           <div className="mt-6 text-center">
             <button
               onClick={() => navigate('/login')}
@@ -258,7 +224,6 @@ export default function VerifyEmail() {
           </div>
         </div>
 
-        {/* Info adicional */}
         <div className="mt-6 text-center text-sm text-gray-600">
           <p>⏰ El código expira en 15 minutos</p>
           <p className="mt-2">🔒 Revisa también tu carpeta de spam</p>
