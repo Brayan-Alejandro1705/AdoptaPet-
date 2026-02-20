@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Header from "../components/common/Header";
 import Sidebar from "../components/common/Sidebar";
-import BottomNav from "../components/layout/BottomNav";
+
 
 const CrearAdopcion = () => {
   const [loading, setLoading] = useState(false);
@@ -471,7 +471,7 @@ const CrearAdopcion = () => {
         </div>
       </div>
 
-      <BottomNav />
+
     </div>
   );
 };

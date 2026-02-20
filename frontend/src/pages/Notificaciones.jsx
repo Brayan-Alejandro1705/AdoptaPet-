@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from '../components/common/Header.jsx';
 import Sidebar from '../components/common/Sidebar';
-import BottomNav from '../components/layout/BottomNav';
+
 import { Check, Trash2 } from 'lucide-react';
 import { notificationService } from '../services/notificationService.js';
 
@@ -256,7 +256,7 @@ const Notificaciones = () => {
         </div>
       </div>
 
-      <BottomNav />
+
 
       {/* Modal confirmación */}
       {confirmModal.isOpen && (

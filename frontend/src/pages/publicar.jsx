@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Header from "../components/common/Header";
 import Sidebar from "../components/common/Sidebar";
-import BottomNav from "../components/layout/BottomNav";
+
 import PublishTextarea from "../components/common/PublishTextarea";
 import ImagePreview from "../components/common/ImagePreview";
 import PublishOptions from "../components/common/PublishOptions";
@@ -183,7 +183,7 @@ const Publicar = () => {
         </div>
       </div>
 
-      <BottomNav />
+
     </div>
   );
 };

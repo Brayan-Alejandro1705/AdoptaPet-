@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
-import BottomNav from '../components/layout/BottomNav';
+
 import PetCard from '../components/common/PetCard';
 import PetModal from '../components/common/PetModal';
 import FilterSection from '../components/adoptar/FilterSection';
@@ -185,7 +185,7 @@ export default function Adoptar() {
         </div>
       </div>
 
-      <BottomNav />
+
       {selectedPet && <PetModal pet={selectedPet} onClose={() => setSelectedPet(null)} />}
     </div>
   );

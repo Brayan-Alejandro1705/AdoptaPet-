@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
 import RightSidebar from '../components/common/RightSidebar';
-import BottomNav from '../components/layout/BottomNav';
+
 import PostCard from '../components/common/PostCard';
 import FeaturedPetsMobile from '../components/common/FeaturedPetsMobile';
 
@@ -265,21 +265,55 @@ export default function Home() {
                   <div className="ap-compose-placeholder">¿Qué quieres compartir?</div>
                 </div>
 
-                {/* Acciones rápidas */}
-                <div style={{ background: 'white', borderRadius: 16, padding: '4px 16px 12px', marginBottom: 12, boxShadow: '0 1px 8px rgba(0,0,0,0.07)' }}>
-                  <div className="ap-compose-actions">
-                    <button className="ap-compose-action-btn" onClick={handleOpenPublicar}>
-                      <span style={{ fontSize: 17 }}>📸</span> Foto
-                    </button>
-                    <div style={{ width: 1, background: '#F0EBE3', margin: '0 4px' }} />
-                    <button className="ap-compose-action-btn" onClick={handleOpenPublicar}>
-                      <span style={{ fontSize: 17 }}>🐾</span> Mascota
-                    </button>
-                    <div style={{ width: 1, background: '#F0EBE3', margin: '0 4px' }} />
-                    <button className="ap-compose-action-btn" onClick={handleOpenPublicar}>
-                      <span style={{ fontSize: 17 }}>✍️</span> Historia
-                    </button>
-                  </div>
+                {/* Acciones rápidas — 2 botones */}
+                <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                  <button
+                    onClick={handleOpenPublicar}
+                    style={{
+                      flex: 1, background: 'white', border: 'none',
+                      borderRadius: 14, padding: '14px 12px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      gap: 8, cursor: 'pointer',
+                      boxShadow: '0 1px 8px rgba(0,0,0,0.07)',
+                      fontFamily: 'Figtree, sans-serif',
+                    }}
+                  >
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontSize: 18 }}>✍️</span>
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1E1030', lineHeight: 1.2 }}>Publicación</div>
+                      <div style={{ fontSize: 11, color: '#9C8E84', marginTop: 1 }}>Foto o historia</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => navigate('/adoptar/crear')}
+                    style={{
+                      flex: 1, background: 'white', border: 'none',
+                      borderRadius: 14, padding: '14px 12px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      gap: 8, cursor: 'pointer',
+                      boxShadow: '0 1px 8px rgba(0,0,0,0.07)',
+                      fontFamily: 'Figtree, sans-serif',
+                    }}
+                  >
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      background: 'linear-gradient(135deg, #3D9E6E, #20B2AA)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontSize: 18 }}>🐾</span>
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1E1030', lineHeight: 1.2 }}>Adopción</div>
+                      <div style={{ fontSize: 11, color: '#9C8E84', marginTop: 1 }}>Dar en adopción</div>
+                    </div>
+                  </button>
                 </div>
               </div>
 
@@ -347,7 +381,7 @@ export default function Home() {
         </div>
       </div>
 
-      <BottomNav onOpenModal={handleOpenPublicar} />
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { chatService } from '../services/chatService';
-import BottomNav from '../components/layout/BottomNav';
+
 import ChatList from '../components/common/ChatList';
 import ChatWindow from '../components/common/ChatWindow';
 
@@ -214,7 +214,7 @@ export default function Chat() {
             <p className="text-gray-500 text-sm">Cuando contactes a alguien sobre una mascota, tus chats aparecerán aquí</p>
           </div>
         </div>
-        <BottomNav />
+
       </div>
     );
   }
@@ -256,7 +256,7 @@ export default function Chat() {
       </div>
 
       {/* BottomNav fija abajo */}
-      <BottomNav />
+
     </div>
   );
 }

@@ -9,7 +9,7 @@ import Registro from './pages/registro';
 import VerifyEmail from './pages/VerifyEmail';
 import Publicar from './pages/publicar';
 import Chat from './pages/Chat';
-import Ajustes from './pages/Ajustes';
+import Ajustes from './pages/ajustes';
 import Amigos from './pages/amigos';
 import Adminpanel from './pages/AdminPanel';
 import CrearAdopcion from './pages/CrearAdopcion';

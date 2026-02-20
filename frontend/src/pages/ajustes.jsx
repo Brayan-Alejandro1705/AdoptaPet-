@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
-import BottomNav from '../components/layout/BottomNav';
+
 import SettingsOption from '../components/common/SettingsOption';
 import CuentaModal from '../components/common/CuentaModal';
 import NotificacionesModal from '../components/common/NotificacionesModal';

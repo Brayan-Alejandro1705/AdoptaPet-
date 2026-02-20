@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
-import BottomNav from '../components/layout/BottomNav';
+
 import FriendCard from '../components/common/FriendCard';
 import ProfileModal from '../components/common/ProfileModal';
 import MessageModal from '../components/common/MessageModal';
@@ -140,7 +140,7 @@ export default function Amigos() {
         </div>
       </div>
 
-      <BottomNav />
+
 
       {selectedFriend && (
         <ProfileModal

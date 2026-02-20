@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
-import BottomNav from '../components/layout/BottomNav';
+
 import { Send, Camera, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function AIAssistant() {
@@ -216,7 +216,7 @@ export default function AIAssistant() {
         </div>
       </div>
 
-      <BottomNav />
+
     </div>
   );
 }
