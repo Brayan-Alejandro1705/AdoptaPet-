@@ -217,8 +217,6 @@ router.get('/notification-settings', protect, async (req, res) => {
 // PUT /api/users/notification-settings
 router.put('/notification-settings', protect, async (req, res) => {
   try {
-    // ✅ Validación / whitelist según tu modelo:
-    // notificationSettings: { likes, comments, followers, mentions, messages }
     const { likes, comments, followers, mentions, messages } = req.body;
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -257,6 +255,78 @@ router.put('/notification-settings', protect, async (req, res) => {
 });
 
 // =====================================================
+// ✅ POST SETTINGS (NUEVO) - AJUSTES DE PUBLICACIONES
+// =====================================================
+// ✅ IMPORTANTÍSIMO: el frontend llama /me/post-settings
+// Así que las rutas deben ser /me/post-settings
+
+// GET /api/users/me/post-settings
+router.get('/me/post-settings', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('postSettings');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    // 👇 Para que tu frontend (que hace ...data) funcione fácil,
+    // devolvemos directamente el objeto (sin envolverlo)
+    return res.json(user.postSettings || {});
+  } catch (error) {
+    console.error('❌ Error al obtener postSettings:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener postSettings'
+    });
+  }
+});
+
+// PUT /api/users/me/post-settings
+router.put('/me/post-settings', protect, async (req, res) => {
+  try {
+    const { privacidadPorDefecto, permitirComentarios, permitirCompartir } = req.body;
+
+    // ✅ whitelist + validación simple
+    const allowedPrivacy = ['publico', 'amigos', 'privado'];
+    const safePrivacy = allowedPrivacy.includes(privacidadPorDefecto)
+      ? privacidadPorDefecto
+      : 'publico';
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        postSettings: {
+          privacidadPorDefecto: safePrivacy,
+          permitirComentarios: Boolean(permitirComentarios),
+          permitirCompartir: Boolean(permitirCompartir),
+          updatedAt: new Date()
+        }
+      },
+      { new: true, runValidators: true }
+    ).select('postSettings');
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    // Igual: devolvemos directo el objeto para el modal
+    return res.json(updatedUser.postSettings || {});
+  } catch (error) {
+    console.error('❌ Error al actualizar postSettings:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al actualizar postSettings'
+    });
+  }
+});
+
+// =====================================================
 // ✅ CUENTA: CAMBIAR CONTRASEÑA (REAL)
 // PATCH /api/users/me/password
 // =====================================================
@@ -278,7 +348,6 @@ router.patch('/me/password', protect, async (req, res) => {
       });
     }
 
-    // Tu schema tiene select:false para password => necesitamos select('+password')
     const user = await User.findById(req.user.id).select('+password');
 
     if (!user) {
@@ -288,7 +357,6 @@ router.patch('/me/password', protect, async (req, res) => {
       });
     }
 
-    // Si es usuario Google sin password
     if (!user.password) {
       return res.status(400).json({
         success: false,
@@ -304,7 +372,6 @@ router.patch('/me/password', protect, async (req, res) => {
       });
     }
 
-    // ✅ NO hasheamos aquí porque tu modelo ya tiene pre('save') que encripta
     user.password = newPassword;
     await user.save();
 
@@ -327,7 +394,6 @@ router.patch('/me/password', protect, async (req, res) => {
 // =====================================================
 router.patch('/me/deactivate', protect, async (req, res) => {
   try {
-    // reason es opcional, por si luego quieres guardarlo en DB/logs
     const { reason } = req.body;
 
     const user = await User.findByIdAndUpdate(

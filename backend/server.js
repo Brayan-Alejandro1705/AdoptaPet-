@@ -484,7 +484,6 @@ try {
   const userRoutes = require('./src/routes/userRoutes');
   app.use('/api/users/avatar', uploadLimiter);
   app.use('/api/users', userRoutes);
-  app.use('/', userRoutes);
   logger.log.success('Rutas de usuarios cargadas');
 } catch (error) {
   logger.log.warning('Rutas de usuarios no disponibles');

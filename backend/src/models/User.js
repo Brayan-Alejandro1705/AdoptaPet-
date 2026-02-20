@@ -265,6 +265,33 @@ const userSchema = new mongoose.Schema({
     }],
     
     // =============================================
+    // ✅ NUEVO: AJUSTES DE PUBLICACIONES (MODAL PUBLICACIONES)
+    // =============================================
+    // Solo estos 3:
+    // - privacidadPorDefecto: publico | amigos | privado
+    // - permitirComentarios: boolean
+    // - permitirCompartir: boolean
+    postSettings: {
+        privacidadPorDefecto: {
+            type: String,
+            enum: ['publico', 'amigos', 'privado'],
+            default: 'publico'
+        },
+        permitirComentarios: {
+            type: Boolean,
+            default: true
+        },
+        permitirCompartir: {
+            type: Boolean,
+            default: true
+        },
+        updatedAt: {
+            type: Date,
+            default: Date.now
+        }
+    },
+    
+    // =============================================
     // SEGURIDAD
     // =============================================
     
@@ -431,6 +458,7 @@ userSchema.virtual('profileCompleteness').get(function() {
 // MIDDLEWARE
 // =============================================
 
+// 🔐 Hash password
 userSchema.pre('save', async function(next) {
     if (!this.password || !this.isModified('password')) return next();
     
@@ -444,6 +472,15 @@ userSchema.pre('save', async function(next) {
         console.error('❌ Error al encriptar contraseña:', error);
         next(error);
     }
+});
+
+// ✅ Actualizar timestamp de postSettings cuando cambie
+userSchema.pre('save', function(next) {
+    if (this.isModified('postSettings')) {
+        this.postSettings = this.postSettings || {};
+        this.postSettings.updatedAt = new Date();
+    }
+    next();
 });
 
 userSchema.pre('save', function(next) {
@@ -595,6 +632,9 @@ userSchema.index({ googleId: 1 }, { sparse: true });
 
 // ✅ (Opcional) índice para consultas por amigos
 userSchema.index({ friends: 1 });
+
+// ✅ (Opcional) índice para consultas por privacidad por defecto
+userSchema.index({ 'postSettings.privacidadPorDefecto': 1 });
 
 // =============================================
 // CREAR Y EXPORTAR MODELO

@@ -58,7 +58,7 @@ const auth = async (req, res, next) => {
     console.log('🔑 Token extraído:', token.substring(0, 20) + '...');
 
     const jwt = require('jsonwebtoken');
-    const User = require('../models/User');
+    const UserModel = require('../models/User');
     
     let decoded;
     try {
@@ -73,7 +73,7 @@ const auth = async (req, res, next) => {
     }
 
     // Buscar usuario en BD
-    const user = await User.findById(decoded.id);
+    const user = await UserModel.findById(decoded.id);
     if (!user) {
       console.log('❌ Usuario no encontrado en BD');
       return res.status(401).json({
@@ -106,6 +106,41 @@ const auth = async (req, res, next) => {
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+
+// ============================================
+// ✅ HELPER: MAPEAR PRIVACIDAD (MODAL) -> VISIBILITY (POST)
+// ============================================
+// Modal:  publico | amigos | privado
+// Post:   public  | friends | private
+const mapPrivacidadToVisibility = (priv) => {
+  if (priv === 'amigos') return 'friends';
+  if (priv === 'privado') return 'private';
+  return 'public';
+};
+
+// ============================================
+// ✅ HELPER: FILTRO DE PRIVACIDAD PARA FEED
+// ============================================
+const buildVisibilityFilter = (req) => {
+  const viewerId = req.userId;
+  const friendsIds = req.user?.friends || [];
+
+  return {
+    status: 'active',
+    $or: [
+      { "settings.visibility": "public" },
+      { "settings.visibility": { $exists: false } }, // posts antiguos
+      { author: viewerId },                          // siempre ves los tuyos
+      {
+        $and: [
+          { "settings.visibility": "friends" },
+          { author: { $in: friendsIds } }
+        ]
+      }
+      // private: solo lo ve el autor (ya cubierto por {author: viewerId})
+    ]
+  };
+};
 
 // ============================================
 // RUTAS DE POSTS
@@ -163,7 +198,7 @@ router.get('/user/my-posts', auth, async (req, res) => {
   }
 });
 
-// ⭐ NUEVO: OBTENER TODAS LAS PUBLICACIONES (FEED PRINCIPAL)
+// ⭐ NUEVO: OBTENER TODAS LAS PUBLICACIONES (FEED PRINCIPAL) ✅ (CON PRIVACIDAD)
 router.get('/', auth, async (req, res) => {
   try {
     console.log('📰 Obteniendo todas las publicaciones...');
@@ -172,7 +207,9 @@ router.get('/', auth, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find({ status: 'active' })
+    const filter = buildVisibilityFilter(req);
+
+    const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
       .populate('comments.user', 'name nombre email avatar')
       .sort({ createdAt: -1 })
@@ -180,7 +217,7 @@ router.get('/', auth, async (req, res) => {
       .limit(limit)
       .lean();
 
-    const totalPosts = await Post.countDocuments({ status: 'active' });
+    const totalPosts = await Post.countDocuments(filter);
 
     console.log(`✅ Posts encontrados: ${posts.length}`);
 
@@ -206,7 +243,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// 1. CREAR PUBLICACIÓN
+// 1. CREAR PUBLICACIÓN (✅ APLICA postSettings DEL USUARIO)
 router.post('/', auth, upload.single('imagen'), async (req, res) => {
   try {
     console.log('📝 ===== CREANDO NUEVA PUBLICACIÓN =====');
@@ -223,6 +260,27 @@ router.post('/', auth, upload.single('imagen'), async (req, res) => {
         message: 'Debes proporcionar contenido o una imagen'
       });
     }
+
+    // ✅ Defaults desde el usuario (del modal)
+    const userPostSettings = req.user?.postSettings || {};
+    const defaultVisibility = mapPrivacidadToVisibility(userPostSettings.privacidadPorDefecto);
+
+    const allowCommentsDefault =
+      typeof userPostSettings.permitirComentarios === 'boolean'
+        ? userPostSettings.permitirComentarios
+        : true;
+
+    const allowSharingDefault =
+      typeof userPostSettings.permitirCompartir === 'boolean'
+        ? userPostSettings.permitirCompartir
+        : true;
+
+    // (Opcional) Si algún día mandas visibility desde el front, lo respetas aquí:
+    const visibilityFromBody = req.body.visibility; // 'public' | 'friends' | 'private'
+    const allowedVisibilities = ['public', 'friends', 'private'];
+    const finalVisibility = allowedVisibilities.includes(visibilityFromBody)
+      ? visibilityFromBody
+      : defaultVisibility;
 
     const postData = {
       author: req.userId,
@@ -241,11 +299,15 @@ router.post('/', auth, upload.single('imagen'), async (req, res) => {
         views: 0
       },
       settings: {
-        visibility: 'public',
-        allowComments: true,
-        allowSharing: true
+        visibility: finalVisibility,
+        allowComments: allowCommentsDefault,
+        allowSharing: allowSharingDefault
       }
     };
+
+    // Si tu app usa petInfo / disponibleAdopcion, puedes guardarlos aquí (solo si tu modelo Post lo soporta)
+    // if (petInfo) postData.petInfo = petInfo;
+    // if (typeof disponibleAdopcion !== 'undefined') postData.disponibleAdopcion = disponibleAdopcion;
 
     if (req.file) {
       postData.media.images.push(`/uploads/posts/${req.file.filename}`);
@@ -276,7 +338,7 @@ router.post('/', auth, upload.single('imagen'), async (req, res) => {
   }
 });
 
-// 2. OBTENER FEED DE PUBLICACIONES
+// 2. OBTENER FEED DE PUBLICACIONES ✅ (CON PRIVACIDAD)
 router.get('/feed', auth, async (req, res) => {
   try {
     console.log('📰 Obteniendo feed...');
@@ -285,7 +347,9 @@ router.get('/feed', auth, async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find({ status: 'active' })
+    const filter = buildVisibilityFilter(req);
+
+    const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
       .populate('comments.user', 'name nombre email avatar')
       .sort({ createdAt: -1 })
@@ -293,7 +357,7 @@ router.get('/feed', auth, async (req, res) => {
       .limit(limit)
       .lean();
 
-    const totalPosts = await Post.countDocuments({ status: 'active' });
+    const totalPosts = await Post.countDocuments(filter);
 
     console.log(`✅ Posts en feed: ${posts.length}`);
 
@@ -318,7 +382,7 @@ router.get('/feed', auth, async (req, res) => {
   }
 });
 
-// 3. OBTENER POSTS DE UN USUARIO
+// 3. OBTENER POSTS DE UN USUARIO (NO FILTRA PRIVACIDAD AQUÍ; si quieres lo ajustamos también)
 router.get('/user/:userId', auth, async (req, res) => {
   try {
     console.log('📋 Obteniendo posts del usuario:', req.params.userId);
@@ -362,38 +426,6 @@ router.get('/user/:userId', auth, async (req, res) => {
       success: false,
       message: 'Error al obtener publicaciones del usuario',
       error: error.message
-    });
-  }
-});
-
-// 4. OBTENER PUBLICACIÓN POR ID
-router.get('/:postId', auth, async (req, res) => {
-  try {
-    console.log('📄 Obteniendo post:', req.params.postId);
-    
-    const post = await Post.findById(req.params.postId)
-      .populate('author', 'name nombre email avatar role verified')
-      .populate('comments.user', 'name nombre email avatar')
-      .lean();
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
-    }
-
-    console.log('✅ Post encontrado');
-
-    res.json({
-      success: true,
-      data: { post }
-    });
-  } catch (error) {
-    console.error('❌ Error obteniendo post:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener la publicación'
     });
   }
 });
@@ -449,7 +481,7 @@ router.post('/:postId/like', auth, async (req, res) => {
           const notificationData = {
             recipient: post.author,
             sender: req.userId,
-            type: 'like',  // ⭐ CORREGIDO: 'like' en lugar de 'favorite'
+            type: 'like',
             title: 'Le gustó tu publicación',
             message: `A ${liker.name || liker.nombre} le gustó tu publicación`,
             icon: '❤️',
@@ -464,11 +496,9 @@ router.post('/:postId/like', auth, async (req, res) => {
           const notification = await Notification.create(notificationData);
           console.log('🔔 ✅ Notificación creada con ID:', notification._id);
           
-          // Verificar que se guardó
           const verificar = await Notification.findById(notification._id);
           console.log('✅ Verificación en BD:', verificar ? 'GUARDADA' : 'ERROR AL GUARDAR');
 
-          // Emitir por Socket.io
           const io = req.app.get('io');
           if (io) {
             io.to(post.author.toString()).emit('nueva-notificacion', {
@@ -586,10 +616,7 @@ router.post('/:postId/comments', auth, async (req, res) => {
       createdAt: new Date()
     };
 
-    if (!post.comments) {
-      post.comments = [];
-    }
-
+    if (!post.comments) post.comments = [];
     post.comments.push(newComment);
 
     if (post.stats) {
@@ -609,7 +636,7 @@ router.post('/:postId/comments', auth, async (req, res) => {
         const notificationData = {
           recipient: post.author,
           sender: req.userId,
-          type: 'comment',  // ⭐ CORREGIDO: 'comment' en lugar de 'message'
+          type: 'comment',
           title: 'Nuevo comentario',
           message: `${commenter.name || commenter.nombre} comentó: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
           icon: '💬',
@@ -624,7 +651,6 @@ router.post('/:postId/comments', auth, async (req, res) => {
         const notification = await Notification.create(notificationData);
         console.log('🔔 ✅ Notificación creada con ID:', notification._id);
 
-        // Emitir por Socket.io
         const io = req.app.get('io');
         if (io) {
           io.to(post.author.toString()).emit('nueva-notificacion', {
@@ -859,20 +885,6 @@ router.put('/:postId', auth, async (req, res) => {
   }
 });
 
-console.log('✅ Rutas de posts configuradas con notificaciones automáticas');
-console.log('   📝 POST   /api/posts - Crear publicación');
-console.log('   📰 GET    /api/posts - TODAS las publicaciones');
-console.log('   📰 GET    /api/posts/feed - Feed de publicaciones');
-console.log('   👤 GET    /api/posts/user/my-posts - Mis publicaciones');
-console.log('   👥 GET    /api/posts/user/:userId - Posts de usuario');
-console.log('   📄 GET    /api/posts/:postId - Ver publicación');
-console.log('   ❤️  POST   /api/posts/:postId/like - Dar like (type: "like")');
-console.log('   💔 DELETE /api/posts/:postId/like - Quitar like');
-console.log('   💬 POST   /api/posts/:postId/comments - Agregar comentario (type: "comment")');
-console.log('   💬 GET    /api/posts/:postId/comments - Ver comentarios');
-console.log('   💬 DELETE /api/posts/:postId/comments/:commentId - Borrar comentario');
-console.log('   🗑️  DELETE /api/posts/:postId - Eliminar');
-console.log('   ✏️  PUT    /api/posts/:postId - Editar');
 // ============================================
 // IMPORTAR MIDDLEWARE DE MODERACIÓN
 // ============================================
@@ -880,6 +892,7 @@ const { isAdmin, isSuperAdmin } = require('../middleware/moderationAuth');
 
 // ============================================
 // RUTAS DE MODERACIÓN (SOLO ADMIN/SUPERADMIN)
+// ⚠️ IMPORTANTE: VAN ANTES DE '/:postId'
 // ============================================
 
 // 1. OBTENER TODAS LAS PUBLICACIONES (INCLUYENDO ELIMINADAS) - SOLO ADMIN
@@ -1018,6 +1031,52 @@ router.delete('/admin/:postId/permanent', auth, isSuperAdmin, async (req, res) =
   }
 });
 
+// 4. OBTENER PUBLICACIÓN POR ID (DEBE IR DESPUÉS DE /admin/*)
+router.get('/:postId', auth, async (req, res) => {
+  try {
+    console.log('📄 Obteniendo post:', req.params.postId);
+    
+    const post = await Post.findById(req.params.postId)
+      .populate('author', 'name nombre email avatar role verified')
+      .populate('comments.user', 'name nombre email avatar')
+      .lean();
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Publicación no encontrada'
+      });
+    }
+
+    console.log('✅ Post encontrado');
+
+    res.json({
+      success: true,
+      data: { post }
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo post:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener la publicación'
+    });
+  }
+});
+
+console.log('✅ Rutas de posts configuradas con notificaciones automáticas');
+console.log('   📝 POST   /api/posts - Crear publicación');
+console.log('   📰 GET    /api/posts - TODAS las publicaciones (con privacidad)');
+console.log('   📰 GET    /api/posts/feed - Feed de publicaciones (con privacidad)');
+console.log('   👤 GET    /api/posts/user/my-posts - Mis publicaciones');
+console.log('   👥 GET    /api/posts/user/:userId - Posts de usuario');
+console.log('   📄 GET    /api/posts/:postId - Ver publicación');
+console.log('   ❤️  POST   /api/posts/:postId/like - Dar like (type: "like")');
+console.log('   💔 DELETE /api/posts/:postId/like - Quitar like');
+console.log('   💬 POST   /api/posts/:postId/comments - Agregar comentario (type: "comment")');
+console.log('   💬 GET    /api/posts/:postId/comments - Ver comentarios');
+console.log('   💬 DELETE /api/posts/:postId/comments/:commentId - Borrar comentario');
+console.log('   🗑️  DELETE /api/posts/:postId - Eliminar');
+console.log('   ✏️  PUT    /api/posts/:postId - Editar');
 console.log('✅ Rutas de moderación configuradas');
 
 module.exports = router;
