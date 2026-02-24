@@ -16,6 +16,7 @@ const favoritesRoutes = require("./src/routes/favoritos");
 console.log('🚀 Iniciando Adoptapet Backend v2.0...');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Estado de servicios
@@ -45,13 +46,15 @@ const corsOptions = {
       'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:5173',
-      'http://127.0.0.1:5173'
+      'http://127.0.0.1:5173',
+      'https://adoptapet.up.railway.app'
     ];
     
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      callback(null, true);
+      callback(new Error('No permitido por CORS'));
+      
     }
   },
   credentials: true,
@@ -192,7 +195,7 @@ const sessionConfig = {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   }
 };
 
