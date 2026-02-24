@@ -14,8 +14,7 @@ const Sidebar = () => {
   ];
 
   return (
-    // hidden en móvil, visible desde md en adelante
-    <aside className="hidden md:flex w-64 bg-white h-screen shadow-xl fixed left-0 top-16 p-5 flex-col z-40">
+    <aside className="hidden md:flex w-64 bg-white shadow-xl fixed left-0 top-16 bottom-0 p-5 flex-col z-40">
       <nav className="flex flex-col space-y-1.5">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
@@ -35,6 +34,21 @@ const Sidebar = () => {
           );
         })}
       </nav>
+
+      {/* Botón de opinión al fondo del sidebar */}
+      <div className="mt-auto pt-4 border-t border-gray-100">
+        <Link
+          to="/feedback"
+          className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium text-sm ${
+            location.pathname === '/feedback'
+              ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-md scale-[1.02]'
+              : 'bg-pink-50 text-pink-600 hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-500 hover:text-white hover:scale-[1.01]'
+          }`}
+        >
+          <span className="text-lg">💬</span>
+          Danos tu opinión
+        </Link>
+      </div>
     </aside>
   );
 };

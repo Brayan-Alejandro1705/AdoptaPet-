@@ -16,7 +16,7 @@ const Ajustes = () => {
   const [modalPublicaciones, setModalPublicaciones] = useState(false);
   const [modalEtiquetado, setModalEtiquetado] = useState(false);
 
-  // Estado global de ajustes
+  // Estado global de ajustes de publicaciones/cuenta
   const [settings, setSettings] = useState({
     privacidadPorDefecto: 'publico',
     permitirComentarios: true,
@@ -26,7 +26,7 @@ const Ajustes = () => {
     archivarAutomatico: false,
   });
 
-  // ✅ Estado específico para notificationSettings (endpoint /api/users/notification-settings)
+  // ✅ Estado específico para notificaciones
   const [notificationSettings, setNotificationSettings] = useState({
     likes: true,
     comments: true,
@@ -37,14 +37,10 @@ const Ajustes = () => {
 
   const token = localStorage.getItem('token');
 
-  // ==============================================
-  // 🟣 OBTENER AJUSTES DESDE BACKEND
-  // ==============================================
+  // Obtener ajustes generales
   useEffect(() => {
-    fetch("http://localhost:4000/api/settings", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    fetch(`${API_URL}/api/settings`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.json())
       .then(data => {
@@ -55,12 +51,10 @@ const Ajustes = () => {
       .catch(err => console.error("Error obteniendo ajustes:", err));
   }, []);
 
-  // ==============================================
-  // 🟢 GUARDAR AJUSTES EN EL BACKEND
-  // ==============================================
+  // Guardar ajustes generales
   const handleGuardar = async () => {
     try {
-      const res = await fetch("http://localhost:4000/api/settings", {
+      const res = await fetch(`${API_URL}/api/settings`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -68,9 +62,7 @@ const Ajustes = () => {
         },
         body: JSON.stringify(settings),
       });
-
       const data = await res.json();
-
       if (data.success) {
         alert("✔️ Ajustes guardados correctamente");
       } else {
@@ -81,66 +73,82 @@ const Ajustes = () => {
     }
   };
 
+  // Guardar ajustes de notificaciones
+  const handleGuardarNotificaciones = async () => {
+    const res = await fetch(`${API_URL}/api/users/notification-settings`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(notificationSettings),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error("Error al guardar notificaciones");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <Header />
       <Sidebar />
-      
+
       <div className="max-w-4xl mx-auto px-4 py-8 ml-64">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
 
-          <SettingsOption 
-            icon="👤" 
-            title="Cuenta" 
-            onClick={() => setModalCuenta(true)} 
+          <SettingsOption
+            icon="👤"
+            title="Cuenta"
+            onClick={() => setModalCuenta(true)}
           />
 
-          <SettingsOption 
-            icon="🔔" 
-            title="Notificaciones" 
-            onClick={() => setModalNotificaciones(true)} 
+          <SettingsOption
+            icon="🔔"
+            title="Notificaciones"
+            onClick={() => setModalNotificaciones(true)}
           />
 
-          <SettingsOption 
-            icon="📝" 
-            title="Publicaciones" 
-            onClick={() => setModalPublicaciones(true)} 
+          <SettingsOption
+            icon="📝"
+            title="Publicaciones"
+            onClick={() => setModalPublicaciones(true)}
           />
 
-          <SettingsOption 
-            icon="🏷️" 
-            title="Etiquetado" 
-            onClick={() => setModalEtiquetado(true)} 
+          <SettingsOption
+            icon="🏷️"
+            title="Etiquetado"
+            onClick={() => setModalEtiquetado(true)}
           />
 
         </div>
       </div>
 
       {/* Modales */}
-      <CuentaModal 
-        isOpen={modalCuenta} 
-        onClose={() => setModalCuenta(false)} 
+      <CuentaModal
+        isOpen={modalCuenta}
+        onClose={() => setModalCuenta(false)}
         settings={settings}
         setSettings={setSettings}
       />
 
-      <NotificacionesModal 
-        isOpen={modalNotificaciones} 
-        onClose={() => setModalNotificaciones(false)} 
+      {/* ✅ CORREGIDO: props correctas para NotificacionesModal */}
+      <NotificacionesModal
+        isOpen={modalNotificaciones}
+        onClose={() => setModalNotificaciones(false)}
+        notificationSettings={notificationSettings}
+        setNotificationSettings={setNotificationSettings}
+        onSave={handleGuardarNotificaciones}
+      />
+
+      <PublicacionesModal
+        isOpen={modalPublicaciones}
+        onClose={() => setModalPublicaciones(false)}
         settings={settings}
         setSettings={setSettings}
       />
 
-      <PublicacionesModal 
-        isOpen={modalPublicaciones} 
-        onClose={() => setModalPublicaciones(false)} 
-        settings={settings}
-        setSettings={setSettings}
-      />
-
-      <EtiquetadoModal 
-        isOpen={modalEtiquetado} 
-        onClose={() => setModalEtiquetado(false)} 
+      <EtiquetadoModal
+        isOpen={modalEtiquetado}
+        onClose={() => setModalEtiquetado(false)}
         settings={settings}
         setSettings={setSettings}
       />

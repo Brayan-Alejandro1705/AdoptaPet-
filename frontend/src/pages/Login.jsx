@@ -16,12 +16,12 @@ function Login() {
 
   const LOGIN_API_URL = 'http://localhost:5000/api';
 
-  // Redirigir si ya está autenticado
+  // ✅ CORREGIDO: redirigir a /home (no a /)
   useEffect(() => {
     if (localStorage.getItem('token')) {
-      navigate('/');
+      navigate('/home', { replace: true });
     }
-  }, [navigate]);
+  }, []); // ✅ Sin 'navigate' en dependencias para evitar loops
 
   // Mostrar mensaje si viene de verificación exitosa
   useEffect(() => {
@@ -60,10 +60,10 @@ function Login() {
         setMessage('✅ Login exitoso. Redirigiendo...');
         setMessageType('success');
 
-        setTimeout(() => navigate('/'), 1500);
+        // ✅ CORREGIDO: redirigir a /home (no a /)
+        setTimeout(() => navigate('/home', { replace: true }), 1500);
 
       } else if (data.requiresVerification) {
-        // ✅ CASO CLAVE: email no verificado → redirigir a verificación
         setMessage('📧 Debes verificar tu email antes de entrar. Redirigiendo...');
         setMessageType('error');
 
