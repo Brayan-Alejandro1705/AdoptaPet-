@@ -14,7 +14,7 @@ function Login() {
   const [messageType, setMessageType] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const LOGIN_API_URL = '${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api';
+  const LOGIN_API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
 
   // ✅ CORREGIDO: redirigir a /home (no a /)
   useEffect(() => {
@@ -86,7 +86,7 @@ function Login() {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = '${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/google';
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/auth/google`;
   };
 
   return (
