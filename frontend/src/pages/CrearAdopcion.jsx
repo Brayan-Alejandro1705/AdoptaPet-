@@ -37,7 +37,6 @@ const CrearAdopcion = () => {
           let width = img.width;
           let height = img.height;
 
-          // Redimensionar a tamaño más pequeño
           const MAX_WIDTH = 800;
           const MAX_HEIGHT = 800;
 
@@ -59,17 +58,15 @@ const CrearAdopcion = () => {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Comprimir a JPEG con calidad más baja (0.6)
           canvas.toBlob(
             (blob) => {
-              // Si aún es muy grande, comprimir más
-              if (blob.size > 4 * 1024 * 1024) { // Si es mayor a 4MB
+              if (blob.size > 4 * 1024 * 1024) {
                 canvas.toBlob(
                   (blob2) => {
                     resolve(new File([blob2], file.name.replace(/\.[^/.]+$/, '.jpg'), { type: 'image/jpeg' }));
                   },
                   'image/jpeg',
-                  0.4 // Compresión más agresiva
+                  0.4
                 );
               } else {
                 resolve(new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), { type: 'image/jpeg' }));
@@ -92,13 +89,11 @@ const CrearAdopcion = () => {
       setError(null);
 
       try {
-        // Comprimir todas las imágenes
         const compressedFiles = await Promise.all(
           files.map(file => compressImage(file))
         );
 
-        // Validar tamaño después de comprimir
-        const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+        const MAX_SIZE = 5 * 1024 * 1024;
         for (const file of compressedFiles) {
           if (file.size > MAX_SIZE) {
             setError(`La imagen "${file.name}" sigue siendo muy grande después de comprimir. Intenta con una imagen más pequeña.`);
@@ -135,7 +130,6 @@ const CrearAdopcion = () => {
       setError(null);
       setSuccess(false);
 
-      // Validaciones
       if (!adoptionData.nombre || !adoptionData.tipo || !adoptionData.edad) {
         setError("Debes completar al menos: Nombre, Tipo y Edad");
         setLoading(false);
@@ -148,8 +142,7 @@ const CrearAdopcion = () => {
         return;
       }
 
-      // ✅ Validar tamaño de cada archivo
-      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+      const MAX_SIZE = 5 * 1024 * 1024;
       for (const file of adoptionImageFiles) {
         if (file.size > MAX_SIZE) {
           const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -189,7 +182,7 @@ const CrearAdopcion = () => {
       console.log('📊 Tamaños de imágenes:', adoptionImageFiles.map(f => `${f.name}: ${(f.size / 1024).toFixed(2)}KB`));
 
       const response = await fetch(
-        "${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/pets/publicar-adopcion",
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/pets/publicar-adopcion`,
         {
           method: "POST",
           headers: {
@@ -207,7 +200,6 @@ const CrearAdopcion = () => {
 
       console.log('✅ Mascota publicada exitosamente');
 
-      // Limpiar formulario
       setAdoptionData({
         nombre: "",
         tipo: "",
@@ -259,7 +251,6 @@ const CrearAdopcion = () => {
                 </p>
               </div>
 
-              {/* Mensajes de estado */}
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
                   <span>⚠️</span>
@@ -274,7 +265,6 @@ const CrearAdopcion = () => {
                 </div>
               )}
 
-              {/* Información básica */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input
                   type="text"
@@ -340,26 +330,20 @@ const CrearAdopcion = () => {
                 </select>
               </div>
 
-              {/* Descripción */}
               <textarea
                 placeholder="Describe la personalidad de la mascota..."
                 value={adoptionData.descripcion}
-                onChange={(e) =>
-                  handleAdoptionChange("descripcion", e.target.value)
-                }
+                onChange={(e) => handleAdoptionChange("descripcion", e.target.value)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none min-h-[120px] resize-none"
                 disabled={loading}
               />
 
-              {/* Checkboxes */}
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={adoptionData.vacunado}
-                    onChange={(e) =>
-                      handleAdoptionChange("vacunado", e.target.checked)
-                    }
+                    onChange={(e) => handleAdoptionChange("vacunado", e.target.checked)}
                     className="w-5 h-5 text-purple-600"
                     disabled={loading}
                   />
@@ -369,9 +353,7 @@ const CrearAdopcion = () => {
                   <input
                     type="checkbox"
                     checked={adoptionData.esterilizado}
-                    onChange={(e) =>
-                      handleAdoptionChange("esterilizado", e.target.checked)
-                    }
+                    onChange={(e) => handleAdoptionChange("esterilizado", e.target.checked)}
                     className="w-5 h-5 text-purple-600"
                     disabled={loading}
                   />
@@ -379,15 +361,12 @@ const CrearAdopcion = () => {
                 </label>
               </div>
 
-              {/* Contacto */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input
                   type="text"
                   placeholder="Ubicación (ciudad)"
                   value={adoptionData.ubicacion}
-                  onChange={(e) =>
-                    handleAdoptionChange("ubicacion", e.target.value)
-                  }
+                  onChange={(e) => handleAdoptionChange("ubicacion", e.target.value)}
                   className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none"
                   disabled={loading}
                 />
@@ -395,15 +374,12 @@ const CrearAdopcion = () => {
                   type="tel"
                   placeholder="Teléfono de contacto"
                   value={adoptionData.telefono}
-                  onChange={(e) =>
-                    handleAdoptionChange("telefono", e.target.value)
-                  }
+                  onChange={(e) => handleAdoptionChange("telefono", e.target.value)}
                   className="px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 outline-none"
                   disabled={loading}
                 />
               </div>
 
-              {/* Imágenes con compresión automática */}
               <div>
                 <label className="block text-gray-700 font-semibold mb-2">
                   Fotos de la mascota * (máximo 5)
@@ -450,7 +426,6 @@ const CrearAdopcion = () => {
                 )}
               </div>
 
-              {/* Botón publicar */}
               <button
                 onClick={publishAdoption}
                 disabled={loading}
@@ -459,7 +434,6 @@ const CrearAdopcion = () => {
                 {loading ? "Publicando..." : "🐾 Publicar en adopción"}
               </button>
 
-              {/* Indicador de carga */}
               {loading && (
                 <div className="text-center py-4">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -470,8 +444,6 @@ const CrearAdopcion = () => {
           </div>
         </div>
       </div>
-
-
     </div>
   );
 };

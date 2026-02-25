@@ -55,7 +55,7 @@ function Perfil() {
       return;
     }
     try {
-      const response = await fetch(`${API}/profile`, {
+      const response = await fetch(`${API}/api/users/profile`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -371,9 +371,9 @@ function Perfil() {
     return types[type] || '📝 Publicación';
   };
 
-  // ✅ Función helper para avatar con fallback seguro (evita loop infinito)
+  // ✅ Proxy del backend para avatares — evita el error de CORS con ui-avatars.com
   const getAvatarFallback = (name) =>
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'U')}&background=random`;
+    `${API}/api/avatar/${encodeURIComponent(name || 'U')}`;
 
   if (loading) {
     return (
@@ -430,10 +430,9 @@ function Perfil() {
                   alt="Foto de perfil"
                   className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-lg object-cover"
                   onError={(e) => {
-                    e.target.onerror = null;
+                    e.target.onerror = null; // evita loop infinito
                     e.target.src = getAvatarFallback(userName);
                   }}
-                  crossOrigin="anonymous"
                 />
                 <div onClick={handleAvatarClick} className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                   <div className="text-white text-center">
@@ -678,7 +677,6 @@ function Perfil() {
                     src={avatarUrl}
                     alt="Foto de perfil"
                     className="w-32 h-32 rounded-full border-4 border-purple-300 object-cover mx-auto"
-                    crossOrigin="anonymous"
                     onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }}
                   />
                   <div onClick={handleAvatarClick} className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">

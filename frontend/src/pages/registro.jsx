@@ -190,7 +190,7 @@ export default function Registro() {
       }
 
       console.log('🔄 Redirigiendo a Google OAuth...');
-      window.location.href = `${API_BASE}/auth/google`;
+      window.location.href = `${API_BASE}/api/auth/google`;
 
     } catch (err) {
       console.error('❌ Error al verificar backend:', err);
