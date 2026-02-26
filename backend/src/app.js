@@ -31,23 +31,20 @@ if (process.env.NODE_ENV === 'development') {
 // =============================================
 // CONFIGURACIÓN CORS
 // =============================================
-const allowedOrigins = process.env.FRONTEND_URL
-  ? [process.env.FRONTEND_URL]
-  : [
-      'http://localhost:3000',      // React
-      'http://127.0.0.1:3000',      // Live Server
-      'http://localhost:8080',      // Webpack
-      'http://localhost:3000',      // Vite
-    ];
+const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? [process.env.FRONTEND_URL]
+    : ['http://localhost:3000'];
 
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+    origin: function(origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
 }));
-
 // =============================================
 // MIDDLEWARE DE PARSEO
 // =============================================
