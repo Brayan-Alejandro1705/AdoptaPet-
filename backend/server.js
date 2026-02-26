@@ -38,7 +38,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // ============================================
-// 1. CORS — ✅ CORREGIDO: URLs de producción agregadas
+// 1. CORS
 // ============================================
 const corsOptions = {
   origin: function (origin, callback) {
@@ -47,12 +47,10 @@ const corsOptions = {
       'http://127.0.0.1:3000',
       'http://localhost:5173',
       'http://127.0.0.1:5173',
-      // ✅ URLs de producción en Railway
       'https://adoptapet.up.railway.app',
       'https://adoptapet-production-9df1.up.railway.app',
-      // ✅ Variable de entorno opcional para mayor flexibilidad
       process.env.FRONTEND_URL
-    ].filter(Boolean); // elimina undefined si FRONTEND_URL no está definida
+    ].filter(Boolean);
     
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -107,7 +105,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
       '.gif': 'image/gif',
       '.webp': 'image/webp'
     };
-    
     if (mimeTypes[ext]) {
       res.setHeader('Content-Type', mimeTypes[ext]);
     }
@@ -123,7 +120,6 @@ console.log('📂 Ruta física:', path.join(__dirname, 'uploads'));
 app.use((req, res, next) => {
   const sanitize = (obj) => {
     if (!obj || typeof obj !== 'object') return obj;
-    
     for (let key in obj) {
       if (key.startsWith('$') || key.includes('.')) {
         delete obj[key];
@@ -137,7 +133,6 @@ app.use((req, res, next) => {
   if (req.body) req.body = sanitize(req.body);
   if (req.query) req.query = sanitize(req.query);
   if (req.params) req.params = sanitize(req.params);
-  
   next();
 });
 
@@ -149,10 +144,7 @@ console.log('✅ Protección NoSQL Injection activada');
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
-  message: { 
-    success: false, 
-    message: 'Demasiadas peticiones, intenta más tarde' 
-  },
+  message: { success: false, message: 'Demasiadas peticiones, intenta más tarde' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -160,10 +152,7 @@ const apiLimiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { 
-    success: false, 
-    message: 'Demasiados intentos de login, intenta en 15 minutos' 
-  },
+  message: { success: false, message: 'Demasiados intentos de login, intenta en 15 minutos' },
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
@@ -172,10 +161,7 @@ const authLimiter = rateLimit({
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
-  message: { 
-    success: false, 
-    message: 'Demasiados uploads, intenta más tarde' 
-  },
+  message: { success: false, message: 'Demasiados uploads, intenta más tarde' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -214,12 +200,12 @@ if (process.env.NODE_ENV === 'production' && process.env.MONGO_URI) {
 app.use(session(sessionConfig));
 
 // ============================================
-// 7. PASSPORT
+// 7. PASSPORT — ✅ CORREGIDO
 // ============================================
-let passport;
+const passport = require('passport'); // ← SIEMPRE disponible en el scope del módulo
 
 try {
-  passport = require('./src/config/passport');
+  require('./src/config/passport'); // ← solo ejecuta la config (registra estrategias)
   app.use(passport.initialize());
   app.use(passport.session());
   services.passportLoaded = true;
@@ -271,12 +257,10 @@ const logger = require('./src/utils/logger');
 
 app.use((req, res, next) => {
   const start = Date.now();
-  
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.log.request(req.method, req.path, res.statusCode, duration);
   });
-  
   next();
 });
 
@@ -302,7 +286,6 @@ app.get('/health', (req, res) => {
       total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
     }
   };
-  
   res.status(200).json(health);
 });
 
@@ -332,12 +315,10 @@ app.get('/api/avatar/:name', async (req, res) => {
   try {
     const { name } = req.params;
     const axios = require('axios');
-    
     const response = await axios.get(
       `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=100&background=random`,
       { responseType: 'arraybuffer' }
     );
-    
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(response.data);
@@ -351,9 +332,7 @@ app.get('/api/avatar/:name', async (req, res) => {
 // ============================================
 if (services.passportLoaded) {
   app.get('/api/auth/google', 
-    passport.authenticate('google', { 
-      scope: ['profile', 'email']
-    })
+    passport.authenticate('google', { scope: ['profile', 'email'] })
   );
 
   app.get('/api/auth/google/callback', 
@@ -363,9 +342,7 @@ if (services.passportLoaded) {
     }),
     (req, res) => {
       try {
-        if (!req.user) {
-          throw new Error('Usuario no autenticado');
-        }
+        if (!req.user) throw new Error('Usuario no autenticado');
         
         console.log('✅ Usuario autenticado:', req.user.email);
         
@@ -415,36 +392,22 @@ if (services.passportLoaded) {
         }
       });
     } else {
-      res.status(401).json({
-        success: false,
-        message: 'No autenticado'
-      });
+      res.status(401).json({ success: false, message: 'No autenticado' });
     }
   });
 
   app.post('/api/auth/logout', (req, res) => {
     const email = req.user?.email || 'Usuario desconocido';
-    
     req.logout((err) => {
       if (err) {
         console.error('❌ Error al cerrar sesión:', err);
-        return res.status(500).json({ 
-          success: false, 
-          message: 'Error al cerrar sesión' 
-        });
+        return res.status(500).json({ success: false, message: 'Error al cerrar sesión' });
       }
-      
       req.session.destroy((err) => {
-        if (err) {
-          console.error('❌ Error al destruir sesión:', err);
-        }
-        
+        if (err) console.error('❌ Error al destruir sesión:', err);
         console.log('👋 Sesión cerrada:', email);
         res.clearCookie('adoptapet.sid');
-        res.json({ 
-          success: true, 
-          message: 'Sesión cerrada correctamente' 
-        });
+        res.json({ success: true, message: 'Sesión cerrada correctamente' });
       });
     });
   });
@@ -474,7 +437,7 @@ try {
   console.log('✅ authRoutes cargadas correctamente');
 } catch (error) {
   console.error('❌ ERROR CARGANDO authRoutes:', error.message);
-  console.error(error.stack); // ← esto te mostrará el archivo y línea exacta
+  console.error(error.stack);
 }
 
 // ============================================
