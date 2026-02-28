@@ -18,7 +18,7 @@ const generateAvatarSVG = (name = 'U') => {
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
-const API_BASE   = 'http://127.0.0.1:5000';
+const API_BASE   = 'http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5000';
 const APP_ORIGIN = 'http://localhost:3000';
 const buildPostLink = (postId) => `${APP_ORIGIN}/?post=${postId}`;
 

@@ -44,9 +44,9 @@ const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
       'http://localhost:3000',
-      'http://127.0.0.1:3000',
+      'http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:3000',
       'http://localhost:5173',
-      'http://127.0.0.1:5173',
+      'http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5173',
       'https://adoptapet.up.railway.app',
       'https://adoptapet-production-9df1.up.railway.app',
       'https://adopta-pet-omega.vercel.app',

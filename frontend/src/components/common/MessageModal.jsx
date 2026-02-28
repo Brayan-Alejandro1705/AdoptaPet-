@@ -40,7 +40,7 @@ export default function MessageModal({ friend, onClose, onSendMessage }) {
       
       // 1. Crear o obtener el chat
       console.log('🔄 Creando/obteniendo chat con ID:', friendId);
-      const chatResponse = await fetch('http://127.0.0.1:5000/api/chat', {
+      const chatResponse = await fetch('http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5000/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +64,7 @@ export default function MessageModal({ friend, onClose, onSendMessage }) {
       
       // 2. Enviar el mensaje
       console.log('📤 Enviando mensaje...');
-      const messageResponse = await fetch(`http://127.0.0.1:5000/api/chat/${chatId}/messages`, {
+      const messageResponse = await fetch(`http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5000/api/chat/${chatId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -49,7 +49,7 @@ export default function Amigos() {
     try {
       const token = localStorage.getItem('token');
       if (!token) { alert('Debes iniciar sesión'); return; }
-      const chatResponse = await fetch('http://127.0.0.1:5000/api/chat', {
+      const chatResponse = await fetch('http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ participantId: friend.id })
@@ -57,7 +57,7 @@ export default function Amigos() {
       const chatData = await chatResponse.json();
       if (!chatData.success) throw new Error(chatData.message);
       const chatId = chatData.data.chat._id;
-      const messageResponse = await fetch(`http://127.0.0.1:5000/api/chat/${chatId}/messages`, {
+      const messageResponse = await fetch(`http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5000/api/chat/${chatId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ content: message })
