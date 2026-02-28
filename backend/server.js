@@ -49,6 +49,7 @@ const corsOptions = {
       'http://127.0.0.1:5173',
       'https://adoptapet.up.railway.app',
       'https://adoptapet-production-9df1.up.railway.app',
+      'https://adopta-pet-omega.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
