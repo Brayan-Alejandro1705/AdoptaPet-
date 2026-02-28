@@ -49,21 +49,31 @@ export default function Amigos() {
     try {
       const token = localStorage.getItem('token');
       if (!token) { alert('Debes iniciar sesión'); return; }
-      const chatResponse = await fetch('http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5000/api/chat', {
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+      // FIX 1: fetch estaba roto — faltaba `await fetch(...)` y la URL mal formada
+      const chatResponse = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ participantId: friend.id })
       });
+
       const chatData = await chatResponse.json();
       if (!chatData.success) throw new Error(chatData.message);
+
       const chatId = chatData.data.chat._id;
-      const messageResponse = await fetch(`http://${import.meta.env.VITE_API_URL || 'http://localhost:5000'}:5000/api/chat/${chatId}/messages`, {
+
+      // FIX 2: URL duplicaba `http://` al concatenar con VITE_API_URL que ya lo incluye
+      const messageResponse = await fetch(`${API_URL}/api/chat/${chatId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ content: message })
       });
+
       const messageData = await messageResponse.json();
       if (!messageData.success) throw new Error(messageData.message);
+
       setMessageModalFriend(null);
       alert(`✅ Mensaje enviado a ${friend.name}!`);
     } catch (error) {
@@ -139,8 +149,6 @@ export default function Amigos() {
           )}
         </div>
       </div>
-
-
 
       {selectedFriend && (
         <ProfileModal
