@@ -5,64 +5,23 @@ import { friendRequestService } from '../../services/friendRequestService';
 
 // ── Nav items para el drawer ──────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { path: '/home',           label: 'Inicio',          sublabel: 'Feed principal',        color: '#7C3AED', bgActive: '#F3EFFD' },
-  { path: '/adoptar',        label: 'Adoptar',          sublabel: 'Encuentra tu mascota',  color: '#EC4899', bgActive: '#FDF2F8' },
-  { path: '/amigos',         label: 'Amigos',           sublabel: 'Tu comunidad',          color: '#3B82F6', bgActive: '#EFF6FF' },
-  { path: '/notificaciones', label: 'Notificaciones',   sublabel: 'Alertas y novedades',   color: '#8B5CF6', bgActive: '#F5F3FF' },
-  { path: '/favoritos',      label: 'Favoritos',        sublabel: 'Mascotas guardadas',    color: '#EC4899', bgActive: '#FDF2F8' },
-  { path: '/mensajes',       label: 'Mensajes',         sublabel: 'Chats y conversaciones',color: '#6366F1', bgActive: '#EEF2FF' },
-  { path: '/ajustes',        label: 'Ajustes',          sublabel: 'Cuenta y preferencias', color: '#7C3AED', bgActive: '#F3EFFD' },
+  { path: '/home',           label: 'Inicio',              color: '#7C3AED', bgActive: '#F3EFFD' },
+  { path: '/adoptar',        label: 'Adoptar',             color: '#EC4899', bgActive: '#FDF2F8' },
+  { path: '/publicar',       label: 'Publicar',            color: '#6366F1', bgActive: '#EEF2FF' },
+  { path: '/adoptar/crear',  label: 'Crear adopción',      color: '#8B5CF6', bgActive: '#F5F3FF' },
+  { path: '/amigos',         label: 'Amigos',              color: '#3B82F6', bgActive: '#EFF6FF' },
+  { path: '/favoritos',      label: 'Favoritos',           color: '#EC4899', bgActive: '#FDF2F8' },
+  { path: '/ajustes',        label: 'Ajustes',             color: '#7C3AED', bgActive: '#F3EFFD' },
 ];
 
 const NAV_ICONS = {
-  '/home': (active, color) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? color : 'none'}
-      stroke={active ? color : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
-      <path d="M9 21V12h6v9"/>
-    </svg>
-  ),
-  '/adoptar': (active, color) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? color : 'none'}
-      stroke={active ? color : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2a8 8 0 00-8 8c0 6 8 12 8 12s8-6 8-12a8 8 0 00-8-8z"/>
-      <circle cx="12" cy="10" r="2.5"/>
-    </svg>
-  ),
-  '/amigos': (active, color) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? color : 'none'}
-      stroke={active ? color : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-      <circle cx="9" cy="7" r="4"/>
-      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-    </svg>
-  ),
-  '/notificaciones': (active, color) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? color : 'none'}
-      stroke={active ? color : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-      <path d="M13.73 21a2 2 0 01-3.46 0"/>
-    </svg>
-  ),
-  '/favoritos': (active, color) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? color : 'none'}
-      stroke={active ? color : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
-    </svg>
-  ),
-  '/mensajes': (active, color) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? color : 'none'}
-      stroke={active ? color : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-    </svg>
-  ),
-  '/ajustes': (active, color) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? color : 'none'}
-      stroke={active ? color : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-    </svg>
-  ),
+  '/home':          () => <span className="text-xl">🏠</span>,
+  '/adoptar':       () => <span className="text-xl">🐕</span>,
+  '/publicar':      () => <span className="text-xl">📝</span>,
+  '/adoptar/crear': () => <span className="text-xl">🐾</span>,
+  '/amigos':        () => <span className="text-xl">👥</span>,
+  '/favoritos':     () => <span className="text-xl">❤️</span>,
+  '/ajustes':       () => <span className="text-xl">⚙️</span>,
 };
 
 export default function Header({ onOpenModal }) {
@@ -87,10 +46,8 @@ export default function Header({ onOpenModal }) {
 
   const isActive = (path) => location.pathname.toLowerCase() === path.toLowerCase();
 
-  // Close drawer on route change
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
-  // Prevent body scroll when drawer open
   useEffect(() => {
     document.body.style.overflow = drawerOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -276,7 +233,6 @@ export default function Header({ onOpenModal }) {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Figtree:wght@400;500;600;700&display=swap');
 
-        /* ── Hamburger lines animation ── */
         .hmb-line {
           width: 18px; height: 2px;
           background: white;
@@ -289,7 +245,6 @@ export default function Header({ onOpenModal }) {
         .hmb-open .hmb-line:nth-child(2) { opacity: 0; width: 0; }
         .hmb-open .hmb-line:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
-        /* ── Backdrop ── */
         .hmb-backdrop {
           position: fixed; inset: 0;
           background: rgba(15, 5, 30, 0.55);
@@ -301,7 +256,6 @@ export default function Header({ onOpenModal }) {
         }
         .hmb-backdrop.open { opacity: 1; pointer-events: all; }
 
-        /* ── Drawer ── */
         .hmb-drawer {
           position: fixed;
           top: 0; left: 0; bottom: 0;
@@ -317,13 +271,11 @@ export default function Header({ onOpenModal }) {
         }
         .hmb-drawer.open { transform: translateX(0); }
 
-        /* Drawer stripe */
         .hmb-stripe {
           height: 4px;
           background: linear-gradient(to right, #7C3AED, #EC4899, #3B82F6, #8B5CF6);
         }
 
-        /* Profile area */
         .hmb-profile {
           padding: 20px 18px 16px;
           background: white;
@@ -359,7 +311,6 @@ export default function Header({ onOpenModal }) {
         }
         .hmb-profile-arrow:active { background: #EDE8FB; }
 
-        /* Publish CTA */
         .hmb-publish {
           margin: 14px 16px 4px;
           background: linear-gradient(135deg, #7C3AED, #EC4899);
@@ -383,14 +334,11 @@ export default function Header({ onOpenModal }) {
         .hmb-publish-title { font-size: 14px; font-weight: 700; color: white; display: block; line-height: 1.2; }
         .hmb-publish-sub { font-size: 11px; color: rgba(255,255,255,0.7); display: block; margin-top: 1px; }
 
-        /* Section label */
         .hmb-section { font-size: 10px; font-weight: 700; color: #C4B8E0; letter-spacing: 0.1em; text-transform: uppercase; padding: 14px 18px 5px; }
 
-        /* Nav list */
         .hmb-list { flex: 1; overflow-y: auto; padding: 0 10px; }
         .hmb-list::-webkit-scrollbar { display: none; }
 
-        /* Nav item */
         .hmb-item {
           display: flex; align-items: center; gap: 12px;
           padding: 10px 10px; border-radius: 14px;
@@ -430,7 +378,6 @@ export default function Header({ onOpenModal }) {
         .hmb-chevron { color: var(--item-color); opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
         .hmb-item.active .hmb-chevron { opacity: 1; }
 
-        /* Footer */
         .hmb-footer {
           padding: 14px 18px;
           border-top: 1px solid #EDE8FB;
@@ -452,7 +399,6 @@ export default function Header({ onOpenModal }) {
         }
         .hmb-logout:active { background: #F3EFFD; color: #7C3AED; }
 
-        /* Stagger */
         .hmb-drawer.open .hmb-item {
           animation: slideIn 0.28s ease both;
         }
@@ -461,7 +407,6 @@ export default function Header({ onOpenModal }) {
           to   { opacity: 1; transform: translateX(0); }
         }
 
-        /* Only show drawer+backdrop on mobile */
         .hmb-backdrop, .hmb-drawer { display: none; }
         @media (max-width: 767px) {
           .hmb-backdrop, .hmb-drawer { display: flex; }
@@ -469,11 +414,10 @@ export default function Header({ onOpenModal }) {
         }
       `}</style>
 
-      {/* ── HEADER ───────────────────────────────────────────────── */}
+      {/* ── HEADER ── */}
       <header className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3 md:px-4 py-2.5 md:py-3 flex items-center gap-2 md:gap-4">
 
-          {/* Hamburger button — solo mobile, integrado en el header */}
           <button
             className={`md:hidden flex flex-col items-center justify-center gap-[5px] w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex-shrink-0 cursor-pointer transition-all active:scale-90 ${drawerOpen ? 'hmb-open' : ''}`}
             onClick={() => setDrawerOpen(!drawerOpen)}
@@ -486,13 +430,11 @@ export default function Header({ onOpenModal }) {
             <div className="hmb-line" />
           </button>
 
-          {/* Logo */}
           <Link to="/home" className="flex items-center gap-1.5 md:gap-2 cursor-pointer hover:scale-105 transition-transform flex-shrink-0">
             <span className="text-2xl md:text-3xl drop-shadow-lg">🐾</span>
             <h1 className="text-lg md:text-2xl font-bold tracking-wide text-white drop-shadow-md">AdoptaPet</h1>
           </Link>
 
-          {/* Buscador Desktop */}
           <div className="hidden md:flex flex-1 max-w-xl mx-4 relative" ref={searchRef}>
             <input
               type="text"
@@ -508,13 +450,10 @@ export default function Header({ onOpenModal }) {
             {showResults && <SearchResultsDropdown />}
           </div>
 
-          {/* Spacer mobile */}
           <div className="flex-1 md:hidden" />
 
-          {/* Íconos de acción */}
           <div className="flex items-center gap-1.5 md:gap-3">
 
-            {/* Lupa mobile */}
             <button
               onClick={() => setShowMobileSearch(prev => !prev)}
               className="md:hidden w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center active:scale-95 transition-all"
@@ -525,7 +464,6 @@ export default function Header({ onOpenModal }) {
               </svg>
             </button>
 
-            {/* Chat */}
             <Link to="/mensajes" className="relative w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/20 border border-white/30 flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="white" strokeWidth="2.2" viewBox="0 0 24 24" className="w-4 h-4 md:w-5 md:h-5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6A8.38 8.38 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z" />
@@ -537,7 +475,6 @@ export default function Header({ onOpenModal }) {
               )}
             </Link>
 
-            {/* Notificaciones */}
             <button
               onClick={() => navigate('/notificaciones')}
               className="relative w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/20 border border-white/30 flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all"
@@ -552,7 +489,6 @@ export default function Header({ onOpenModal }) {
               )}
             </button>
 
-            {/* Avatar */}
             {loading ? (
               <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-white/30 animate-pulse flex-shrink-0" />
             ) : (
@@ -569,7 +505,6 @@ export default function Header({ onOpenModal }) {
           </div>
         </div>
 
-        {/* Barra búsqueda mobile desplegable */}
         {showMobileSearch && (
           <div className="md:hidden px-3 pb-3 relative" ref={mobileSearchRef}>
             <div className="relative">
@@ -591,23 +526,21 @@ export default function Header({ onOpenModal }) {
         )}
       </header>
 
-      {/* ── BACKDROP ─────────────────────────────────────────────── */}
+      {/* ── BACKDROP ── */}
       <div
         className={`hmb-backdrop ${drawerOpen ? 'open' : ''}`}
         onClick={() => setDrawerOpen(false)}
         aria-hidden="true"
       />
 
-      {/* ── DRAWER ───────────────────────────────────────────────── */}
+      {/* ── DRAWER ── */}
       <nav
         className={`hmb-drawer ${drawerOpen ? 'open' : ''}`}
         aria-label="Menú principal"
         {...(!drawerOpen && { inert: '' })}
       >
-        {/* Stripe */}
         <div className="hmb-stripe" />
 
-        {/* Profile */}
         <div className="hmb-profile">
           <div className="hmb-avatar-box">
             {user?.avatar
@@ -626,26 +559,10 @@ export default function Header({ onOpenModal }) {
           </button>
         </div>
 
-        {/* Publish CTA */}
-        <button className="hmb-publish" onClick={() => { if (onOpenModal) onOpenModal(); else navigate('/publicar'); setDrawerOpen(false); }}>
-          <div className="hmb-publish-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14"/>
-            </svg>
-          </div>
-          <div className="hmb-publish-texts">
-            <span className="hmb-publish-title">Nueva publicación</span>
-            <span className="hmb-publish-sub">Comparte con la comunidad</span>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
-        </button>
+     
 
-        {/* Section label */}
         <div className="hmb-section">Navegación</div>
 
-        {/* Nav list */}
         <div className="hmb-list">
           {NAV_ITEMS.map((item, i) => {
             const active = isActive(item.path);
@@ -674,7 +591,6 @@ export default function Header({ onOpenModal }) {
           })}
         </div>
 
-        {/* Footer */}
         <div className="hmb-footer">
           <div className="hmb-brand">
             <span>🐾</span><span>AdoptaPet</span>
@@ -685,7 +601,6 @@ export default function Header({ onOpenModal }) {
         </div>
       </nav>
 
-      {/* Notificación flotante */}
       {notification && (
         <div className="fixed top-20 right-4 z-[9999] bg-purple-500 text-white shadow-2xl px-5 py-3 rounded-2xl">
           <p className="font-bold text-sm">{notification}</p>

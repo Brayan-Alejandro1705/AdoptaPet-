@@ -11,6 +11,7 @@ import Publicar from './pages/publicar';
 import Chat from './pages/Chat';
 import Ajustes from './pages/ajustes';
 import Amigos from './pages/amigos';
+import Favoritos from './pages/favoritos';
 import Adminpanel from './pages/AdminPanel';
 import CrearAdopcion from './pages/CrearAdopcion';
 import AIAssistant from './pages/AIAssistant';
@@ -100,6 +101,7 @@ function App() {
         <Route path="/admin" element={<PrivateRoute><Adminpanel /></PrivateRoute>} />
         <Route path="/ai-assistant" element={<PrivateRoute><AIAssistant /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><Feedback /></PrivateRoute>} />
+        <Route path="/favoritos" element={<PrivateRoute><Favoritos /></PrivateRoute>} />
       </Routes>
 
       <FloatingAIChatCondicional />

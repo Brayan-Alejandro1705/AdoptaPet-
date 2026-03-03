@@ -108,9 +108,6 @@ export default function Home() {
 
   const handleOpenPublicar = () => navigate('/publicar');
 
-  const userName = currentUser?.nombre || currentUser?.name || 'Tú';
-  const userAvatar = currentUser?.avatar;
-
   return (
     <div className="min-h-screen bg-[#F0EBE3] text-gray-800">
       {/* Google Font import via style tag */}
@@ -121,71 +118,6 @@ export default function Home() {
         .ap-font-body { font-family: 'Figtree', sans-serif; }
 
         .ap-feed-bg { background-color: #F0EBE3; }
-
-        /* Compose box */
-        .ap-compose {
-          background: #fff;
-          border-radius: 16px;
-          padding: 14px 16px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          box-shadow: 0 1px 8px rgba(0,0,0,0.07);
-          margin: 0 0 12px 0;
-          cursor: pointer;
-          transition: box-shadow 0.2s;
-        }
-        .ap-compose:active { box-shadow: 0 2px 16px rgba(0,0,0,0.12); }
-
-        .ap-compose-avatar {
-          width: 42px; height: 42px;
-          border-radius: 50%;
-          object-fit: cover;
-          flex-shrink: 0;
-          background: #E07B39;
-          display: flex; align-items: center; justify-content: center;
-          font-weight: 700; color: white; font-size: 16px;
-        }
-
-        .ap-compose-placeholder {
-          flex: 1;
-          background: #F0EBE3;
-          border-radius: 999px;
-          padding: 10px 16px;
-          font-size: 14px;
-          color: #9C8E84;
-          font-family: 'Figtree', sans-serif;
-          font-weight: 400;
-          border: none;
-          pointer-events: none;
-        }
-
-        /* Divider de acciones */
-        .ap-compose-actions {
-          display: flex;
-          border-top: 1px solid #F0EBE3;
-          margin-top: 12px;
-          padding-top: 10px;
-          gap: 0;
-        }
-        .ap-compose-action-btn {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          padding: 6px 4px;
-          border-radius: 8px;
-          font-size: 12px;
-          font-weight: 600;
-          color: #6B5E56;
-          background: none;
-          border: none;
-          cursor: pointer;
-          transition: background 0.15s;
-          font-family: 'Figtree', sans-serif;
-        }
-        .ap-compose-action-btn:active { background: #F0EBE3; }
 
         /* Skeleton loader */
         @keyframes shimmer {
@@ -256,69 +188,6 @@ export default function Home() {
             {/* Feed principal */}
             <main className="flex-1 min-w-0">
 
-              {/* ── Compose box (solo mobile) ── */}
-              <div className="md:hidden">
-                <div className="ap-compose" onClick={handleOpenPublicar}>
-                  {userAvatar ? (
-                    <img src={userAvatar} alt={userName} className="ap-compose-avatar" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
-                  ) : (
-                    <div className="ap-compose-avatar">{userName.charAt(0).toUpperCase()}</div>
-                  )}
-                  <div className="ap-compose-placeholder">¿Qué quieres compartir?</div>
-                </div>
-
-                {/* Acciones rápidas — 2 botones */}
-                <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                  <button
-                    onClick={handleOpenPublicar}
-                    style={{
-                      flex: 1, background: 'white', border: 'none',
-                      borderRadius: 14, padding: '14px 12px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      gap: 8, cursor: 'pointer',
-                      boxShadow: '0 1px 8px rgba(0,0,0,0.07)',
-                      fontFamily: 'Figtree, sans-serif',
-                    }}
-                  >
-                    <div style={{
-                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                      background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <span style={{ fontSize: 18 }}>✍️</span>
-                    </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1E1030', lineHeight: 1.2 }}>Publicación</div>
-                      <div style={{ fontSize: 11, color: '#9C8E84', marginTop: 1 }}>Foto o historia</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => navigate('/adoptar/crear')}
-                    style={{
-                      flex: 1, background: 'white', border: 'none',
-                      borderRadius: 14, padding: '14px 12px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      gap: 8, cursor: 'pointer',
-                      boxShadow: '0 1px 8px rgba(0,0,0,0.07)',
-                      fontFamily: 'Figtree, sans-serif',
-                    }}
-                  >
-                    <div style={{
-                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                      background: 'linear-gradient(135deg, #3D9E6E, #20B2AA)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <span style={{ fontSize: 18 }}>🐾</span>
-                    </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1E1030', lineHeight: 1.2 }}>Adopción</div>
-                      <div style={{ fontSize: 11, color: '#9C8E84', marginTop: 1 }}>Dar en adopción</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
               {/* ── Skeleton loader ── */}
               {loading && (
                 <div>
@@ -382,8 +251,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-
     </div>
   );
 }

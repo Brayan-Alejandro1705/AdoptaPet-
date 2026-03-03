@@ -3,6 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 export default function BottomNav({ onOpenModal }) {
   const location = useLocation();
 
+  // ✅ Ocultar en páginas específicas
+  const rutasOcultas = ['/mensajes'];
+  if (rutasOcultas.includes(location.pathname)) return null;
+
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-2xl z-50">
       <div className="flex justify-around items-center py-2">

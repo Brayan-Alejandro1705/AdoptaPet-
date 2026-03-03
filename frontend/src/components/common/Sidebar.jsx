@@ -10,6 +10,7 @@ const Sidebar = () => {
     { path: '/publicar',      label: 'Publicar',      icon: '📝' },
     { path: '/adoptar/crear', label: 'Crear adopción',icon: '🐾' },
     { path: '/amigos',        label: 'Amigos',        icon: '👥' },
+    { path: '/favoritos',     label: 'Favoritos',     icon: '❤️' },
     { path: '/ajustes',       label: 'Ajustes',       icon: '⚙️' }
   ];
 
@@ -48,6 +49,13 @@ const Sidebar = () => {
           <span className="text-lg">💬</span>
           Danos tu opinión
         </Link>
+        <button
+    onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; }}
+    className="w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-medium text-blue-500 hover:bg-red-50 hover:scale-[1.01] transition-all duration-200"
+  >
+    <span className="text-lg">🚪</span>
+    Cerrar sesión
+  </button>
       </div>
     </aside>
   );

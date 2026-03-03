@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { friendRequestService } from '../services/friendRequestService';
 
@@ -6,6 +7,7 @@ import { friendRequestService } from '../services/friendRequestService';
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function Perfil() {
+  const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -407,20 +409,31 @@ function Perfil() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+
+      {/* ===== HEADER CON BOTÓN VOLVER ===== */}
       <header className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
+
+            {/* 🔙 BOTÓN VOLVER */}
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-semibold transition-all duration-200 hover:-translate-x-1 border border-white/30"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              Volver
+            </button>
+
             <a href="/" className="text-3xl font-bold text-white tracking-tight">🐾 ADOPTAPET</a>
-            <ul className="hidden md:flex space-x-8">
-              <li><a href="/" className="text-white font-medium hover:-translate-y-1 transition-transform duration-300 inline-block">Inicio</a></li>
-              <li><button onClick={handleLogout} className="text-white font-medium hover:-translate-y-1 transition-transform duration-300 inline-block">Cerrar Sesión</button></li>
-            </ul>
+            <ul className="hidden md:flex space-x-8"></ul>
           </div>
         </nav>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-gradient-to-r from-purple-500 via-purple-600 to-purple-700 rounded-3xl shadow-xl overflow-hidden mb-8">
+        <div className="bg-gradient-to-r from-purple-400 via-purple-700 to-purple-400 rounded-3xl shadow-xl overflow-hidden mb-8">
           <div className="relative px-6 py-12">
             <div className="flex flex-col sm:flex-row items-center sm:items-end">
               <div className="relative group">
@@ -464,7 +477,6 @@ function Perfil() {
                 <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{friendRequests.length}</span>
               )}
             </button>
-            <button onClick={() => setActiveTab('historial')} className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'historial' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>⭐ Favoritos</button>
           </div>
 
           <div className="p-6">
@@ -604,54 +616,6 @@ function Perfil() {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {activeTab === 'historial' && (
-              <div>
-                {favoritesLoading ? (
-                  <div className="text-center py-8"><div className="text-4xl mb-4">🔄</div><p className="text-gray-600">Cargando favoritos...</p></div>
-                ) : favoritePosts.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">⭐</div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">No tienes favoritos aún</h3>
-                    <p className="text-gray-600">Los posts que marques como favoritos aparecerán aquí</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {favoritePosts.map(post => (
-                      <div key={post._id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition">
-                        <div className="p-4 flex items-center justify-between border-b">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={post.author?.avatar || avatarUrl}
-                              alt={post.author?.nombre || post.author?.name || userName}
-                              className="w-10 h-10 rounded-full object-cover"
-                              onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }}
-                            />
-                            <div>
-                              <p className="font-semibold">{post.author?.nombre || post.author?.name || userName}</p>
-                              <p className="text-xs text-gray-500">{formatTimeAgo(post.createdAt)}</p>
-                            </div>
-                          </div>
-                        </div>
-                        {post.media?.images && post.media.images.length > 0 && (
-                          <div className="w-full">
-                            <img
-                              src={`${API}${post.media.images[0]}`}
-                              alt="Post"
-                              className="w-full h-auto max-h-96 object-cover"
-                              onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
-                            />
-                          </div>
-                        )}
-                        <div className="p-4">
-                          {post.content && (<p className="text-gray-800 whitespace-pre-wrap">{post.content}</p>)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
           </div>
