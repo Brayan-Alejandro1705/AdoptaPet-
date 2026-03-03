@@ -7,12 +7,16 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  host: '74.125.134.109',
+  host: 'smtp.gmail.com',
   port: 587,
   secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
