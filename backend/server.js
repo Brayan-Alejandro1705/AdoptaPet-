@@ -49,6 +49,7 @@ const corsOptions = {
       'http://127.0.0.1:5173',
       'https://adoptapet.up.railway.app',
       'https://adoptapet-production-9df1.up.railway.app',
+      'https://adopta-pet-omega.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
@@ -200,12 +201,12 @@ if (process.env.NODE_ENV === 'production' && process.env.MONGO_URI) {
 app.use(session(sessionConfig));
 
 // ============================================
-// 7. PASSPORT — ✅ CORREGIDO
+// 7. PASSPORT
 // ============================================
-const passport = require('passport'); // ← SIEMPRE disponible en el scope del módulo
+const passport = require('passport');
 
 try {
-  require('./src/config/passport'); // ← solo ejecuta la config (registra estrategias)
+  require('./src/config/passport');
   app.use(passport.initialize());
   app.use(passport.session());
   services.passportLoaded = true;

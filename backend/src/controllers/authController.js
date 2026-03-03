@@ -7,10 +7,16 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -197,7 +203,6 @@ exports.verifyEmail = async (req, res) => {
       return res.status(404).json({ success: false, message: 'No se encontró ninguna cuenta con ese email' });
     }
 
-    // Si ya estaba verificado, igual devolver token para que entre
     if (user.verified.email) {
       const token = generateToken(user._id);
       return res.json({
@@ -216,12 +221,8 @@ exports.verifyEmail = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Código incorrecto. Intenta de nuevo.' });
     }
 
-    // Marcar como verificado
     await user.verifyEmail();
-
-    // ✅ Generar token para que entre directo al home
     const token = generateToken(user._id);
-
     console.log(`✅ Email verificado: ${user.email}`);
 
     res.json({

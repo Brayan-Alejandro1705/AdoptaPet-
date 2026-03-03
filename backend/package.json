@@ -7,13 +7,10 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-
-  
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
   },
-
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -44,6 +41,7 @@
     "openai": "^6.21.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "resend": "^6.9.3",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.1",
     "vue3-google-login": "^2.0.34"
@@ -52,5 +50,4 @@
     "nodemon": "^3.1.10",
     "tailwindcss": "^4.1.17"
   }
-  
 }

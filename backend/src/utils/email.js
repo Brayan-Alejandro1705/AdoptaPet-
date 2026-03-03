@@ -3,10 +3,16 @@ const nodemailer = require('nodemailer');
 
 // Configurar transportador de email
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -269,7 +275,7 @@ const sendWelcomeEmail = async (email, userName) => {
         ¡Estamos emocionados de tenerte con nosotros en esta misión de ayudar a las mascotas a encontrar hogares amorosos!
       </p>
       <div style="text-align: center;">
-        <a href="http://localhost:3000" class="button">Ir a AdoptaPet</a>
+        <a href="https://adopta-pet-omega.vercel.app" class="button">Ir a AdoptaPet</a>
       </div>
       <p class="message" style="margin-top: 30px;">
         ¡Gracias por unirte! 🐾
