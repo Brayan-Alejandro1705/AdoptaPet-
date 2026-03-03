@@ -208,7 +208,7 @@ const getVerificationEmailTemplate = (userName, code) => {
 const sendVerificationEmail = async (email, userName, code) => {
   try {
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'AdoptaPet <noreply@adoptapet.com>',
+      from: process.env.EMAIL_FROM || `AdoptaPet <${process.env.EMAIL_USER}>`,
       to: email,
       subject: '🐾 Verifica tu email - AdoptaPet',
       html: getVerificationEmailTemplate(userName, code)
@@ -294,7 +294,7 @@ const sendWelcomeEmail = async (email, userName) => {
     `;
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'AdoptaPet <noreply@adoptapet.com>',
+      from: process.env.EMAIL_FROM || `AdoptaPet <${process.env.EMAIL_USER}>`,
       to: email,
       subject: '🎉 ¡Bienvenido/a a AdoptaPet!',
       html: welcomeTemplate
