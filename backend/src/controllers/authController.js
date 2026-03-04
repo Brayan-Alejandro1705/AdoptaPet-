@@ -4,8 +4,188 @@
 
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const { sendVerificationEmail } = require('../utils/email');
 
+// =============================================
+// FUNCIÓN DE ENVÍO DE EMAIL (INTEGRADA)
+// =============================================
+const sendVerificationEmail = async (email, userName, code) => {
+  try {
+    const payload = {
+      from: {
+        email: process.env.EMAIL_USER || "noreply@test-nrw7gywmev2g2k8e.mlsender.net",
+        name: "AdoptaPet Team",
+      },
+      to: [
+        {
+          email: email,
+        },
+      ],
+      subject: "🐾 Verifica tu email - AdoptaPet",
+      html: `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifica tu email - AdoptaPet</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', sans-serif;
+      background-color: #f4f4f7;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 40px auto;
+      background-color: #ffffff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .logo {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    .header-title {
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: bold;
+      margin: 0;
+    }
+    .content {
+      padding: 40px 30px;
+    }
+    .greeting {
+      font-size: 20px;
+      color: #333333;
+      margin-bottom: 20px;
+    }
+    .message {
+      font-size: 16px;
+      color: #666666;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .code-container {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      margin: 30px 0;
+    }
+    .code-label {
+      color: #ffffff;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .code {
+      color: #ffffff;
+      font-size: 48px;
+      font-weight: bold;
+      letter-spacing: 8px;
+      font-family: 'Courier New', monospace;
+    }
+    .warning {
+      background-color: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .warning-text {
+      color: #856404;
+      font-size: 14px;
+      margin: 0;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 30px;
+      text-align: center;
+      border-top: 1px solid #e9ecef;
+    }
+    .footer-text {
+      color: #6c757d;
+      font-size: 14px;
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <div class="logo">🐾</div>
+      <h1 class="header-title">AdoptaPet</h1>
+    </div>
+    <div class="content">
+      <p class="greeting">¡Hola ${userName}! 👋</p>
+      <p class="message">
+        ¡Bienvenido/a a AdoptaPet! Estamos emocionados de tenerte en nuestra comunidad de amantes de los animales. 🎉
+      </p>
+      <p class="message">
+        Para completar tu registro, verifica tu email usando el siguiente código:
+      </p>
+      <div class="code-container">
+        <div class="code-label">Tu código de verificación</div>
+        <div class="code">${code}</div>
+      </div>
+      <p class="message">
+        Ingresa este código en la aplicación para activar tu cuenta.
+      </p>
+      <div class="warning">
+        <p class="warning-text">
+          ⚠️ <strong>Importante:</strong> Este código expira en 15 minutos.
+        </p>
+      </div>
+      <p class="message">
+        ¡Gracias por unirte! ❤️
+      </p>
+    </div>
+    <div class="footer">
+      <p class="footer-text">© 2025 AdoptaPet. Todos los derechos reservados.</p>
+      <p class="footer-text">Ayudando a mascotas a encontrar hogares felices 🏡</p>
+    </div>
+  </div>
+</body>
+</html>
+      `,
+    };
+
+    const response = await fetch("https://api.mailersend.com/v1/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        Authorization: `Bearer ${process.env.API_TOKEN_MAILERSEND}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("❌ MailerSend API Error:", errorData);
+      throw new Error(`MailerSend Error: ${response.status}`);
+    }
+
+    console.log("✅ Email de verificación enviado a:", email);
+    console.log("   🔢 Código:", code);
+    return { success: true };
+  } catch (err) {
+    console.error("❌ Error al enviar email:", err.message);
+    throw err;
+  }
+};
+
+// =============================================
+// GENERAR TOKEN
+// =============================================
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
@@ -49,7 +229,7 @@ exports.registro = async (req, res) => {
       await sendVerificationEmail(user.email, user.name, verificationCode);
     } catch (emailError) {
       console.error('❌ Error al enviar email:', emailError.message);
-      // No lanzar error, permitir que continúe el registro
+      // No interrumpir el flujo si falla el email
     }
 
     res.status(201).json({
@@ -137,7 +317,6 @@ exports.login = async (req, res) => {
 
 // =============================================
 // VERIFICAR EMAIL
-// ✅ Devuelve token directo para ir al home sin pasar por login
 // =============================================
 exports.verifyEmail = async (req, res) => {
   try {
@@ -227,7 +406,6 @@ exports.resendVerification = async (req, res) => {
       await sendVerificationEmail(user.email, user.name, newCode);
     } catch (emailError) {
       console.error('❌ Error al reenviar email:', emailError.message);
-      // No lanzar error, permitir que continúe
     }
 
     res.json({ success: true, message: 'Código reenviado. Revisa tu bandeja de entrada.' });
