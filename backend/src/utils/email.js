@@ -1,29 +1,50 @@
 // backend/src/utils/email.js
-const nodemailer = require('nodemailer');
+const sendEmail = async (subject, message, send_to, sent_from, reply_to) => {
+  try {
+    const payload = {
+      from: {
+        email: process.env.EMAIL_USER || sent_from || "noreply@adoptapet.com",
+        name: "AdoptaPet Team",
+      },
+      to: [
+        {
+          email: send_to,
+        },
+      ],
+      subject: subject,
+      html: message,
+    };
 
-// Configurar transportador de email
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  requireTLS: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+    if (reply_to) {
+      payload.reply_to = {
+        email: reply_to,
+        name: "Reply",
+      };
+    }
 
-// Verificar configuración
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Error en configuración de email:', error.message);
-  } else {
-    console.log('✅ Servidor de email listo para enviar mensajes');
+    const response = await fetch("https://api.mailersend.com/v1/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        Authorization: `Bearer ${process.env.API_TOKEN_MAILERSEND}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("❌ MailerSend API Error Details:", errorData);
+      throw new Error(`MailerSend HTTP Error: ${response.status} ${response.statusText}`);
+    }
+
+    console.log("✅ Email enviado exitosamente a:", send_to);
+    return { success: true };
+  } catch (err) {
+    console.error("❌ Error enviando email:", err.message);
+    throw new Error("Error al enviar email");
   }
-});
+};
 
 // Generar código de verificación de 6 dígitos
 const generateVerificationCode = () => {
@@ -204,36 +225,9 @@ const getVerificationEmailTemplate = (userName, code) => {
   `;
 };
 
-// Enviar email de verificación
-const sendVerificationEmail = async (email, userName, code) => {
-  try {
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `AdoptaPet <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: '🐾 Verifica tu email - AdoptaPet',
-      html: getVerificationEmailTemplate(userName, code)
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    
-    console.log('✅ Email de verificación enviado:', info.messageId);
-    console.log('   📧 Para:', email);
-    console.log('   🔢 Código:', code);
-    
-    return {
-      success: true,
-      messageId: info.messageId
-    };
-  } catch (error) {
-    console.error('❌ Error enviando email:', error);
-    throw new Error('Error al enviar email de verificación');
-  }
-};
-
-// Enviar email de bienvenida (después de verificación exitosa)
-const sendWelcomeEmail = async (email, userName) => {
-  try {
-    const welcomeTemplate = `
+// Plantilla HTML para email de bienvenida
+const getWelcomeEmailTemplate = (userName) => {
+  return `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -291,19 +285,51 @@ const sendWelcomeEmail = async (email, userName) => {
   </div>
 </body>
 </html>
-    `;
+  `;
+};
 
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `AdoptaPet <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: '🎉 ¡Bienvenido/a a AdoptaPet!',
-      html: welcomeTemplate
+// Enviar email de verificación
+const sendVerificationEmail = async (email, userName, code) => {
+  try {
+    const htmlTemplate = getVerificationEmailTemplate(userName, code);
+    
+    await sendEmail(
+      "🐾 Verifica tu email - AdoptaPet",
+      htmlTemplate,
+      email,
+      process.env.EMAIL_USER || "noreply@adoptapet.com",
+      null
+    );
+
+    console.log('✅ Email de verificación enviado:', email);
+    console.log('   🔢 Código:', code);
+    
+    return {
+      success: true,
+      message: "Email de verificación enviado correctamente"
     };
+  } catch (error) {
+    console.error('❌ Error enviando email de verificación:', error.message);
+    throw new Error('Error al enviar email de verificación');
+  }
+};
 
-    await transporter.sendMail(mailOptions);
+// Enviar email de bienvenida (después de verificación exitosa)
+const sendWelcomeEmail = async (email, userName) => {
+  try {
+    const htmlTemplate = getWelcomeEmailTemplate(userName);
+    
+    await sendEmail(
+      "🎉 ¡Bienvenido/a a AdoptaPet!",
+      htmlTemplate,
+      email,
+      process.env.EMAIL_USER || "noreply@adoptapet.com",
+      null
+    );
+
     console.log('✅ Email de bienvenida enviado a:', email);
   } catch (error) {
-    console.error('❌ Error enviando email de bienvenida:', error);
+    console.error('❌ Error enviando email de bienvenida:', error.message);
     // No lanzar error para no interrumpir el flujo
   }
 };
@@ -311,5 +337,6 @@ const sendWelcomeEmail = async (email, userName) => {
 module.exports = {
   generateVerificationCode,
   sendVerificationEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendEmail
 };

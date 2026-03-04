@@ -4,62 +4,12 @@
 
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  requireTLS: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-});
-
-transporter.verify((error) => {
-  if (error) {
-    console.error('❌ Error al conectar con servidor de correo:', error.message);
-  } else {
-    console.log('✅ Servidor de correo listo para enviar emails');
-  }
-});
+const { sendVerificationEmail } = require('../utils/email');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   });
-};
-
-const sendVerificationEmail = async (email, code, nombre) => {
-  await transporter.sendMail({
-    from: `"AdoptaPet 🐾" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: '🔐 Código de verificación - AdoptaPet',
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1)">
-        <div style="background:linear-gradient(135deg,#a855f7,#ec4899);padding:30px;text-align:center">
-          <h1 style="color:white;margin:0;font-size:28px">🐾 AdoptaPet</h1>
-          <p style="color:rgba(255,255,255,0.9);margin:8px 0 0">Verificación de correo electrónico</p>
-        </div>
-        <div style="padding:40px 30px;text-align:center">
-          <p style="color:#555;font-size:16px">Hola <strong>${nombre || 'usuario'}</strong>,</p>
-          <p style="color:#555;font-size:16px">Usa este código para verificar tu correo:</p>
-          <div style="background:#f3e8ff;border:2px dashed #a855f7;border-radius:12px;padding:20px;display:inline-block;margin:20px 0">
-            <div style="font-size:42px;font-weight:bold;color:#7c3aed;letter-spacing:10px">${code}</div>
-          </div>
-          <p style="color:#888;font-size:13px">⏰ Expira en <strong>15 minutos</strong>.</p>
-        </div>
-        <div style="background:#f9fafb;padding:20px;text-align:center;color:#aaa;font-size:12px">
-          AdoptaPet — Dale un hogar a tu nuevo mejor amigo 🐶🐱
-        </div>
-      </div>
-    `
-  });
-  console.log(`📧 Email enviado a: ${email}`);
 };
 
 // =============================================
@@ -96,9 +46,10 @@ exports.registro = async (req, res) => {
     });
 
     try {
-      await sendVerificationEmail(user.email, verificationCode, nombre);
+      await sendVerificationEmail(user.email, user.name, verificationCode);
     } catch (emailError) {
       console.error('❌ Error al enviar email:', emailError.message);
+      // No lanzar error, permitir que continúe el registro
     }
 
     res.status(201).json({
@@ -272,7 +223,12 @@ exports.resendVerification = async (req, res) => {
     user.verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
     await user.save({ validateBeforeSave: false });
 
-    await sendVerificationEmail(user.email, newCode, user.name);
+    try {
+      await sendVerificationEmail(user.email, user.name, newCode);
+    } catch (emailError) {
+      console.error('❌ Error al reenviar email:', emailError.message);
+      // No lanzar error, permitir que continúe
+    }
 
     res.json({ success: true, message: 'Código reenviado. Revisa tu bandeja de entrada.' });
 
