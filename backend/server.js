@@ -38,7 +38,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // ============================================
-// 1. CORS
+// 1. CORS (CORREGIDO PARA VERCEL PREVIEW)
 // ============================================
 const corsOptions = {
   origin: function (origin, callback) {
@@ -52,13 +52,17 @@ const corsOptions = {
       'https://adopta-pet-omega.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean);
-    
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.warn('⚠️  Origen bloqueado por CORS:', origin);
-      callback(new Error('No permitido por CORS'));
+
+    // ✅ Permitir cualquier preview de Vercel (*.vercel.app)
+    const isVercelPreview = origin && origin.endsWith('.vercel.app');
+
+    // Permitir requests sin Origin (curl/postman) + lista blanca + previews
+    if (!origin || allowedOrigins.includes(origin) || isVercelPreview) {
+      return callback(null, true);
     }
+
+    console.warn('⚠️  Origen bloqueado por CORS:', origin);
+    return callback(new Error('No permitido por CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -67,6 +71,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// ✅ IMPORTANTÍSIMO: responder preflight OPTIONS para cualquier ruta
+app.options('*', cors(corsOptions));
+
 console.log('✅ CORS configurado con soporte para uploads');
 
 // ============================================
@@ -130,7 +138,7 @@ app.use((req, res, next) => {
     }
     return obj;
   };
-  
+
   if (req.body) req.body = sanitize(req.body);
   if (req.query) req.query = sanitize(req.query);
   if (req.params) req.params = sanitize(req.params);
@@ -182,7 +190,7 @@ const sessionConfig = {
   resave: false,
   saveUninitialized: false,
   name: 'adoptapet.sid',
-  cookie: { 
+  cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
@@ -224,7 +232,7 @@ try {
     const mongoose = require('mongoose');
     mongoose.set('strictQuery', false);
     mongoose.set('autoIndex', true);
-    
+
     const { connectDB } = require('./src/config/database');
     await connectDB();
     services.mongoConnected = true;
@@ -332,32 +340,32 @@ app.get('/api/avatar/:name', async (req, res) => {
 // RUTAS DE GOOGLE OAUTH
 // ============================================
 if (services.passportLoaded) {
-  app.get('/api/auth/google', 
+  app.get('/api/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
   );
 
-  app.get('/api/auth/google/callback', 
-    passport.authenticate('google', { 
+  app.get('/api/auth/google/callback',
+    passport.authenticate('google', {
       failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`,
       session: true
     }),
     (req, res) => {
       try {
         if (!req.user) throw new Error('Usuario no autenticado');
-        
+
         console.log('✅ Usuario autenticado:', req.user.email);
-        
+
         const jwt = require('jsonwebtoken');
         const token = jwt.sign(
-          { 
-            id: req.user._id || req.user.id, 
+          {
+            id: req.user._id || req.user.id,
             email: req.user.email,
             role: req.user.role || 'adopter'
           },
           process.env.JWT_SECRET || 'adoptapet_secreto_super_seguro_2025',
           { expiresIn: '7d' }
         );
-        
+
         const userData = {
           id: req.user._id || req.user.id,
           nombre: req.user.nombre || req.user.name,
@@ -365,13 +373,13 @@ if (services.passportLoaded) {
           avatar: req.user.avatar,
           rol: req.user.role || 'adopter'
         };
-        
+
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const redirectUrl = `${frontendUrl}/home?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
-        
+
         console.log('🔄 Redirigiendo a:', redirectUrl);
         res.redirect(redirectUrl);
-        
+
       } catch (error) {
         console.error('❌ Error en callback de Google:', error);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -420,7 +428,7 @@ if (services.passportLoaded) {
       message: 'Google OAuth no disponible. Verifica la configuración.'
     });
   });
-  
+
   app.get('/api/auth/me', (req, res) => {
     res.status(503).json({
       success: false,
@@ -553,11 +561,11 @@ app.use((req, res, next) => {
 // ============================================
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
-  
+
   if (process.env.NODE_ENV === 'development') {
     console.error('   Stack:', err.stack);
   }
-  
+
   if (err.message === 'No permitido por CORS') {
     return res.status(403).json({
       success: false,
@@ -565,7 +573,7 @@ app.use((err, req, res, next) => {
       origin: req.headers.origin
     });
   }
-  
+
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       success: false,
@@ -573,32 +581,32 @@ app.use((err, req, res, next) => {
       errors: Object.values(err.errors).map(e => e.message)
     });
   }
-  
+
   if (err.name === 'CastError') {
     return res.status(400).json({ success: false, message: 'ID inválido' });
   }
-  
+
   if (err.code === 11000) {
     const field = Object.keys(err.keyPattern)[0];
     return res.status(400).json({ success: false, message: `El ${field} ya está registrado` });
   }
-  
+
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({ success: false, message: 'Token inválido' });
   }
-  
+
   if (err.name === 'TokenExpiredError') {
     return res.status(401).json({ success: false, message: 'Token expirado' });
   }
-  
+
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({ success: false, message: 'El archivo es demasiado grande. Máximo 5MB.' });
   }
-  
+
   if (err.code === 'LIMIT_UNEXPECTED_FILE') {
     return res.status(400).json({ success: false, message: 'Campo de archivo inesperado' });
   }
-  
+
   const statusCode = err.statusCode || err.status || 500;
   res.status(statusCode).json({
     success: false,
@@ -622,7 +630,7 @@ server.listen(PORT, HOST, () => {
     mongoConnected: services.mongoConnected,
     socketLoaded: services.socketLoaded
   });
-  
+
   console.log('\n📂 Uploads configurado:');
   console.log(`   • URL: http://localhost:${PORT}/uploads`);
   console.log(`   • Directorio: ${uploadsDir}`);
@@ -638,14 +646,14 @@ server.listen(PORT, HOST, () => {
 // ============================================
 const gracefulShutdown = (signal) => {
   logger.showShutdown(signal);
-  
+
   server.close(async () => {
     logger.log.success('Servidor HTTP cerrado');
-    
+
     if (services.socketLoaded && io) {
       io.close(() => { logger.log.success('Socket.io cerrado'); });
     }
-    
+
     if (services.mongoConnected) {
       try {
         const mongoose = require('mongoose');
@@ -655,11 +663,11 @@ const gracefulShutdown = (signal) => {
         logger.log.error('Error al cerrar MongoDB', error);
       }
     }
-    
+
     console.log('👋 Adiós!\n');
     process.exit(0);
   });
-  
+
   setTimeout(() => {
     logger.log.warning('Forzando cierre después de timeout');
     process.exit(1);
