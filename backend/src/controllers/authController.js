@@ -6,13 +6,27 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
 // =============================================
-// FUNCIÓN DE ENVÍO DE EMAIL (INTEGRADA)
+// FUNCIÓN DE ENVÍO DE EMAIL (CON LOGS DETALLADOS)
 // =============================================
 const sendVerificationEmail = async (email, userName, code) => {
   try {
+    console.log('🔄 Iniciando envío de email...');
+    console.log('   📧 Email:', email);
+    console.log('   👤 Usuario:', userName);
+    console.log('   🔑 API Token:', process.env.API_TOKEN_MAILERSEND ? 'CONFIGURADO' : '❌ NO CONFIGURADO');
+    console.log('   📬 EMAIL_USER:', process.env.EMAIL_USER || 'NO CONFIGURADO');
+
+    if (!process.env.API_TOKEN_MAILERSEND) {
+      throw new Error('API_TOKEN_MAILERSEND no está configurado');
+    }
+
+    if (!process.env.EMAIL_USER) {
+      throw new Error('EMAIL_USER no está configurado');
+    }
+
     const payload = {
       from: {
-        email: process.env.EMAIL_USER || "noreply@test-nrw7gywmev2g2k8e.mlsender.net",
+        email: process.env.EMAIL_USER,
         name: "AdoptaPet Team",
       },
       to: [
@@ -158,6 +172,8 @@ const sendVerificationEmail = async (email, userName, code) => {
       `,
     };
 
+    console.log('📤 Enviando a MailerSend...');
+
     const response = await fetch("https://api.mailersend.com/v1/email", {
       method: "POST",
       headers: {
@@ -168,17 +184,24 @@ const sendVerificationEmail = async (email, userName, code) => {
       body: JSON.stringify(payload),
     });
 
+    console.log('📡 Respuesta MailerSend Status:', response.status);
+
     if (!response.ok) {
       const errorData = await response.text();
-      console.error("❌ MailerSend API Error:", errorData);
-      throw new Error(`MailerSend Error: ${response.status}`);
+      console.error('❌ MailerSend Error Status:', response.status);
+      console.error('❌ MailerSend Error Body:', errorData);
+      throw new Error(`MailerSend HTTP ${response.status}: ${errorData}`);
     }
 
-    console.log("✅ Email de verificación enviado a:", email);
-    console.log("   🔢 Código:", code);
+    const responseData = await response.json().catch(() => ({}));
+    console.log('✅ Email de verificación enviado EXITOSAMENTE a:', email);
+    console.log('   🔢 Código:', code);
+    console.log('   📨 Respuesta:', responseData);
     return { success: true };
   } catch (err) {
-    console.error("❌ Error al enviar email:", err.message);
+    console.error('❌ ERROR AL ENVIAR EMAIL:');
+    console.error('   Mensaje:', err.message);
+    console.error('   Stack:', err.stack);
     throw err;
   }
 };
@@ -225,10 +248,12 @@ exports.registro = async (req, res) => {
       verified: { email: false }
     });
 
+    console.log('👤 Usuario creado:', user.email);
+
     try {
       await sendVerificationEmail(user.email, user.name, verificationCode);
     } catch (emailError) {
-      console.error('❌ Error al enviar email:', emailError.message);
+      console.error('❌ Error enviando email:', emailError.message);
       // No interrumpir el flujo si falla el email
     }
 
