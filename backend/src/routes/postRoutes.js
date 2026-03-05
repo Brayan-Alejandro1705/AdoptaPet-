@@ -1,41 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-
-// Crear carpeta uploads si no existe
-const uploadsDir = path.join(__dirname, '../../uploads/posts');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log('📁 Carpeta uploads/posts creada');
-}
-
-// Configuración de multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: function (req, file, cb) {
-    const filetypes = /jpeg|jpg|png|gif|webp/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    }
-    cb(new Error('Solo se permiten imágenes'));
-  }
-});
 
 // Middleware de autenticación mejorado
 const auth = async (req, res, next) => {
@@ -237,17 +201,21 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// ✅ CORRECCIÓN PRINCIPAL: upload.array('imagenes', 5) en lugar de upload.single('imagen')
-router.post('/', auth, upload.array('imagenes', 5), async (req, res) => {
+// ✅ CREAR PUBLICACIÓN — SIN multer, acepta JSON con URLs de Cloudinary
+// CAMBIO 1: Eliminado upload.array('imagenes', 5) — ya no se usan archivos locales
+router.post('/', auth, async (req, res) => {
   try {
     console.log('📝 ===== CREANDO NUEVA PUBLICACIÓN =====');
     console.log('📦 Body:', req.body);
-    console.log('📸 Archivos:', req.files ? req.files.map(f => f.filename) : 'Sin imágenes');
     console.log('👤 UserId:', req.userId);
 
     const { contenido, tipo, petInfo, disponibleAdopcion } = req.body;
 
-    if (!contenido && (!req.files || req.files.length === 0)) {
+    // CAMBIO 2: Leer URLs de Cloudinary desde req.body.images
+    const imageUrls = Array.isArray(req.body.images) ? req.body.images : [];
+    console.log('🖼️ URLs de Cloudinary recibidas:', imageUrls);
+
+    if (!contenido && imageUrls.length === 0) {
       console.log('❌ Validación fallida: Sin contenido ni imagen');
       return res.status(400).json({
         success: false,
@@ -297,12 +265,10 @@ router.post('/', auth, upload.array('imagenes', 5), async (req, res) => {
       }
     };
 
-    // ✅ Procesar múltiples imágenes
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        postData.media.images.push(`/uploads/posts/${file.filename}`);
-      });
-      console.log('✅ Imágenes agregadas:', postData.media.images);
+    // ✅ Guardar URLs permanentes de Cloudinary (NO rutas locales /uploads/...)
+    if (imageUrls.length > 0) {
+      postData.media.images = imageUrls;
+      console.log('✅ Imágenes Cloudinary agregadas:', postData.media.images);
     }
 
     console.log('💾 Datos del post a guardar:', JSON.stringify(postData, null, 2));
@@ -998,7 +964,7 @@ router.get('/:postId', auth, async (req, res) => {
 });
 
 console.log('✅ Rutas de posts configuradas con notificaciones automáticas');
-console.log('   📝 POST   /api/posts - Crear publicación');
+console.log('   📝 POST   /api/posts - Crear publicación (Cloudinary URLs vía JSON)');
 console.log('   📰 GET    /api/posts - TODAS las publicaciones (con privacidad)');
 console.log('   📰 GET    /api/posts/feed - Feed de publicaciones (con privacidad)');
 console.log('   👤 GET    /api/posts/user/my-posts - Mis publicaciones');
