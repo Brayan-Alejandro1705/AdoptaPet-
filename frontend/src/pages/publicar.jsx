@@ -8,15 +8,40 @@ import PublishOptions from "../components/common/PublishOptions";
 import PublishFooter from "../components/common/PublishFooter";
 
 const MAX_IMAGES = 5;
-const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}`; // ✅ definido una sola vez
+const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}`;
+
+// ✅ Cloudinary config — reemplaza con tus valores
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dn9x4ccqk";
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "adopta_pet_unsigned";
+
+// ✅ Sube UN archivo a Cloudinary y devuelve la URL segura
+const uploadToCloudinary = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append("folder", "adopta-pet/posts");
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: "POST", body: formData }
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || "Error al subir imagen a Cloudinary");
+  }
+
+  const data = await res.json();
+  return data.secure_url; // ✅ URL permanente de Cloudinary
+};
 
 const Publicar = () => {
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState(null);
-  const [success, setSuccess]   = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError]           = useState(null);
+  const [success, setSuccess]       = useState(false);
   const [momentText, setMomentText] = useState("");
-
-  const [images, setImages] = useState([]);
+  const [images, setImages]         = useState([]);
 
   const handleImages = (e) => {
     const files = Array.from(e.target.files || []);
@@ -57,6 +82,7 @@ const Publicar = () => {
       setLoading(true);
       setError(null);
       setSuccess(false);
+      setUploadProgress(0);
 
       if (!momentText.trim() && images.length === 0) {
         setError("Debes escribir algo o subir al menos una imagen");
@@ -71,20 +97,30 @@ const Publicar = () => {
         return;
       }
 
-      const formData = new FormData();
-      formData.append("contenido", momentText);
-      formData.append("tipo", "update");
+      // ✅ PASO 1: Subir imágenes a Cloudinary (una por una)
+      let imageUrls = [];
+      if (images.length > 0) {
+        setUploadProgress(10);
+        const uploadPromises = images.map(({ file }) => uploadToCloudinary(file));
+        imageUrls = await Promise.all(uploadPromises);
+        setUploadProgress(70);
+      }
 
-      images.forEach(({ file }) => {
-        formData.append("imagenes", file);
-      });
-
-      const response = await fetch(`${API_BASE}/api/posts`, { // ✅ corregido
+      // ✅ PASO 2: Enviar al backend con URLs de Cloudinary (JSON, no FormData)
+      const response = await fetch(`${API_BASE}/api/posts`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contenido: momentText,
+          tipo: "update",
+          images: imageUrls, // ✅ URLs permanentes de Cloudinary
+        }),
       });
 
+      setUploadProgress(90);
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.message || "Error al publicar");
@@ -92,10 +128,11 @@ const Publicar = () => {
       setMomentText("");
       clearAll();
       setSuccess(true);
+      setUploadProgress(100);
 
       setTimeout(() => { window.location.href = "/home"; }, 2000);
     } catch (err) {
-      console.error("Error:", err);
+      console.error("Error al publicar:", err);
       setError(err.message || "Error al publicar. Intenta de nuevo.");
     } finally {
       setLoading(false);
@@ -120,7 +157,10 @@ const Publicar = () => {
                 </h2>
                 {images.length > 0 && (
                   <p className="text-xs text-gray-400">
-                    {images.length}/{MAX_IMAGES} imágenes — {MAX_IMAGES - images.length > 0 ? `puedes agregar ${MAX_IMAGES - images.length} más` : 'límite alcanzado'}
+                    {images.length}/{MAX_IMAGES} imágenes —{" "}
+                    {MAX_IMAGES - images.length > 0
+                      ? `puedes agregar ${MAX_IMAGES - images.length} más`
+                      : "límite alcanzado"}
                   </p>
                 )}
               </div>
@@ -165,7 +205,20 @@ const Publicar = () => {
               {loading && (
                 <div className="text-center py-4">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-                  <p className="text-gray-600 mt-2">Publicando...</p>
+                  <p className="text-gray-600 mt-2">
+                    {uploadProgress < 70
+                      ? "Subiendo imágenes a Cloudinary..."
+                      : uploadProgress < 90
+                      ? "Guardando publicación..."
+                      : "¡Casi listo!"}
+                  </p>
+                  {/* Barra de progreso */}
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2 mx-auto max-w-xs">
+                    <div
+                      className="bg-purple-600 h-1.5 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
