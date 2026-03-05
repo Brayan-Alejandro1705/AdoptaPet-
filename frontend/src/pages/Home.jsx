@@ -16,21 +16,23 @@ export default function Home() {
   const [error, setError] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Capturar token de Google OAuth
+  // Capturar token de Google OAuth (CORREGIDO)
   useEffect(() => {
     const token = searchParams.get('token');
     const userStr = searchParams.get('user');
+    
     if (token && userStr) {
       try {
         const userData = JSON.parse(decodeURIComponent(userStr));
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(userData));
-        navigate('/Home', { replace: true });
+        // Usa window.location.href en lugar de navigate para limpiar completamente la URL
+        window.location.href = '/home';
       } catch (error) {
         console.error('❌ Error al procesar datos de autenticación:', error);
       }
     }
-  }, [searchParams, navigate]);
+  }, []);
 
   // Scroll al post si viene con ?post=ID en la URL
   useEffect(() => {
