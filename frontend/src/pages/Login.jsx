@@ -14,7 +14,6 @@ function Login() {
   const [messageType, setMessageType] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // ✅ URL del backend: usa variable de entorno en producción, localhost en desarrollo
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   const LOGIN_API_URL = `${API_BASE}/api`;
 
@@ -41,8 +40,6 @@ function Login() {
     setMessage('');
 
     try {
-      console.log('🌐 Conectando a:', `${LOGIN_API_URL}/auth/login`);
-
       const response = await fetch(`${LOGIN_API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,7 +50,6 @@ function Login() {
       });
 
       const data = await response.json();
-      console.log('📥 Respuesta del servidor:', data);
 
       if (response.ok && data.success) {
         if (data.token) localStorage.setItem('token', data.token);
@@ -80,7 +76,6 @@ function Login() {
 
     } catch (error) {
       console.error('❌ Error en login:', error);
-      console.error('🌐 URL usada:', `${LOGIN_API_URL}/auth/login`);
       setMessage('❌ Error al conectar con el servidor.');
       setMessageType('error');
       setIsLoading(false);
@@ -156,6 +151,15 @@ function Login() {
           >
             {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
+
+          {/* ✅ NUEVO: Enlace olvidaste tu contraseña */}
+          <p className="text-center text-sm text-gray-500">
+            ¿Olvidaste tu contraseña?{' '}
+            <Link to="/forgot-password" className="text-blue-500 font-semibold hover:underline">
+              Recupérala aquí
+            </Link>
+          </p>
+
         </form>
 
         {/* Mensajes */}

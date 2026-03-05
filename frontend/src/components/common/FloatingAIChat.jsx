@@ -8,7 +8,7 @@ export default function FloatingAIChat() {
     {
       id: 1,
       sender: 'ai',
-      text: '¡Hola! 👋 Soy VetAssist, tu asistente veterinario de confianza 🐾\n\n¿En qué puedo ayudarte hoy?',
+      text: '¡Hola! 👋 Soy SimonBot, tu asistente veterinario de confianza 🐾\n\n¿En qué puedo ayudarte hoy?',
       timestamp: new Date()
     }
   ]);
@@ -23,26 +23,22 @@ export default function FloatingAIChat() {
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-  // Auto-scroll al último mensaje
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Notificación de nuevo mensaje cuando el chat está cerrado
   useEffect(() => {
     if (!isOpen && messages.length > 1 && messages[messages.length - 1].sender === 'ai') {
       setHasNewMessage(true);
     }
   }, [messages, isOpen]);
 
-  // Limpiar notificación al abrir
   useEffect(() => {
     if (isOpen) {
       setHasNewMessage(false);
     }
   }, [isOpen]);
 
-  // Manejar selección de imagen
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -50,7 +46,6 @@ export default function FloatingAIChat() {
         alert('La imagen es muy grande. Máximo 5MB.');
         return;
       }
-
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -60,7 +55,6 @@ export default function FloatingAIChat() {
     }
   };
 
-  // Remover imagen seleccionada
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
@@ -69,7 +63,6 @@ export default function FloatingAIChat() {
     }
   };
 
-  // Enviar mensaje
   const handleSendMessage = async () => {
     if (!inputMessage.trim() && !imageFile) return;
 
@@ -79,7 +72,6 @@ export default function FloatingAIChat() {
       return;
     }
 
-    // Agregar mensaje del usuario
     const userMessage = {
       id: Date.now(),
       sender: 'user',
@@ -106,9 +98,7 @@ export default function FloatingAIChat() {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-              imageBase64: base64Image
-            })
+            body: JSON.stringify({ imageBase64: base64Image })
           });
 
           const data = await response.json();
@@ -201,19 +191,19 @@ export default function FloatingAIChat() {
         }`}>
           <div className="bg-white rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
             
-            {/* HEADER */}
-            <div className="bg-gradient-to-r from-orange-400 to-amber-600 p-4 flex items-center justify-between">
+            {/* HEADER — gradiente púrpura a rosa */}
+            <div className="bg-gradient-to-r  to-blue-500 from-blue-700 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center p-1">
                   <img 
                     src="/robot-dog.png" 
-                    alt="VetAssist" 
+                    alt="SimonBot" 
                     className="w-full h-full object-contain"
                   />
                 </div>
                 <div>
-                  <h3 className="text-white font-bold text-sm">VetAssist IA</h3>
-                  <p className="text-orange-100 text-xs">Tu asistente veterinario</p>
+                  <h3 className="text-white font-bold text-sm">SimonBot</h3>
+                  <p className="text-purple-100 text-xs">Tu asistente veterinario</p>
                 </div>
               </div>
               
@@ -246,7 +236,7 @@ export default function FloatingAIChat() {
                       <div
                         className={`max-w-[80%] rounded-lg px-3 py-2 shadow-sm ${
                           message.sender === 'user'
-                            ? 'bg-[#d9fdd3] text-gray-900'
+                            ? 'bg-[#e9d9fd] text-gray-900'
                             : 'bg-white text-gray-900'
                         }`}
                       >
@@ -278,9 +268,8 @@ export default function FloatingAIChat() {
                     <div className="flex justify-start">
                       <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce delay-100"></div>
-                          <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce delay-200"></div>
+                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
+                          
                         </div>
                       </div>
                     </div>
@@ -334,18 +323,19 @@ export default function FloatingAIChat() {
                       onChange={(e) => setInputMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder={imageFile ? "Pregunta sobre la imagen..." : "Escribe un mensaje..."}
-                      className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-orange-500 outline-none resize-none text-sm"
+                      className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-xl focus:border-purple-400 outline-none resize-none text-sm"
                       rows="1"
                       disabled={loading}
                     />
 
+                    {/* Botón enviar — gradiente púrpura a rosa */}
                     <button
                       onClick={handleSendMessage}
                       disabled={(!inputMessage.trim() && !imageFile) || loading}
                       className={`p-2 rounded-full transition flex-shrink-0 ${
                         (!inputMessage.trim() && !imageFile) || loading
                           ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-orange-400 to-amber-600 text-white hover:shadow-lg'
+                          : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
                       }`}
                     >
                       <Send className="w-4 h-4" />
@@ -371,7 +361,7 @@ export default function FloatingAIChat() {
       >
         <img 
           src="/robot-dog.png" 
-          alt="VetAssist" 
+          alt="SimonBot" 
           className="w-full h-full object-contain drop-shadow-2xl"
         />
         
@@ -383,14 +373,9 @@ export default function FloatingAIChat() {
         )}
       </button>
 
-      {/* Estilos adicionales para animaciones */}
       <style>{`
-        .delay-100 {
-          animation-delay: 0.1s;
-        }
-        .delay-200 {
-          animation-delay: 0.2s;
-        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
       `}</style>
     </>
   );
