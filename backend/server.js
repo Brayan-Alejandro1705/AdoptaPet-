@@ -10,25 +10,18 @@ const path = require('path');
 const fs = require('fs');
 const favoritesRoutes = require("./src/routes/favoritos");
 
-// ============================================
-// INICIALIZACIÓN
-// ============================================
 console.log('🚀 Iniciando Adoptapet Backend v2.0...');
 
 const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
 
-// Estado de servicios
 const services = {
   mongoConnected: false,
   passportLoaded: false,
   socketLoaded: false
 };
 
-// ============================================
-// CREAR DIRECTORIO DE UPLOADS
-// ============================================
 const uploadsDir = path.join(__dirname, 'uploads/avatars');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -38,7 +31,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // ============================================
-// 1. CORS (CORREGIDO PARA VERCEL PREVIEW)
+// 1. CORS (CORREGIDO PARA VERCEL PREVIEW + EXPRESS 5)
 // ============================================
 const corsOptions = {
   origin: function (origin, callback) {
@@ -53,10 +46,8 @@ const corsOptions = {
       process.env.FRONTEND_URL
     ].filter(Boolean);
 
-    // ✅ Permitir cualquier preview de Vercel (*.vercel.app)
     const isVercelPreview = origin && origin.endsWith('.vercel.app');
 
-    // Permitir requests sin Origin (curl/postman) + lista blanca + previews
     if (!origin || allowedOrigins.includes(origin) || isVercelPreview) {
       return callback(null, true);
     }
@@ -72,8 +63,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// ✅ IMPORTANTÍSIMO: responder preflight OPTIONS para cualquier ruta
-app.options('*', cors(corsOptions));
+// ✅ CORRECCIÓN CLAVE: regex en lugar de '*' (incompatible con Express 5)
+app.options(/(.*)/, cors(corsOptions));
 
 console.log('✅ CORS configurado con soporte para uploads');
 
@@ -96,7 +87,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ============================================
-// SERVIR ARCHIVOS ESTÁTICOS
+// ARCHIVOS ESTÁTICOS
 // ============================================
 app.use('/uploads', (req, res, next) => {
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -114,9 +105,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
       '.gif': 'image/gif',
       '.webp': 'image/webp'
     };
-    if (mimeTypes[ext]) {
-      res.setHeader('Content-Type', mimeTypes[ext]);
-    }
+    if (mimeTypes[ext]) res.setHeader('Content-Type', mimeTypes[ext]);
   }
 }));
 
@@ -138,7 +127,6 @@ app.use((req, res, next) => {
     }
     return obj;
   };
-
   if (req.body) req.body = sanitize(req.body);
   if (req.query) req.query = sanitize(req.query);
   if (req.params) req.params = sanitize(req.params);
@@ -176,9 +164,7 @@ const uploadLimiter = rateLimit({
 });
 
 app.use('/api/', (req, res, next) => {
-  if (req.path.startsWith('/avatar')) {
-    return next();
-  }
+  if (req.path.startsWith('/avatar')) return next();
   apiLimiter(req, res, next);
 });
 
@@ -232,7 +218,6 @@ try {
     const mongoose = require('mongoose');
     mongoose.set('strictQuery', false);
     mongoose.set('autoIndex', true);
-
     const { connectDB } = require('./src/config/database');
     await connectDB();
     services.mongoConnected = true;
@@ -277,7 +262,7 @@ app.use((req, res, next) => {
 // RUTAS DE ESTADO
 // ============================================
 app.get('/health', (req, res) => {
-  const health = {
+  res.status(200).json({
     success: true,
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -294,8 +279,7 @@ app.get('/health', (req, res) => {
       used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
       total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`
     }
-  };
-  res.status(200).json(health);
+  });
 });
 
 app.get('/api/info', (req, res) => {
@@ -352,16 +336,11 @@ if (services.passportLoaded) {
     (req, res) => {
       try {
         if (!req.user) throw new Error('Usuario no autenticado');
-
         console.log('✅ Usuario autenticado:', req.user.email);
 
         const jwt = require('jsonwebtoken');
         const token = jwt.sign(
-          {
-            id: req.user._id || req.user.id,
-            email: req.user.email,
-            role: req.user.role || 'adopter'
-          },
+          { id: req.user._id || req.user.id, email: req.user.email, role: req.user.role || 'adopter' },
           process.env.JWT_SECRET || 'adoptapet_secreto_super_seguro_2025',
           { expiresIn: '7d' }
         );
@@ -376,7 +355,6 @@ if (services.passportLoaded) {
 
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
         const redirectUrl = `${frontendUrl}/home?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`;
-
         console.log('🔄 Redirigiendo a:', redirectUrl);
         res.redirect(redirectUrl);
 
@@ -423,17 +401,10 @@ if (services.passportLoaded) {
 
 } else {
   app.get('/api/auth/google', (req, res) => {
-    res.status(503).json({
-      success: false,
-      message: 'Google OAuth no disponible. Verifica la configuración.'
-    });
+    res.status(503).json({ success: false, message: 'Google OAuth no disponible. Verifica la configuración.' });
   });
-
   app.get('/api/auth/me', (req, res) => {
-    res.status(503).json({
-      success: false,
-      message: 'Servicio de autenticación no disponible'
-    });
+    res.status(503).json({ success: false, message: 'Servicio de autenticación no disponible' });
   });
 }
 
@@ -456,9 +427,7 @@ try {
   const petRoutes = require('./src/routes/petRoutes');
   app.use('/api/pets', petRoutes);
   logger.log.success('Rutas de mascotas cargadas');
-} catch (error) {
-  logger.log.warning('Rutas de mascotas no disponibles');
-}
+} catch (error) { logger.log.warning('Rutas de mascotas no disponibles'); }
 
 try {
   const userRoutes = require('./src/routes/userRoutes');
@@ -483,9 +452,7 @@ try {
   const applicationRoutes = require('./src/routes/applicationRoutes');
   app.use('/api/applications', applicationRoutes);
   logger.log.success('Rutas de solicitudes cargadas');
-} catch (error) {
-  logger.log.warning('Rutas de solicitudes no disponibles');
-}
+} catch (error) { logger.log.warning('Rutas de solicitudes no disponibles'); }
 
 try {
   const postRoutes = require('./src/routes/postRoutes');
@@ -508,9 +475,7 @@ try {
 try {
   app.use('/api/favoritos', favoritesRoutes);
   logger.log.success('Rutas de favoritos cargadas');
-} catch (error) {
-  logger.log.warning('Rutas de favoritos no disponibles');
-}
+} catch (error) { logger.log.warning('Rutas de favoritos no disponibles'); }
 
 try {
   const notificationRoutes = require('./src/routes/Notificationroutes');
@@ -529,20 +494,19 @@ try {
   const aiRoutes = require('./src/routes/aiRoutes');
   app.use('/api/ai', aiRoutes);
   logger.log.success('✨ Rutas de IA cargadas correctamente');
-  console.log('   💬 POST /api/ai/chat - Chat con IA');
-  console.log('   🔍 POST /api/ai/identify-breed - Identificar raza');
-  console.log('   💡 POST /api/ai/advice - Consejos sobre mascota');
-  console.log('   🔄 POST /api/ai/compatibility - Compatibilidad');
-  console.log('   📝 POST /api/ai/generate-description - Generar descripción');
+  console.log('   💬 POST /api/ai/chat');
+  console.log('   🔍 POST /api/ai/identify-breed');
+  console.log('   💡 POST /api/ai/advice');
+  console.log('   🔄 POST /api/ai/compatibility');
+  console.log('   📝 POST /api/ai/generate-description');
 } catch (error) {
   logger.log.warning('⚠️  Rutas de IA NO disponibles');
-  console.error('❌ ERROR COMPLETO al cargar aiRoutes:');
-  console.error('   Mensaje:', error.message);
+  console.error('❌ ERROR al cargar aiRoutes:', error.message);
   console.error('   Stack:', error.stack);
 }
 
 // ============================================
-// MANEJO DE ERRORES 404
+// 404
 // ============================================
 app.use((req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/auth')) {
@@ -557,55 +521,27 @@ app.use((req, res, next) => {
 });
 
 // ============================================
-// MIDDLEWARE DE MANEJO DE ERRORES GLOBAL
+// MANEJO DE ERRORES GLOBAL
 // ============================================
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
-
-  if (process.env.NODE_ENV === 'development') {
-    console.error('   Stack:', err.stack);
-  }
+  if (process.env.NODE_ENV === 'development') console.error('   Stack:', err.stack);
 
   if (err.message === 'No permitido por CORS') {
-    return res.status(403).json({
-      success: false,
-      message: 'Acceso denegado por política de CORS',
-      origin: req.headers.origin
-    });
+    return res.status(403).json({ success: false, message: 'Acceso denegado por política de CORS', origin: req.headers.origin });
   }
-
   if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Error de validación',
-      errors: Object.values(err.errors).map(e => e.message)
-    });
+    return res.status(400).json({ success: false, message: 'Error de validación', errors: Object.values(err.errors).map(e => e.message) });
   }
-
-  if (err.name === 'CastError') {
-    return res.status(400).json({ success: false, message: 'ID inválido' });
-  }
-
+  if (err.name === 'CastError') return res.status(400).json({ success: false, message: 'ID inválido' });
   if (err.code === 11000) {
     const field = Object.keys(err.keyPattern)[0];
     return res.status(400).json({ success: false, message: `El ${field} ya está registrado` });
   }
-
-  if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({ success: false, message: 'Token inválido' });
-  }
-
-  if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({ success: false, message: 'Token expirado' });
-  }
-
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({ success: false, message: 'El archivo es demasiado grande. Máximo 5MB.' });
-  }
-
-  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-    return res.status(400).json({ success: false, message: 'Campo de archivo inesperado' });
-  }
+  if (err.name === 'JsonWebTokenError') return res.status(401).json({ success: false, message: 'Token inválido' });
+  if (err.name === 'TokenExpiredError') return res.status(401).json({ success: false, message: 'Token expirado' });
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ success: false, message: 'El archivo es demasiado grande. Máximo 5MB.' });
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') return res.status(400).json({ success: false, message: 'Campo de archivo inesperado' });
 
   const statusCode = err.statusCode || err.status || 500;
   res.status(statusCode).json({
@@ -623,18 +559,15 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
   logger.showStartupBanner({
-    port: PORT,
-    host: HOST,
+    port: PORT, host: HOST,
     env: process.env.NODE_ENV || 'development',
     passportLoaded: services.passportLoaded,
     mongoConnected: services.mongoConnected,
     socketLoaded: services.socketLoaded
   });
-
   console.log('\n📂 Uploads configurado:');
   console.log(`   • URL: http://localhost:${PORT}/uploads`);
   console.log(`   • Directorio: ${uploadsDir}`);
-
   console.log('\n🤖 Inteligencia Artificial:');
   console.log(`   • Groq API Key: ${process.env.GROQ_API_KEY ? '✅ Configurada' : '❌ NO configurada'}`);
   console.log(`   • Modelo: llama-3.3-70b-versatile`);
@@ -646,44 +579,25 @@ server.listen(PORT, HOST, () => {
 // ============================================
 const gracefulShutdown = (signal) => {
   logger.showShutdown(signal);
-
   server.close(async () => {
     logger.log.success('Servidor HTTP cerrado');
-
-    if (services.socketLoaded && io) {
-      io.close(() => { logger.log.success('Socket.io cerrado'); });
-    }
-
+    if (services.socketLoaded && io) io.close(() => { logger.log.success('Socket.io cerrado'); });
     if (services.mongoConnected) {
       try {
         const mongoose = require('mongoose');
         await mongoose.connection.close();
         logger.log.success('MongoDB desconectado');
-      } catch (error) {
-        logger.log.error('Error al cerrar MongoDB', error);
-      }
+      } catch (error) { logger.log.error('Error al cerrar MongoDB', error); }
     }
-
     console.log('👋 Adiós!\n');
     process.exit(0);
   });
-
-  setTimeout(() => {
-    logger.log.warning('Forzando cierre después de timeout');
-    process.exit(1);
-  }, 10000);
+  setTimeout(() => { logger.log.warning('Forzando cierre después de timeout'); process.exit(1); }, 10000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-  gracefulShutdown('UNCAUGHT_EXCEPTION');
-});
+process.on('unhandledRejection', (reason) => { console.error('❌ Unhandled Rejection:', reason); });
+process.on('uncaughtException', (error) => { console.error('❌ Uncaught Exception:', error); gracefulShutdown('UNCAUGHT_EXCEPTION'); });
 
 module.exports = app;
