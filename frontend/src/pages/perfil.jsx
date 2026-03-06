@@ -1,27 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { friendRequestService } from '../services/friendRequestService';
 
-// ✅ URL base unificada — antes estaba mezclado ${import.meta.env.VITE_API_URL || 'http://localhost:5000'} y localhost
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 function Perfil() {
   const navigate = useNavigate();
+  const { userId } = useParams(); // ✅ Si hay userId en la URL, es perfil ajeno
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('publicaciones');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    nombre: '',
-    email: '',
-    bio: '',
-    telefono: '',
-    ubicacion: ''
-  });
+  const [editForm, setEditForm] = useState({ nombre: '', email: '', bio: '', telefono: '', ubicacion: '' });
   const [notification, setNotification] = useState('');
-  
+
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsCount, setPostsCount] = useState(0);
@@ -31,15 +26,25 @@ function Perfil() {
   const fileInputRef = useRef(null);
   const [favoritePosts, setFavoritePosts] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(false);
-
   const [friendRequests, setFriendRequests] = useState([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
 
-  useEffect(() => {
-    cargarPerfil();
-  }, []);
+  // ✅ Estado para solicitud de amistad en perfil ajeno
+  const [friendRequestStatus, setFriendRequestStatus] = useState('none'); // 'none' | 'pending' | 'friends'
+  const [sendingRequest, setSendingRequest] = useState(false);
+
+  const isOwnProfile = !userId; // Si no hay userId en URL, es mi perfil
 
   useEffect(() => {
+    if (isOwnProfile) {
+      cargarPerfil();
+    } else {
+      cargarPerfilAjeno(userId);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!isOwnProfile) return; // Las tabs solo aplican al perfil propio
     if (activeTab === 'publicaciones' && user) {
       cargarPublicaciones();
     } else if (activeTab === 'solicitudes' && user) {
@@ -50,19 +55,20 @@ function Perfil() {
     }
   }, [activeTab, user]);
 
+  // ✅ Cargar publicaciones del usuario ajeno cuando se carga su perfil
+  useEffect(() => {
+    if (!isOwnProfile && user) {
+      cargarPublicacionesAjenas(userId);
+    }
+  }, [user, userId]);
+
+  // ===== CARGAR PERFIL PROPIO =====
   const cargarPerfil = async () => {
     const token = localStorage.getItem('token');
-    if (!token) {
-      window.location.href = '/login';
-      return;
-    }
+    if (!token) { window.location.href = '/login'; return; }
     try {
       const response = await fetch(`${API}/api/users/profile`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
       if (!response.ok) {
         if (response.status === 401) {
@@ -75,9 +81,7 @@ function Perfil() {
       }
       const data = await response.json();
       const userData = data.user || data;
-      if (userData.avatar && !userData.avatar.startsWith('http')) {
-        userData.avatar = `${API}${userData.avatar}`;
-      }
+      if (userData.avatar && !userData.avatar.startsWith('http')) userData.avatar = `${API}${userData.avatar}`;
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
     } catch (err) {
@@ -87,20 +91,38 @@ function Perfil() {
       if (storedUser) {
         try {
           const userData = JSON.parse(storedUser);
-          if (userData.avatar && !userData.avatar.startsWith('http')) {
-            userData.avatar = `${API}${userData.avatar}`;
-          }
+          if (userData.avatar && !userData.avatar.startsWith('http')) userData.avatar = `${API}${userData.avatar}`;
           setUser(userData);
           setError('');
-        } catch (parseError) {
-          console.error('Error al parsear usuario de localStorage:', parseError);
-        }
+        } catch {}
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // ===== CARGAR PERFIL AJENO =====
+  const cargarPerfilAjeno = async (id) => {
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+    try {
+      const response = await fetch(`${API}/api/users/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Usuario no encontrado');
+      const data = await response.json();
+      const userData = data.user || data;
+      if (userData.avatar && !userData.avatar.startsWith('http')) userData.avatar = `${API}${userData.avatar}`;
+      setUser(userData);
+    } catch (err) {
+      console.error('❌ Error al cargar perfil ajeno:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===== CARGAR PUBLICACIONES PROPIAS =====
   const cargarPublicaciones = async () => {
     setPostsLoading(true);
     try {
@@ -113,13 +135,34 @@ function Perfil() {
         setPosts(postsArray);
         setPostsCount(postsArray.length);
       } else {
-        setPosts([]);
-        setPostsCount(0);
+        setPosts([]); setPostsCount(0);
       }
     } catch (err) {
       console.error('❌ Error al cargar publicaciones:', err);
-      setPosts([]);
-      setPostsCount(0);
+      setPosts([]); setPostsCount(0);
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+
+  // ===== CARGAR PUBLICACIONES AJENAS =====
+  const cargarPublicacionesAjenas = async (id) => {
+    setPostsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API}/api/posts/user/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success && response.data.data) {
+        const postsArray = response.data.data.posts || response.data.data || [];
+        setPosts(postsArray);
+        setPostsCount(postsArray.length);
+      } else {
+        setPosts([]); setPostsCount(0);
+      }
+    } catch (err) {
+      console.error('❌ Error al cargar publicaciones ajenas:', err);
+      setPosts([]); setPostsCount(0);
     } finally {
       setPostsLoading(false);
     }
@@ -134,15 +177,9 @@ function Perfil() {
       });
       if (response.data.success && response.data.data) {
         setApplications(response.data.data.applications || []);
-      } else {
-        setApplications([]);
-      }
-    } catch (err) {
-      console.error('❌ Error al cargar solicitudes:', err);
-      setApplications([]);
-    } finally {
-      setApplicationsLoading(false);
-    }
+      } else { setApplications([]); }
+    } catch { setApplications([]); }
+    finally { setApplicationsLoading(false); }
   };
 
   const cargarFavoritos = async () => {
@@ -152,17 +189,10 @@ function Perfil() {
       const response = await axios.get(`${API}/api/favoritos`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.data.success) {
-        setFavoritePosts(response.data.data || []);
-      } else {
-        setFavoritePosts([]);
-      }
-    } catch (err) {
-      console.error('❌ Error al cargar favoritos:', err);
-      setFavoritePosts([]);
-    } finally {
-      setFavoritesLoading(false);
-    }
+      if (response.data.success) setFavoritePosts(response.data.data || []);
+      else setFavoritePosts([]);
+    } catch { setFavoritePosts([]); }
+    finally { setFavoritesLoading(false); }
   };
 
   const cargarSolicitudesAmistad = async () => {
@@ -170,11 +200,22 @@ function Perfil() {
     try {
       const response = await friendRequestService.getReceivedRequests();
       setFriendRequests(response.data || []);
+    } catch { setFriendRequests([]); }
+    finally { setRequestsLoading(false); }
+  };
+
+  // ✅ ENVIAR SOLICITUD DE AMISTAD
+  const handleSendFriendRequest = async () => {
+    setSendingRequest(true);
+    try {
+      await friendRequestService.sendRequest(userId);
+      setFriendRequestStatus('pending');
+      showNotification('✅ Solicitud de amistad enviada');
     } catch (err) {
-      console.error('❌ Error al cargar solicitudes de amistad:', err);
-      setFriendRequests([]);
+      console.error('Error al enviar solicitud:', err);
+      showNotification('❌ Error al enviar la solicitud');
     } finally {
-      setRequestsLoading(false);
+      setSendingRequest(false);
     }
   };
 
@@ -183,80 +224,52 @@ function Perfil() {
       await friendRequestService.acceptRequest(requestId);
       setFriendRequests(prev => prev.filter(req => req._id !== requestId));
       showNotification('✅ Solicitud de amistad aceptada');
-    } catch (err) {
-      console.error('Error al aceptar solicitud:', err);
-      showNotification('❌ Error al aceptar solicitud');
-    }
+    } catch { showNotification('❌ Error al aceptar solicitud'); }
   };
 
   const handleRejectRequest = async (requestId) => {
     try {
       await friendRequestService.rejectRequest(requestId);
       setFriendRequests(prev => prev.filter(req => req._id !== requestId));
-      showNotification('✅ Solicitud de amistad rechazada');
-    } catch (err) {
-      console.error('Error al rechazar solicitud:', err);
-      showNotification('❌ Error al rechazar solicitud');
-    }
+      showNotification('✅ Solicitud rechazada');
+    } catch { showNotification('❌ Error al rechazar solicitud'); }
   };
 
   const handleDeletePost = async (postId) => {
     if (!window.confirm('¿Estás seguro de eliminar esta publicación?')) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`${API}/api/posts/${postId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.delete(`${API}/api/posts/${postId}`, { headers: { Authorization: `Bearer ${token}` } });
       setPosts(prev => prev.filter(post => post._id !== postId));
       setPostsCount(prev => prev - 1);
       showNotification('✅ Publicación eliminada');
-    } catch (err) {
-      console.error('Error al eliminar:', err);
-      showNotification('❌ Error al eliminar la publicación');
-    }
+    } catch { showNotification('❌ Error al eliminar la publicación'); }
   };
 
   const handleApplicationAction = async (applicationId, action) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`${API}/api/applications/${applicationId}`, 
+      await axios.put(`${API}/api/applications/${applicationId}`,
         { status: action },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setApplications(prev => prev.filter(app => app._id !== applicationId));
       showNotification(`✅ Solicitud ${action === 'approved' ? 'aprobada' : 'rechazada'}`);
-    } catch (err) {
-      console.error('Error al actualizar solicitud:', err);
-      showNotification('❌ Error al procesar solicitud');
-    }
+    } catch { showNotification('❌ Error al procesar solicitud'); }
   };
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleAvatarClick = () => { fileInputRef.current?.click(); };
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      showNotification('❌ Solo se permiten imágenes (JPG, PNG, GIF, WEBP)');
-      e.target.value = '';
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showNotification('❌ La imagen no puede superar los 5MB');
-      e.target.value = '';
-      return;
-    }
+    if (!allowedTypes.includes(file.type)) { showNotification('❌ Solo se permiten imágenes (JPG, PNG, GIF, WEBP)'); e.target.value = ''; return; }
+    if (file.size > 5 * 1024 * 1024) { showNotification('❌ La imagen no puede superar los 5MB'); e.target.value = ''; return; }
     setIsUploadingAvatar(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        showNotification('❌ No estás autenticado');
-        window.location.href = '/login';
-        return;
-      }
+      if (!token) { showNotification('❌ No estás autenticado'); window.location.href = '/login'; return; }
       const formData = new FormData();
       formData.append('avatar', file);
       const response = await fetch(`${API}/api/users/avatar`, {
@@ -274,13 +287,8 @@ function Perfil() {
       } else {
         showNotification('❌ ' + (data.message || 'Error al subir la imagen'));
       }
-    } catch (error) {
-      console.error('❌ Error:', error);
-      showNotification('❌ Error al subir la imagen');
-    } finally {
-      setIsUploadingAvatar(false);
-      e.target.value = '';
-    }
+    } catch { showNotification('❌ Error al subir la imagen'); }
+    finally { setIsUploadingAvatar(false); e.target.value = ''; }
   };
 
   const handleLogout = () => {
@@ -304,31 +312,18 @@ function Perfil() {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!editForm.nombre || !editForm.email) {
-      showNotification('❌ Nombre y email son obligatorios');
-      return;
-    }
+    if (!editForm.nombre || !editForm.email) { showNotification('❌ Nombre y email son obligatorios'); return; }
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API}/api/users/profile`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          nombre: editForm.nombre,
-          bio: editForm.bio,
-          telefono: editForm.telefono,
-          ubicacion: editForm.ubicacion
-        })
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: editForm.nombre, bio: editForm.bio, telefono: editForm.telefono, ubicacion: editForm.ubicacion })
       });
       const data = await response.json();
       if (response.ok && data.success) {
         const updatedUser = data.user;
-        if (updatedUser.avatar && !updatedUser.avatar.startsWith('http')) {
-          updatedUser.avatar = `${API}${updatedUser.avatar}`;
-        }
+        if (updatedUser.avatar && !updatedUser.avatar.startsWith('http')) updatedUser.avatar = `${API}${updatedUser.avatar}`;
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setShowEditModal(false);
@@ -336,10 +331,7 @@ function Perfil() {
       } else {
         showNotification('❌ ' + (data.message || 'Error al actualizar perfil'));
       }
-    } catch (error) {
-      console.error('Error al actualizar perfil:', error);
-      showNotification('❌ Error al actualizar perfil');
-    }
+    } catch { showNotification('❌ Error al actualizar perfil'); }
   };
 
   const showNotification = (message) => {
@@ -356,26 +348,15 @@ function Perfil() {
       if (seconds < 86400) return `hace ${Math.floor(seconds / 3600)} h`;
       if (seconds < 2592000) return `hace ${Math.floor(seconds / 86400)} d`;
       return `hace ${Math.floor(seconds / 2592000)} m`;
-    } catch {
-      return 'reciente';
-    }
+    } catch { return 'reciente'; }
   };
 
   const getTypeText = (type) => {
-    const types = {
-      story: ' Historia',
-      tip: ' Consejo',
-      adoption: ' Adopción',
-      update: 'Actualización',
-      question: ' Pregunta',
-      celebration: ' Celebración'
-    };
+    const types = { story: ' Historia', tip: ' Consejo', adoption: ' Adopción', update: 'Actualización', question: ' Pregunta', celebration: ' Celebración' };
     return types[type] || '📝 Publicación';
   };
 
-  // ✅ Proxy del backend para avatares — evita el error de CORS con ui-avatars.com
-  const getAvatarFallback = (name) =>
-    `${API}/api/avatar/${encodeURIComponent(name || 'U')}`;
+  const getAvatarFallback = (name) => `${API}/api/avatar/${encodeURIComponent(name || 'U')}`;
 
   if (loading) {
     return (
@@ -394,8 +375,8 @@ function Perfil() {
         <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
           <div className="text-6xl mb-4">⚠️</div>
           <h3 className="text-xl font-bold mb-4">No se encontró el usuario</h3>
-          <button onClick={handleLogout} className="bg-gradient-to-r from-cyan-500 to-cyan-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-cyan-600 hover:to-cyan-700">
-            Ir al Login
+          <button onClick={() => navigate(-1)} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold">
+            Volver
           </button>
         </div>
       </div>
@@ -410,12 +391,10 @@ function Perfil() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* ===== HEADER CON BOTÓN VOLVER ===== */}
+      {/* HEADER */}
       <header className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-
-            {/* 🔙 BOTÓN VOLVER */}
             <button
               onClick={() => navigate(-1)}
               className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-semibold transition-all duration-200 hover:-translate-x-1 border border-white/30"
@@ -425,7 +404,6 @@ function Perfil() {
               </svg>
               Volver
             </button>
-
             <a href="/" className="text-3xl font-bold text-white tracking-tight">🐾 ADOPTAPET</a>
             <ul className="hidden md:flex space-x-8"></ul>
           </div>
@@ -433,53 +411,98 @@ function Perfil() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        {/* BANNER DE PERFIL */}
         <div className="bg-gradient-to-r from-purple-400 via-purple-700 to-purple-400 rounded-3xl shadow-xl overflow-hidden mb-8">
           <div className="relative px-6 py-12">
             <div className="flex flex-col sm:flex-row items-center sm:items-end">
+
+              {/* Avatar */}
               <div className="relative group">
                 <img
                   key={avatarUrl}
                   src={avatarUrl}
                   alt="Foto de perfil"
                   className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-lg object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null; // evita loop infinito
-                    e.target.src = getAvatarFallback(userName);
-                  }}
+                  onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }}
                 />
-                <div onClick={handleAvatarClick} className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  <div className="text-white text-center">
-                    <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-xs font-semibold">{isUploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}</span>
+                {/* Solo mostrar opción de cambiar foto en perfil propio */}
+                {isOwnProfile && (
+                  <div onClick={handleAvatarClick} className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <div className="text-white text-center">
+                      <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="text-xs font-semibold">{isUploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}</span>
+                    </div>
                   </div>
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={handleAvatarUpload} className="hidden" disabled={isUploadingAvatar} />
+                )}
+                {isOwnProfile && (
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={handleAvatarUpload} className="hidden" disabled={isUploadingAvatar} />
+                )}
               </div>
+
+              {/* Info */}
               <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1">
                 <h1 className="text-3xl font-bold text-white mb-2">{userName}</h1>
                 <p className="text-purple-100 mb-2">{userEmail}</p>
                 <p className="text-white italic">{userBio}</p>
               </div>
-              <button onClick={openEditModal} className="mt-4 sm:mt-0 bg-white text-purple-600 px-6 py-2 rounded-full font-semibold hover:bg-purple-50 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">Editar Perfil</button>
+
+              {/* Botón: Editar perfil (propio) o Enviar solicitud (ajeno) */}
+              {isOwnProfile ? (
+                <button
+                  onClick={openEditModal}
+                  className="mt-4 sm:mt-0 bg-white text-purple-600 px-6 py-2 rounded-full font-semibold hover:bg-purple-50 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+                >
+                  Editar Perfil
+                </button>
+              ) : (
+                <button
+                  onClick={handleSendFriendRequest}
+                  disabled={sendingRequest || friendRequestStatus === 'pending' || friendRequestStatus === 'friends'}
+                  className="mt-4 sm:mt-0 px-6 py-2 rounded-full font-semibold transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
+                  style={{
+                    background: friendRequestStatus === 'pending' ? '#9CA3AF' : friendRequestStatus === 'friends' ? '#10B981' : 'white',
+                    color: friendRequestStatus === 'none' ? '#7C3AED' : 'white'
+                  }}
+                >
+                  {sendingRequest ? 'Enviando...' :
+                   friendRequestStatus === 'pending' ? '⏳ Solicitud enviada' :
+                   friendRequestStatus === 'friends' ? '✅ Amigos' :
+                   '👤 Agregar amigo'}
+                </button>
+              )}
             </div>
           </div>
         </div>
 
+        {/* TABS Y CONTENIDO */}
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           <div className="flex border-b border-gray-200 overflow-x-auto">
-            <button onClick={() => setActiveTab('publicaciones')} className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'publicaciones' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>📱 Publicaciones</button>
-            <button onClick={() => setActiveTab('solicitudes')} className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'solicitudes' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>
-              📋 Solicitudes
-              {friendRequests.length > 0 && (
-                <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{friendRequests.length}</span>
-              )}
+            <button
+              onClick={() => setActiveTab('publicaciones')}
+              className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'publicaciones' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
+            >
+              📱 Publicaciones
             </button>
+            {/* Tabs adicionales solo en perfil propio */}
+            {isOwnProfile && (
+              <button
+                onClick={() => setActiveTab('solicitudes')}
+                className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'solicitudes' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
+              >
+                📋 Solicitudes
+                {friendRequests.length > 0 && (
+                  <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{friendRequests.length}</span>
+                )}
+              </button>
+            )}
           </div>
 
           <div className="p-6">
+            {/* PUBLICACIONES */}
             {activeTab === 'publicaciones' && (
               <div>
                 {postsLoading ? (
@@ -487,9 +510,15 @@ function Perfil() {
                 ) : posts.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">📭</div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">No tienes publicaciones aún</h3>
-                    <p className="text-gray-600 mb-4">Empieza a compartir historias de mascotas</p>
-                    <a href="/publicar" className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600">Crear Publicación</a>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">
+                      {isOwnProfile ? 'No tienes publicaciones aún' : `${userName} no tiene publicaciones aún`}
+                    </h3>
+                    {isOwnProfile && (
+                      <>
+                        <p className="text-gray-600 mb-4">Empieza a compartir historias de mascotas</p>
+                        <a href="/publicar" className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600">Crear Publicación</a>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -508,31 +537,24 @@ function Perfil() {
                               <p className="text-xs text-gray-500">{formatTimeAgo(post.createdAt)}</p>
                             </div>
                           </div>
-                          <button onClick={() => handleDeletePost(post._id)} className="text-gray-400 hover:text-red-500 transition" title="Eliminar publicación">🗑️</button>
+                          {/* Solo mostrar botón eliminar en perfil propio */}
+                          {isOwnProfile && (
+                            <button onClick={() => handleDeletePost(post._id)} className="text-gray-400 hover:text-red-500 transition" title="Eliminar publicación">🗑️</button>
+                          )}
                         </div>
                         {post.media?.images && post.media.images.length > 0 && (
                           <div className="w-full">
-                            <img
-                              src={`${API}${post.media.images[0]}`}
-                              alt="Publicación"
-                              className="w-full h-auto max-h-96 object-cover"
-                              onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
-                            />
+                            <img src={`${API}${post.media.images[0]}`} alt="Publicación" className="w-full h-auto max-h-96 object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                           </div>
                         )}
                         {!post.media?.images && post.images && post.images.length > 0 && (
                           <div className="w-full">
-                            <img
-                              src={`${API}${post.images[0].url || post.images[0]}`}
-                              alt="Publicación"
-                              className="w-full h-auto max-h-96 object-cover"
-                              onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }}
-                            />
+                            <img src={`${API}${post.images[0].url || post.images[0]}`} alt="Publicación" className="w-full h-auto max-h-96 object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
                           </div>
                         )}
                         <div className="p-4">
-                          {post.title && (<h3 className="text-lg font-bold mb-2">{post.title}</h3>)}
-                          {post.content && (<p className="text-gray-800 whitespace-pre-wrap">{post.content}</p>)}
+                          {post.title && <h3 className="text-lg font-bold mb-2">{post.title}</h3>}
+                          {post.content && <p className="text-gray-800 whitespace-pre-wrap">{post.content}</p>}
                           <span className="inline-block mt-3 px-3 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">{getTypeText(post.type)}</span>
                         </div>
                         <div className="px-4 py-3 bg-gray-50 border-t flex items-center justify-between text-sm">
@@ -546,7 +568,8 @@ function Perfil() {
               </div>
             )}
 
-            {activeTab === 'solicitudes' && (
+            {/* SOLICITUDES (solo perfil propio) */}
+            {activeTab === 'solicitudes' && isOwnProfile && (
               <div className="space-y-8">
                 <div>
                   <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -554,23 +577,18 @@ function Perfil() {
                     👥 Solicitudes de Amistad
                   </h3>
                   {requestsLoading ? (
-                    <div className="text-center py-8"><div className="text-4xl mb-4">🔄</div><p className="text-gray-600">Cargando solicitudes de amistad...</p></div>
+                    <div className="text-center py-8"><div className="text-4xl mb-4">🔄</div><p className="text-gray-600">Cargando...</p></div>
                   ) : friendRequests.length === 0 ? (
                     <div className="text-center py-8 bg-gray-50 rounded-2xl"><div className="text-4xl mb-2">📭</div><p className="text-gray-600">No tienes solicitudes de amistad pendientes</p></div>
                   ) : (
                     <div className="space-y-3">
                       {friendRequests.map(request => (
                         <div key={request._id} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                          <img
-                            src={request.from?.avatar || getAvatarFallback(request.from?.nombre || request.from?.name)}
-                            alt={request.from?.nombre || request.from?.name}
-                            className="w-16 h-16 rounded-full object-cover border-2 border-purple-200"
-                            onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(request.from?.nombre || request.from?.name); }}
-                          />
+                          <img src={request.from?.avatar || getAvatarFallback(request.from?.nombre || request.from?.name)} alt={request.from?.nombre || request.from?.name} className="w-16 h-16 rounded-full object-cover border-2 border-purple-200" onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(request.from?.nombre || request.from?.name); }} />
                           <div className="flex-1">
                             <h4 className="font-bold text-gray-800">{request.from?.nombre || request.from?.name}</h4>
                             <p className="text-sm text-gray-500">{request.from?.email}</p>
-                            {request.message && (<p className="text-sm text-gray-600 mt-1 italic">"{request.message}"</p>)}
+                            {request.message && <p className="text-sm text-gray-600 mt-1 italic">"{request.message}"</p>}
                             <p className="text-xs text-gray-400 mt-1">{formatTimeAgo(request.createdAt)}</p>
                           </div>
                           <div className="flex gap-2">
@@ -589,19 +607,14 @@ function Perfil() {
                     🏠 Solicitudes de Adopción
                   </h3>
                   {applicationsLoading ? (
-                    <div className="text-center py-8"><div className="text-4xl mb-4">🔄</div><p className="text-gray-600">Cargando solicitudes de adopción...</p></div>
+                    <div className="text-center py-8"><div className="text-4xl mb-4">🔄</div><p className="text-gray-600">Cargando...</p></div>
                   ) : applications.length === 0 ? (
                     <div className="text-center py-8 bg-gray-50 rounded-2xl"><div className="text-4xl mb-2">📭</div><p className="text-gray-600">No tienes solicitudes de adopción pendientes</p></div>
                   ) : (
                     <div className="space-y-3">
                       {applications.map(app => (
                         <div key={app._id} className="bg-gray-50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                          <img
-                            src={app.user?.avatar || getAvatarFallback(app.user?.nombre || app.user?.name)}
-                            alt={app.user?.nombre || app.user?.name}
-                            className="w-16 h-16 rounded-full border-2 border-blue-300"
-                            onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(app.user?.nombre || app.user?.name); }}
-                          />
+                          <img src={app.user?.avatar || getAvatarFallback(app.user?.nombre || app.user?.name)} alt={app.user?.nombre} className="w-16 h-16 rounded-full border-2 border-blue-300" onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(app.user?.nombre || app.user?.name); }} />
                           <div className="flex-1">
                             <h3 className="text-lg font-bold text-gray-800">{app.user?.nombre || app.user?.name}</h3>
                             <p className="text-gray-600 text-sm">Interesado en <span className="font-semibold">{app.pet?.name}</span></p>
@@ -626,7 +639,8 @@ function Perfil() {
         <p>&copy; 2025 AdoptaPet. Todos los derechos reservados. Hecho con ❤️ para las mascotas.</p>
       </footer>
 
-      {showEditModal && (
+      {/* MODAL EDITAR PERFIL (solo perfil propio) */}
+      {showEditModal && isOwnProfile && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
@@ -636,13 +650,7 @@ function Perfil() {
             <div className="space-y-6">
               <div className="text-center mb-6">
                 <div className="relative inline-block group">
-                  <img
-                    key={avatarUrl}
-                    src={avatarUrl}
-                    alt="Foto de perfil"
-                    className="w-32 h-32 rounded-full border-4 border-purple-300 object-cover mx-auto"
-                    onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }}
-                  />
+                  <img key={avatarUrl} src={avatarUrl} alt="Foto de perfil" className="w-32 h-32 rounded-full border-4 border-purple-300 object-cover mx-auto" onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }} />
                   <div onClick={handleAvatarClick} className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                     <div className="text-white text-center">
                       <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -657,25 +665,25 @@ function Perfil() {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre *</label>
-                <input type="text" value={editForm.nombre} onChange={(e) => setEditForm({...editForm, nombre: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none" placeholder="Tu nombre completo" />
+                <input type="text" value={editForm.nombre} onChange={(e) => setEditForm({...editForm, nombre: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Tu nombre completo" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
-                <input type="email" value={editForm.email} onChange={(e) => setEditForm({...editForm, email: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none" placeholder="tu@email.com" disabled />
+                <input type="email" value={editForm.email} disabled className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 outline-none" />
                 <p className="text-xs text-gray-500 mt-1">El email no se puede cambiar</p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Biografía</label>
-                <textarea value={editForm.bio} onChange={(e) => setEditForm({...editForm, bio: e.target.value})} rows={4} maxLength={200} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none" placeholder="Cuéntanos sobre ti..."></textarea>
+                <textarea value={editForm.bio} onChange={(e) => setEditForm({...editForm, bio: e.target.value})} rows={4} maxLength={200} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none resize-none" placeholder="Cuéntanos sobre ti..."></textarea>
                 <p className="text-sm text-gray-500 mt-1">{editForm.bio.length}/200 caracteres</p>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Teléfono</label>
-                <input type="tel" value={editForm.telefono} onChange={(e) => setEditForm({...editForm, telefono: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none" placeholder="+57 300 123 4567" />
+                <input type="tel" value={editForm.telefono} onChange={(e) => setEditForm({...editForm, telefono: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="+57 300 123 4567" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Ubicación</label>
-                <input type="text" value={editForm.ubicacion} onChange={(e) => setEditForm({...editForm, ubicacion: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none" placeholder="Ciudad, País" />
+                <input type="text" value={editForm.ubicacion} onChange={(e) => setEditForm({...editForm, ubicacion: e.target.value})} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Ciudad, País" />
               </div>
               <div className="flex gap-4 pt-4">
                 <button onClick={() => setShowEditModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-400 transition-colors">Cancelar</button>
