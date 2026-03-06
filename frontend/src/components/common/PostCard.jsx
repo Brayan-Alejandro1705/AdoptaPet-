@@ -382,10 +382,12 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
         const imageStr = typeof imagePath === 'string' ? imagePath : (imagePath.url || imagePath);
         if (!imageStr) return null;
         
-        // Si ya es una URL completa (ej: de Cloudinary), retórnala tal cual
-        if (imageStr.startsWith('http')) return imageStr;
+        // ✅ IMPORTANTE: Si ya comienza con http/https, es URL completa - RETORNA TAL CUAL
+        if (typeof imageStr === 'string' && (imageStr.startsWith('http://') || imageStr.startsWith('https://'))) {
+            return imageStr;
+        }
         
-        // Si es una ruta relativa, construye la URL completa
+        // Si es una ruta relativa local, construye la URL completa
         return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${imageStr.startsWith('/') ? '' : '/'}${imageStr}`;
     };
 
