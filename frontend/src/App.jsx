@@ -92,7 +92,11 @@ function App() {
         {/* Rutas privadas */}
         <Route path="/adoptar" element={<PrivateRoute><Adoptar /></PrivateRoute>} />
         <Route path="/adoptar/crear" element={<PrivateRoute><CrearAdopcion /></PrivateRoute>} />
+
+        {/* ✅ Perfil propio y perfil de otro usuario */}
         <Route path="/perfil" element={<PrivateRoute><Perfil /></PrivateRoute>} />
+        <Route path="/perfil/:userId" element={<PrivateRoute><Perfil /></PrivateRoute>} />
+
         <Route path="/notificaciones" element={<PrivateRoute><Notificaciones /></PrivateRoute>} />
         <Route path="/publicar" element={<PrivateRoute><Publicar /></PrivateRoute>} />
         <Route path="/mensajes" element={<PrivateRoute><Chat /></PrivateRoute>} />
