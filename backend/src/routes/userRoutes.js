@@ -6,26 +6,22 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+
+console.log('👤 Rutas de usuarios cargadas');
 
 // =============================================
-// MULTER CONFIG (AVATARS)
+// CLOUDINARY STORAGE PARA AVATARES
 // =============================================
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadDir = 'uploads/avatars';
 
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      'avatar-' + req.user.id + '-' + uniqueSuffix + path.extname(file.originalname)
-    );
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'adopta-pet/avatars',
+    resource_type: 'auto',
+    quality: 'auto',
+    fetch_format: 'auto'
   }
 });
 
@@ -34,7 +30,11 @@ const fileFilter = (req, file, cb) => {
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
 
-  if (mimetype && extname) return cb(null, true);
+  if (mimetype && extname) {
+    console.log(`✅ Archivo válido: ${file.originalname}`);
+    return cb(null, true);
+  }
+  console.log(`❌ Tipo de archivo no permitido: ${file.mimetype}`);
   cb(new Error('Solo se permiten imágenes (jpeg, jpg, png, gif, webp)'));
 };
 
@@ -52,16 +52,20 @@ const upload = multer({
 router.get('/', protect, async (req, res) => {
   try {
     const users = await User.find()
-      .select('-password')
+      .select('-password -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires')
       .sort({ createdAt: -1 });
 
     console.log(`✅ ${users.length} usuarios encontrados`);
-    res.json(users);
+    res.json({
+      success: true,
+      data: users
+    });
   } catch (error) {
     console.error('❌ Error al obtener usuarios:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener usuarios'
+      message: 'Error al obtener usuarios',
+      error: error.message
     });
   }
 });
@@ -82,28 +86,37 @@ router.get('/search', protect, async (req, res) => {
       _id: { $ne: req.user.id },
       $or: [
         { name: { $regex: q, $options: 'i' } },
-        { nombre: { $regex: q, $options: 'i' } },
         { email: { $regex: q, $options: 'i' } }
-      ]
+      ],
+      status: 'active'
     })
-      .select('-password')
+      .select('-password -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires')
       .limit(20);
 
     console.log(`🔍 Búsqueda: "${q}" - ${users.length} resultados`);
-    res.json(users);
+    res.json({
+      success: true,
+      data: users
+    });
   } catch (error) {
     console.error('❌ Error al buscar usuarios:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al buscar usuarios'
+      message: 'Error al buscar usuarios',
+      error: error.message
     });
   }
 });
 
-// GET - Obtener perfil del usuario autenticado (antes de /:userId)
+// =============================================
+// GET - Obtener perfil del usuario autenticado
+// =============================================
 router.get('/profile', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    console.log(`📋 Obteniendo perfil del usuario: ${req.user.id}`);
+    
+    const user = await User.findById(req.user.id)
+      .select('-password -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires');
 
     if (!user) {
       return res.status(404).json({
@@ -112,46 +125,47 @@ router.get('/profile', protect, async (req, res) => {
       });
     }
 
+    console.log(`✅ Perfil obtenido: ${user.email}`);
+
     res.json({
       success: true,
       user: {
         id: user._id,
-        nombre: user.nombre || user.name,
+        nombre: user.name,
+        name: user.name,
         email: user.email,
         avatar: user.avatar,
         bio: user.bio,
-        telefono: user.telefono || user.phone,
-        ubicacion: user.ubicacion || user.location,
-        rol: user.rol || user.role,
+        telefono: user.phone,
+        phone: user.phone,
+        ubicacion: user.location?.city || user.location,
+        location: user.location,
+        rol: user.role,
+        role: user.role,
         verified: user.verified,
         createdAt: user.createdAt
       }
     });
   } catch (error) {
-    console.error('Error al obtener perfil:', error);
+    console.error('❌ Error al obtener perfil:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener perfil'
+      message: 'Error al obtener perfil',
+      error: error.message
     });
   }
 });
 
+// =============================================
 // PUT - Actualizar perfil del usuario
+// ✅ ACEPTA AMBOS FORMATOS: español (nombre, telefono, ubicacion) e inglés (name, phone, location)
+// =============================================
 router.put('/profile', protect, async (req, res) => {
   try {
-    const { nombre, bio, telefono, ubicacion } = req.body;
+    console.log('✏️ Actualizando perfil...');
+    console.log('📥 Datos recibidos:', JSON.stringify(req.body, null, 2));
 
-    const updateData = {};
-    if (nombre) updateData.nombre = nombre;
-    if (bio) updateData.bio = bio;
-    if (telefono) updateData.telefono = telefono;
-    if (ubicacion) updateData.ubicacion = ubicacion;
-
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
+    const user = await User.findById(req.user.id);
 
     if (!user) {
       return res.status(404).json({
@@ -160,35 +174,87 @@ router.put('/profile', protect, async (req, res) => {
       });
     }
 
+    // ✅ ACEPTAR AMBOS FORMATOS
+    const nombre = req.body.nombre || req.body.name;
+    const bio = req.body.bio;
+    const telefono = req.body.telefono || req.body.phone;
+    const ubicacion = req.body.ubicacion || req.body.location;
+
+    // ✅ IMPORTANTE: El schema usa "name" no "nombre"
+    if (nombre) {
+      user.name = nombre.trim();
+      console.log(`📝 Nombre actualizado: ${user.name}`);
+    }
+
+    if (bio !== undefined) {
+      user.bio = bio.trim();
+      console.log(`📄 Bio actualizada: ${user.bio.substring(0, 30)}...`);
+    }
+
+    // ✅ IMPORTANTE: El schema usa "phone" no "telefono"
+    if (telefono) {
+      user.phone = telefono.trim();
+      console.log(`📞 Teléfono actualizado: ${user.phone}`);
+    }
+
+    // ✅ IMPORTANTE: El schema usa "location" no "ubicacion"
+    if (ubicacion) {
+      if (typeof ubicacion === 'object') {
+        user.location = { ...user.location, ...ubicacion };
+        console.log(`📍 Ubicación actualizada: ${JSON.stringify(user.location)}`);
+      } else {
+        // Si viene como string, asumimos que es la ciudad
+        user.location = user.location || {};
+        user.location.city = ubicacion.trim();
+        console.log(`📍 Ciudad actualizada: ${user.location.city}`);
+      }
+    }
+
+    await user.save();
+    console.log(`✅ Perfil actualizado para: ${user.email}`);
+
+    // ✅ RETORNAR EN AMBOS FORMATOS para que el frontend entienda
     res.json({
       success: true,
       message: 'Perfil actualizado correctamente',
       user: {
         id: user._id,
-        nombre: user.nombre || user.name,
+        nombre: user.name,
+        name: user.name,
         email: user.email,
         avatar: user.avatar,
         bio: user.bio,
-        telefono: user.telefono || user.phone,
-        ubicacion: user.ubicacion || user.location,
-        rol: user.rol || user.role
+        telefono: user.phone,
+        phone: user.phone,
+        ubicacion: user.location?.city || user.location,
+        location: user.location,
+        rol: user.role,
+        role: user.role,
+        verified: user.verified
       }
     });
   } catch (error) {
-    console.error('Error al actualizar perfil:', error);
+    console.error('❌ Error al actualizar perfil:', error);
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({
+        success: false,
+        message: messages[0]
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Error al actualizar perfil'
+      message: 'Error al actualizar perfil',
+      error: error.message
     });
   }
 });
 
 // =====================================================
-// ✅ NOTIFICATION SETTINGS (NUEVO)
+// GET - Obtener ajustes de notificaciones
 // =====================================================
-
-// GET - Traer los ajustes de notificaciones del usuario autenticado
-// GET /api/users/notification-settings
 router.get('/notification-settings', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('notificationSettings');
@@ -208,16 +274,20 @@ router.get('/notification-settings', protect, async (req, res) => {
     console.error('❌ Error al obtener notificationSettings:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error al obtener notificationSettings'
+      message: 'Error al obtener notificationSettings',
+      error: error.message
     });
   }
 });
 
-// PUT - Guardar los ajustes de notificaciones del usuario autenticado
-// PUT /api/users/notification-settings
+// =====================================================
+// PUT - Guardar ajustes de notificaciones
+// =====================================================
 router.put('/notification-settings', protect, async (req, res) => {
   try {
     const { likes, comments, followers, mentions, messages } = req.body;
+
+    console.log('📬 Actualizando notificationSettings...');
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
@@ -240,6 +310,8 @@ router.put('/notification-settings', protect, async (req, res) => {
       });
     }
 
+    console.log('✅ Notificaciones actualizadas');
+
     return res.json({
       success: true,
       message: '✅ Configuración de notificaciones actualizada',
@@ -249,20 +321,19 @@ router.put('/notification-settings', protect, async (req, res) => {
     console.error('❌ Error al actualizar notificationSettings:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error al actualizar notificationSettings'
+      message: 'Error al actualizar notificationSettings',
+      error: error.message
     });
   }
 });
 
 // =====================================================
-// ✅ POST SETTINGS (NUEVO) - AJUSTES DE PUBLICACIONES
+// GET - Obtener ajustes de publicaciones (POST SETTINGS)
 // =====================================================
-// ✅ IMPORTANTÍSIMO: el frontend llama /me/post-settings
-// Así que las rutas deben ser /me/post-settings
-
-// GET /api/users/me/post-settings
 router.get('/me/post-settings', protect, async (req, res) => {
   try {
+    console.log('📋 Obteniendo postSettings...');
+    
     const user = await User.findById(req.user.id).select('postSettings');
 
     if (!user) {
@@ -272,24 +343,26 @@ router.get('/me/post-settings', protect, async (req, res) => {
       });
     }
 
-    // 👇 Para que tu frontend (que hace ...data) funcione fácil,
-    // devolvemos directamente el objeto (sin envolverlo)
     return res.json(user.postSettings || {});
   } catch (error) {
     console.error('❌ Error al obtener postSettings:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error al obtener postSettings'
+      message: 'Error al obtener postSettings',
+      error: error.message
     });
   }
 });
 
-// PUT /api/users/me/post-settings
+// =====================================================
+// PUT - Guardar ajustes de publicaciones
+// =====================================================
 router.put('/me/post-settings', protect, async (req, res) => {
   try {
     const { privacidadPorDefecto, permitirComentarios, permitirCompartir } = req.body;
 
-    // ✅ whitelist + validación simple
+    console.log('📝 Actualizando postSettings...');
+
     const allowedPrivacy = ['publico', 'amigos', 'privado'];
     const safePrivacy = allowedPrivacy.includes(privacidadPorDefecto)
       ? privacidadPorDefecto
@@ -315,24 +388,27 @@ router.put('/me/post-settings', protect, async (req, res) => {
       });
     }
 
-    // Igual: devolvemos directo el objeto para el modal
+    console.log('✅ Post settings actualizados');
+
     return res.json(updatedUser.postSettings || {});
   } catch (error) {
     console.error('❌ Error al actualizar postSettings:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error al actualizar postSettings'
+      message: 'Error al actualizar postSettings',
+      error: error.message
     });
   }
 });
 
 // =====================================================
-// ✅ CUENTA: CAMBIAR CONTRASEÑA (REAL)
-// PATCH /api/users/me/password
+// PATCH - Cambiar contraseña
 // =====================================================
 router.patch('/me/password', protect, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
+
+    console.log('🔐 Cambiando contraseña...');
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
@@ -375,6 +451,8 @@ router.patch('/me/password', protect, async (req, res) => {
     user.password = newPassword;
     await user.save();
 
+    console.log('✅ Contraseña actualizada');
+
     return res.json({
       success: true,
       message: '✅ Contraseña actualizada correctamente'
@@ -383,18 +461,18 @@ router.patch('/me/password', protect, async (req, res) => {
     console.error('❌ Error al cambiar contraseña:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error al cambiar contraseña'
+      message: 'Error al cambiar contraseña',
+      error: error.message
     });
   }
 });
 
 // =====================================================
-// ✅ CUENTA: DESACTIVAR CUENTA (REAL)
-// PATCH /api/users/me/deactivate
+// PATCH - Desactivar cuenta
 // =====================================================
 router.patch('/me/deactivate', protect, async (req, res) => {
   try {
-    const { reason } = req.body;
+    console.log('❌ Desactivando cuenta...');
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
@@ -409,22 +487,29 @@ router.patch('/me/deactivate', protect, async (req, res) => {
       });
     }
 
+    console.log('✅ Cuenta desactivada');
+
     return res.json({
       success: true,
       message: 'Cuenta desactivada correctamente'
     });
   } catch (error) {
-    console.error('Error al desactivar cuenta:', error);
+    console.error('❌ Error al desactivar cuenta:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error al desactivar cuenta'
+      message: 'Error al desactivar cuenta',
+      error: error.message
     });
   }
 });
 
-// POST - Subir avatar
+// =====================================================
+// POST - Subir avatar (CLOUDINARY)
+// =====================================================
 router.post('/avatar', protect, upload.single('avatar'), async (req, res) => {
   try {
+    console.log('📸 Subiendo avatar a Cloudinary...');
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -432,18 +517,8 @@ router.post('/avatar', protect, upload.single('avatar'), async (req, res) => {
       });
     }
 
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-
-    const currentUser = await User.findById(req.user.id);
-
-    if (
-      currentUser.avatar &&
-      !currentUser.avatar.includes('googleusercontent') &&
-      !currentUser.avatar.includes('ui-avatars')
-    ) {
-      const oldAvatarPath = path.join(__dirname, '../..', currentUser.avatar);
-      if (fs.existsSync(oldAvatarPath)) fs.unlinkSync(oldAvatarPath);
-    }
+    const avatarUrl = req.file.secure_url;
+    console.log(`✅ Avatar subido: ${avatarUrl}`);
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
@@ -451,36 +526,41 @@ router.post('/avatar', protect, upload.single('avatar'), async (req, res) => {
       { new: true }
     ).select('-password');
 
+    console.log(`✅ Avatar actualizado para: ${user.email}`);
+
     res.json({
       success: true,
       message: 'Avatar actualizado correctamente',
       avatar: avatarUrl,
       user: {
         id: user._id,
-        nombre: user.nombre || user.name,
+        nombre: user.name,
+        name: user.name,
         email: user.email,
         avatar: user.avatar,
         bio: user.bio,
-        rol: user.rol || user.role
+        rol: user.role,
+        role: user.role
       }
     });
   } catch (error) {
-    console.error('Error al subir avatar:', error);
-
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    console.error('❌ Error al subir avatar:', error);
 
     res.status(500).json({
       success: false,
-      message: error.message || 'Error al subir avatar'
+      message: error.message || 'Error al subir avatar',
+      error: error.message
     });
   }
 });
 
-// DELETE - Eliminar avatar (volver al avatar por defecto)
+// =====================================================
+// DELETE - Eliminar avatar
+// =====================================================
 router.delete('/avatar', protect, async (req, res) => {
   try {
+    console.log('🗑️ Eliminando avatar...');
+
     const user = await User.findById(req.user.id);
 
     if (!user) {
@@ -490,16 +570,7 @@ router.delete('/avatar', protect, async (req, res) => {
       });
     }
 
-    if (
-      user.avatar &&
-      !user.avatar.includes('googleusercontent') &&
-      !user.avatar.includes('ui-avatars')
-    ) {
-      const avatarPath = path.join(__dirname, '../..', user.avatar);
-      if (fs.existsSync(avatarPath)) fs.unlinkSync(avatarPath);
-    }
-
-    const nameForAvatar = user.nombre || user.name || 'User';
+    const nameForAvatar = user.name || 'User';
     const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(
       nameForAvatar
     )}&size=200&background=random`;
@@ -507,26 +578,32 @@ router.delete('/avatar', protect, async (req, res) => {
     user.avatar = defaultAvatar;
     await user.save();
 
+    console.log('✅ Avatar eliminado, volviendo al avatar por defecto');
+
     res.json({
       success: true,
       message: 'Avatar eliminado correctamente',
       avatar: defaultAvatar
     });
   } catch (error) {
-    console.error('Error al eliminar avatar:', error);
+    console.error('❌ Error al eliminar avatar:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al eliminar avatar'
+      message: 'Error al eliminar avatar',
+      error: error.message
     });
   }
 });
 
 // =============================================
-// GET - Perfil de usuario por ID (DEBE IR AL FINAL)
+// GET - Obtener usuario por ID (DEBE IR AL FINAL)
 // =============================================
 router.get('/:userId', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId).select('-password');
+    console.log(`👤 Obteniendo usuario: ${req.params.userId}`);
+
+    const user = await User.findById(req.params.userId)
+      .select('-password -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires');
 
     if (!user) {
       return res.status(404).json({
@@ -535,28 +612,38 @@ router.get('/:userId', protect, async (req, res) => {
       });
     }
 
+    console.log(`✅ Usuario encontrado: ${user.email}`);
+
     res.json({
       success: true,
       user: {
         id: user._id,
-        nombre: user.nombre || user.name,
+        nombre: user.name,
+        name: user.name,
         email: user.email,
         avatar: user.avatar,
         bio: user.bio,
-        telefono: user.telefono || user.phone,
-        ubicacion: user.ubicacion || user.location,
-        rol: user.rol || user.role,
+        telefono: user.phone,
+        phone: user.phone,
+        ubicacion: user.location?.city || user.location,
+        location: user.location,
+        rol: user.role,
+        role: user.role,
         verified: user.verified,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        stats: user.stats
       }
     });
   } catch (error) {
-    console.error('Error al obtener usuario:', error);
+    console.error('❌ Error al obtener usuario:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener usuario'
+      message: 'Error al obtener usuario',
+      error: error.message
     });
   }
 });
+
+console.log('✅ Rutas de usuarios listas');
 
 module.exports = router;
