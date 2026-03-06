@@ -442,8 +442,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
     };
 
     const getPostTypeIcon = (type) => {
-        const icons = { story:'📖', tip:'💡', adoption:'🏠', update:'📢', question:'❓', celebration:'🎉' };
-        return icons[type] || '📝';
+        const icons = { story:'', tip:'', adoption:'', update:'', question:'', celebration:'' };
+        return icons[type] || '';
     };
 
     const authorId      = post.author?._id || null;

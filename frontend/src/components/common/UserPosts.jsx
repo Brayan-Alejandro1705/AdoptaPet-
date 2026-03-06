@@ -149,7 +149,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike }) => {
                                 {post.author?.name || 'Usuario'}
                             </span>
                             {post.author?.verified?.email && (
-                                <span className="text-blue-500 text-sm">✓</span>
+                                <span className="text-blue-500 text-sm"></span>
                             )}
                         </div>
                         <p className="text-xs text-gray-500">

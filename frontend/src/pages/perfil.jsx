@@ -363,12 +363,12 @@ function Perfil() {
 
   const getTypeText = (type) => {
     const types = {
-      story: '📖 Historia',
-      tip: '💡 Consejo',
-      adoption: '🏠 Adopción',
-      update: '📢 Actualización',
-      question: '❓ Pregunta',
-      celebration: '🎉 Celebración'
+      story: ' Historia',
+      tip: ' Consejo',
+      adoption: ' Adopción',
+      update: 'Actualización',
+      question: ' Pregunta',
+      celebration: ' Celebración'
     };
     return types[type] || '📝 Publicación';
   };
