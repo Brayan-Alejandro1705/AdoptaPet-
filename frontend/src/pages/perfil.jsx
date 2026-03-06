@@ -5,9 +5,20 @@ import { friendRequestService } from '../services/friendRequestService';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// ✅ FIX 1: No concatenar API si ya es URL completa (Cloudinary)
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  const imageStr = typeof imagePath === 'string' ? imagePath : (imagePath.url || imagePath);
+  if (!imageStr) return null;
+  if (typeof imageStr === 'string' && (imageStr.startsWith('http://') || imageStr.startsWith('https://'))) {
+    return imageStr;
+  }
+  return `${API}${imageStr.startsWith('/') ? '' : '/'}${imageStr}`;
+};
+
 function Perfil() {
   const navigate = useNavigate();
-  const { userId } = useParams(); // ✅ Si hay userId en la URL, es perfil ajeno
+  const { userId } = useParams();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,40 +40,41 @@ function Perfil() {
   const [friendRequests, setFriendRequests] = useState([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
 
-  // ✅ Estado para solicitud de amistad en perfil ajeno
-  const [friendRequestStatus, setFriendRequestStatus] = useState('none'); // 'none' | 'pending' | 'friends'
+  // ✅ Estado solicitud de amistad
+  const [friendRequestStatus, setFriendRequestStatus] = useState('none');
   const [sendingRequest, setSendingRequest] = useState(false);
 
-  const isOwnProfile = !userId; // Si no hay userId en URL, es mi perfil
+  const isOwnProfile = !userId;
 
   useEffect(() => {
     if (isOwnProfile) {
       cargarPerfil();
     } else {
       cargarPerfilAjeno(userId);
+      cargarEstadoAmistad(userId);
     }
   }, [userId]);
 
   useEffect(() => {
-    if (!isOwnProfile) return; // Las tabs solo aplican al perfil propio
-    if (activeTab === 'publicaciones' && user) {
-      cargarPublicaciones();
-    } else if (activeTab === 'solicitudes' && user) {
-      cargarSolicitudes();
-      cargarSolicitudesAmistad();
-    } else if (activeTab === 'historial' && user) {
-      cargarFavoritos();
-    }
+    if (!isOwnProfile) return;
+    if (activeTab === 'publicaciones' && user) cargarPublicaciones();
+    else if (activeTab === 'solicitudes' && user) cargarSolicitudesAmistad();
+    else if (activeTab === 'historial' && user) cargarFavoritos();
   }, [activeTab, user]);
 
-  // ✅ Cargar publicaciones del usuario ajeno cuando se carga su perfil
   useEffect(() => {
-    if (!isOwnProfile && user) {
-      cargarPublicacionesAjenas(userId);
-    }
+    if (!isOwnProfile && user) cargarPublicacionesAjenas(userId);
   }, [user, userId]);
 
-  // ===== CARGAR PERFIL PROPIO =====
+  const cargarEstadoAmistad = async (id) => {
+    try {
+      const status = await friendRequestService.checkFriendshipStatus(id);
+      setFriendRequestStatus(status || 'none');
+    } catch {
+      setFriendRequestStatus('none');
+    }
+  };
+
   const cargarPerfil = async () => {
     const token = localStorage.getItem('token');
     if (!token) { window.location.href = '/login'; return; }
@@ -71,12 +83,7 @@ function Perfil() {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
       if (!response.ok) {
-        if (response.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return;
-        }
+        if (response.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; return; }
         throw new Error('Error al cargar el perfil');
       }
       const data = await response.json();
@@ -85,110 +92,63 @@ function Perfil() {
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
     } catch (err) {
-      console.error('❌ Error al cargar perfil:', err);
       setError(err.message);
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         try {
           const userData = JSON.parse(storedUser);
           if (userData.avatar && !userData.avatar.startsWith('http')) userData.avatar = `${API}${userData.avatar}`;
-          setUser(userData);
-          setError('');
+          setUser(userData); setError('');
         } catch {}
       }
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  // ===== CARGAR PERFIL AJENO =====
   const cargarPerfilAjeno = async (id) => {
     const token = localStorage.getItem('token');
     if (!token) { window.location.href = '/login'; return; }
     try {
-      const response = await fetch(`${API}/api/users/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await fetch(`${API}/api/users/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (!response.ok) throw new Error('Usuario no encontrado');
       const data = await response.json();
       const userData = data.user || data;
       if (userData.avatar && !userData.avatar.startsWith('http')) userData.avatar = `${API}${userData.avatar}`;
       setUser(userData);
-    } catch (err) {
-      console.error('❌ Error al cargar perfil ajeno:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
-  // ===== CARGAR PUBLICACIONES PROPIAS =====
   const cargarPublicaciones = async () => {
     setPostsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API}/api/posts/user/my-posts`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API}/api/posts/user/my-posts`, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.success && response.data.data) {
         const postsArray = response.data.data.posts || [];
-        setPosts(postsArray);
-        setPostsCount(postsArray.length);
-      } else {
-        setPosts([]); setPostsCount(0);
-      }
-    } catch (err) {
-      console.error('❌ Error al cargar publicaciones:', err);
-      setPosts([]); setPostsCount(0);
-    } finally {
-      setPostsLoading(false);
-    }
+        setPosts(postsArray); setPostsCount(postsArray.length);
+      } else { setPosts([]); setPostsCount(0); }
+    } catch { setPosts([]); setPostsCount(0); }
+    finally { setPostsLoading(false); }
   };
 
-  // ===== CARGAR PUBLICACIONES AJENAS =====
   const cargarPublicacionesAjenas = async (id) => {
     setPostsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API}/api/posts/user/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API}/api/posts/user/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.success && response.data.data) {
         const postsArray = response.data.data.posts || response.data.data || [];
-        setPosts(postsArray);
-        setPostsCount(postsArray.length);
-      } else {
-        setPosts([]); setPostsCount(0);
-      }
-    } catch (err) {
-      console.error('❌ Error al cargar publicaciones ajenas:', err);
-      setPosts([]); setPostsCount(0);
-    } finally {
-      setPostsLoading(false);
-    }
-  };
-
-  const cargarSolicitudes = async () => {
-    setApplicationsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API}/api/applications`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data.success && response.data.data) {
-        setApplications(response.data.data.applications || []);
-      } else { setApplications([]); }
-    } catch { setApplications([]); }
-    finally { setApplicationsLoading(false); }
+        setPosts(postsArray); setPostsCount(postsArray.length);
+      } else { setPosts([]); setPostsCount(0); }
+    } catch { setPosts([]); setPostsCount(0); }
+    finally { setPostsLoading(false); }
   };
 
   const cargarFavoritos = async () => {
     setFavoritesLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API}/api/favoritos`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(`${API}/api/favoritos`, { headers: { Authorization: `Bearer ${token}` } });
       if (response.data.success) setFavoritePosts(response.data.data || []);
       else setFavoritePosts([]);
     } catch { setFavoritePosts([]); }
@@ -204,19 +164,17 @@ function Perfil() {
     finally { setRequestsLoading(false); }
   };
 
-  // ✅ ENVIAR SOLICITUD DE AMISTAD
+  // ✅ FIX 2: Nombre correcto del método
   const handleSendFriendRequest = async () => {
     setSendingRequest(true);
     try {
-      await friendRequestService.sendRequest(userId);
+      await friendRequestService.sendFriendRequest(userId);
       setFriendRequestStatus('pending');
       showNotification('✅ Solicitud de amistad enviada');
     } catch (err) {
       console.error('Error al enviar solicitud:', err);
       showNotification('❌ Error al enviar la solicitud');
-    } finally {
-      setSendingRequest(false);
-    }
+    } finally { setSendingRequest(false); }
   };
 
   const handleAcceptRequest = async (requestId) => {
@@ -246,18 +204,6 @@ function Perfil() {
     } catch { showNotification('❌ Error al eliminar la publicación'); }
   };
 
-  const handleApplicationAction = async (applicationId, action) => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.put(`${API}/api/applications/${applicationId}`,
-        { status: action },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setApplications(prev => prev.filter(app => app._id !== applicationId));
-      showNotification(`✅ Solicitud ${action === 'approved' ? 'aprobada' : 'rechazada'}`);
-    } catch { showNotification('❌ Error al procesar solicitud'); }
-  };
-
   const handleAvatarClick = () => { fileInputRef.current?.click(); };
 
   const handleAvatarUpload = async (e) => {
@@ -272,11 +218,7 @@ function Perfil() {
       if (!token) { showNotification('❌ No estás autenticado'); window.location.href = '/login'; return; }
       const formData = new FormData();
       formData.append('avatar', file);
-      const response = await fetch(`${API}/api/users/avatar`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
-      });
+      const response = await fetch(`${API}/api/users/avatar`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
       const data = await response.json();
       if (response.ok && data.success) {
         const avatarUrl = data.avatar.startsWith('http') ? data.avatar : `${API}${data.avatar}`;
@@ -284,28 +226,14 @@ function Perfil() {
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
         showNotification('✅ Foto de perfil actualizada');
-      } else {
-        showNotification('❌ ' + (data.message || 'Error al subir la imagen'));
-      }
+      } else { showNotification('❌ ' + (data.message || 'Error al subir la imagen')); }
     } catch { showNotification('❌ Error al subir la imagen'); }
     finally { setIsUploadingAvatar(false); e.target.value = ''; }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-  };
-
   const openEditModal = () => {
     if (user) {
-      setEditForm({
-        nombre: user.nombre || user.name || '',
-        email: user.email || '',
-        bio: user.bio || '',
-        telefono: user.telefono || user.phone || '',
-        ubicacion: user.ubicacion || user.location || ''
-      });
+      setEditForm({ nombre: user.nombre || user.name || '', email: user.email || '', bio: user.bio || '', telefono: user.telefono || user.phone || '', ubicacion: user.ubicacion || user.location || '' });
     }
     setShowEditModal(true);
   };
@@ -328,16 +256,11 @@ function Perfil() {
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setShowEditModal(false);
         showNotification('✅ Perfil actualizado correctamente');
-      } else {
-        showNotification('❌ ' + (data.message || 'Error al actualizar perfil'));
-      }
+      } else { showNotification('❌ ' + (data.message || 'Error al actualizar perfil')); }
     } catch { showNotification('❌ Error al actualizar perfil'); }
   };
 
-  const showNotification = (message) => {
-    setNotification(message);
-    setTimeout(() => setNotification(''), 5000);
-  };
+  const showNotification = (message) => { setNotification(message); setTimeout(() => setNotification(''), 5000); };
 
   const formatTimeAgo = (date) => {
     if (!date) return 'reciente';
@@ -361,10 +284,7 @@ function Perfil() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🔄</div>
-          <p className="text-xl text-gray-600">Cargando perfil...</p>
-        </div>
+        <div className="text-center"><div className="text-6xl mb-4">🔄</div><p className="text-xl text-gray-600">Cargando perfil...</p></div>
       </div>
     );
   }
@@ -375,9 +295,7 @@ function Perfil() {
         <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
           <div className="text-6xl mb-4">⚠️</div>
           <h3 className="text-xl font-bold mb-4">No se encontró el usuario</h3>
-          <button onClick={() => navigate(-1)} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold">
-            Volver
-          </button>
+          <button onClick={() => navigate(-1)} className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold">Volver</button>
         </div>
       </div>
     );
@@ -391,17 +309,11 @@ function Perfil() {
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* HEADER */}
       <header className="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 shadow-lg sticky top-0 z-50">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-semibold transition-all duration-200 hover:-translate-x-1 border border-white/30"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
+            <button onClick={() => navigate(-1)} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full font-semibold transition-all duration-200 hover:-translate-x-1 border border-white/30">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}><polyline points="15 18 9 12 15 6" /></svg>
               Volver
             </button>
             <a href="/" className="text-3xl font-bold text-white tracking-tight">🐾 ADOPTAPET</a>
@@ -412,50 +324,38 @@ function Perfil() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        {/* BANNER DE PERFIL */}
         <div className="bg-gradient-to-r from-purple-400 via-purple-700 to-purple-400 rounded-3xl shadow-xl overflow-hidden mb-8">
           <div className="relative px-6 py-12">
             <div className="flex flex-col sm:flex-row items-center sm:items-end">
-
-              {/* Avatar */}
               <div className="relative group">
-                <img
-                  key={avatarUrl}
-                  src={avatarUrl}
-                  alt="Foto de perfil"
+                <img key={avatarUrl} src={avatarUrl} alt="Foto de perfil"
                   className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-white shadow-lg object-cover"
                   onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }}
                 />
-                {/* Solo mostrar opción de cambiar foto en perfil propio */}
                 {isOwnProfile && (
-                  <div onClick={handleAvatarClick} className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <div className="text-white text-center">
-                      <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="text-xs font-semibold">{isUploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}</span>
+                  <>
+                    <div onClick={handleAvatarClick} className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      <div className="text-white text-center">
+                        <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="text-xs font-semibold">{isUploadingAvatar ? 'Subiendo...' : 'Cambiar foto'}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {isOwnProfile && (
-                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={handleAvatarUpload} className="hidden" disabled={isUploadingAvatar} />
+                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" onChange={handleAvatarUpload} className="hidden" disabled={isUploadingAvatar} />
+                  </>
                 )}
               </div>
 
-              {/* Info */}
               <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-1">
                 <h1 className="text-3xl font-bold text-white mb-2">{userName}</h1>
                 <p className="text-purple-100 mb-2">{userEmail}</p>
                 <p className="text-white italic">{userBio}</p>
               </div>
 
-              {/* Botón: Editar perfil (propio) o Enviar solicitud (ajeno) */}
               {isOwnProfile ? (
-                <button
-                  onClick={openEditModal}
-                  className="mt-4 sm:mt-0 bg-white text-purple-600 px-6 py-2 rounded-full font-semibold hover:bg-purple-50 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-                >
+                <button onClick={openEditModal} className="mt-4 sm:mt-0 bg-white text-purple-600 px-6 py-2 rounded-full font-semibold hover:bg-purple-50 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
                   Editar Perfil
                 </button>
               ) : (
@@ -478,31 +378,20 @@ function Perfil() {
           </div>
         </div>
 
-        {/* TABS Y CONTENIDO */}
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           <div className="flex border-b border-gray-200 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('publicaciones')}
-              className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'publicaciones' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
-            >
+            <button onClick={() => setActiveTab('publicaciones')} className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'publicaciones' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>
               📱 Publicaciones
             </button>
-            {/* Tabs adicionales solo en perfil propio */}
             {isOwnProfile && (
-              <button
-                onClick={() => setActiveTab('solicitudes')}
-                className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'solicitudes' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}
-              >
+              <button onClick={() => setActiveTab('solicitudes')} className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'solicitudes' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>
                 📋 Solicitudes
-                {friendRequests.length > 0 && (
-                  <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{friendRequests.length}</span>
-                )}
+                {friendRequests.length > 0 && <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{friendRequests.length}</span>}
               </button>
             )}
           </div>
 
           <div className="p-6">
-            {/* PUBLICACIONES */}
             {activeTab === 'publicaciones' && (
               <div>
                 {postsLoading ? (
@@ -510,13 +399,11 @@ function Perfil() {
                 ) : posts.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="text-6xl mb-4">📭</div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">
-                      {isOwnProfile ? 'No tienes publicaciones aún' : `${userName} no tiene publicaciones aún`}
-                    </h3>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">{isOwnProfile ? 'No tienes publicaciones aún' : `${userName} no tiene publicaciones aún`}</h3>
                     {isOwnProfile && (
                       <>
                         <p className="text-gray-600 mb-4">Empieza a compartir historias de mascotas</p>
-                        <a href="/publicar" className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600">Crear Publicación</a>
+                        <a href="/publicar" className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-semibold">Crear Publicación</a>
                       </>
                     )}
                   </div>
@@ -526,32 +413,28 @@ function Perfil() {
                       <div key={post._id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition">
                         <div className="p-4 flex items-center justify-between border-b">
                           <div className="flex items-center gap-3">
-                            <img
-                              src={post.author?.avatar || avatarUrl}
-                              alt={post.author?.nombre || post.author?.name || userName}
-                              className="w-10 h-10 rounded-full object-cover"
-                              onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }}
-                            />
+                            <img src={post.author?.avatar || avatarUrl} alt={post.author?.nombre || post.author?.name || userName} className="w-10 h-10 rounded-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }} />
                             <div>
                               <p className="font-semibold">{post.author?.nombre || post.author?.name || userName}</p>
                               <p className="text-xs text-gray-500">{formatTimeAgo(post.createdAt)}</p>
                             </div>
                           </div>
-                          {/* Solo mostrar botón eliminar en perfil propio */}
                           {isOwnProfile && (
-                            <button onClick={() => handleDeletePost(post._id)} className="text-gray-400 hover:text-red-500 transition" title="Eliminar publicación">🗑️</button>
+                            <button onClick={() => handleDeletePost(post._id)} className="text-gray-400 hover:text-red-500 transition" title="Eliminar">🗑️</button>
                           )}
                         </div>
-                        {post.media?.images && post.media.images.length > 0 && (
-                          <div className="w-full">
-                            <img src={`${API}${post.media.images[0]}`} alt="Publicación" className="w-full h-auto max-h-96 object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
-                          </div>
-                        )}
-                        {!post.media?.images && post.images && post.images.length > 0 && (
-                          <div className="w-full">
-                            <img src={`${API}${post.images[0].url || post.images[0]}`} alt="Publicación" className="w-full h-auto max-h-96 object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
-                          </div>
-                        )}
+
+                        {/* ✅ FIX 3: usar getImageUrl para imágenes del post */}
+                        {(() => {
+                          const rawImg = post.media?.images?.[0] || post.images?.[0]?.url || post.images?.[0];
+                          const imgUrl = getImageUrl(rawImg);
+                          return imgUrl ? (
+                            <div className="w-full">
+                              <img src={imgUrl} alt="Publicación" className="w-full h-auto max-h-96 object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                            </div>
+                          ) : null;
+                        })()}
+
                         <div className="p-4">
                           {post.title && <h3 className="text-lg font-bold mb-2">{post.title}</h3>}
                           {post.content && <p className="text-gray-800 whitespace-pre-wrap">{post.content}</p>}
@@ -568,7 +451,6 @@ function Perfil() {
               </div>
             )}
 
-            {/* SOLICITUDES (solo perfil propio) */}
             {activeTab === 'solicitudes' && isOwnProfile && (
               <div className="space-y-8">
                 <div>
@@ -600,35 +482,6 @@ function Perfil() {
                     </div>
                   )}
                 </div>
-
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm">{applications.length}</span>
-                    🏠 Solicitudes de Adopción
-                  </h3>
-                  {applicationsLoading ? (
-                    <div className="text-center py-8"><div className="text-4xl mb-4">🔄</div><p className="text-gray-600">Cargando...</p></div>
-                  ) : applications.length === 0 ? (
-                    <div className="text-center py-8 bg-gray-50 rounded-2xl"><div className="text-4xl mb-2">📭</div><p className="text-gray-600">No tienes solicitudes de adopción pendientes</p></div>
-                  ) : (
-                    <div className="space-y-3">
-                      {applications.map(app => (
-                        <div key={app._id} className="bg-gray-50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                          <img src={app.user?.avatar || getAvatarFallback(app.user?.nombre || app.user?.name)} alt={app.user?.nombre} className="w-16 h-16 rounded-full border-2 border-blue-300" onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(app.user?.nombre || app.user?.name); }} />
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-gray-800">{app.user?.nombre || app.user?.name}</h3>
-                            <p className="text-gray-600 text-sm">Interesado en <span className="font-semibold">{app.pet?.name}</span></p>
-                            <p className="text-gray-500 text-xs mt-1">{formatTimeAgo(app.createdAt)}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => handleApplicationAction(app._id, 'approved')} className="bg-green-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-600">Aceptar</button>
-                            <button onClick={() => handleApplicationAction(app._id, 'rejected')} className="bg-red-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-600">Rechazar</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -639,7 +492,6 @@ function Perfil() {
         <p>&copy; 2025 AdoptaPet. Todos los derechos reservados. Hecho con ❤️ para las mascotas.</p>
       </footer>
 
-      {/* MODAL EDITAR PERFIL (solo perfil propio) */}
       {showEditModal && isOwnProfile && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
