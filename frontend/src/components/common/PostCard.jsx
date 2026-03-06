@@ -374,10 +374,19 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
         return generateAvatarSVG(user.name || user.nombre || 'User');
     };
 
+    // ✅ FUNCIÓN CORREGIDA
     const getImageUrl = (imagePath) => {
         if (!imagePath) return null;
-        if (imagePath.startsWith('http')) return imagePath;
-        return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+        
+        // Si es un objeto, extrae la URL
+        const imageStr = typeof imagePath === 'string' ? imagePath : (imagePath.url || imagePath);
+        if (!imageStr) return null;
+        
+        // Si ya es una URL completa (ej: de Cloudinary), retórnala tal cual
+        if (imageStr.startsWith('http')) return imageStr;
+        
+        // Si es una ruta relativa, construye la URL completa
+        return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${imageStr.startsWith('/') ? '' : '/'}${imageStr}`;
     };
 
     const getPostImages = () => {
@@ -566,10 +575,16 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                     className={`relative overflow-hidden bg-gray-100 cursor-zoom-in ${getImageHeight(postImages.length)}`}
                                     onClick={() => setLightbox({ images: postImages.map(img => getImageUrl(img.url || img)), index })}
                                 >
-                                    <img src={imageUrl} alt={`Imagen ${index + 1}`}
-                                        className="w-full h-full object-cover hover:opacity-90 transition"
-                                        onError={e => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">Error cargando imagen</div>'; }}
-                                    />
+                                    {imageUrl ? (
+                                        <img src={imageUrl} alt={`Imagen ${index + 1}`}
+                                            className="w-full h-full object-cover hover:opacity-90 transition"
+                                            onError={e => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">Error cargando imagen</div>'; }}
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">
+                                            URL inválida
+                                        </div>
+                                    )}
                                     {index === 3 && postImages.length > 4 && (
                                         <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
                                             <span className="text-white text-xl font-bold">+{postImages.length - 4}</span>
