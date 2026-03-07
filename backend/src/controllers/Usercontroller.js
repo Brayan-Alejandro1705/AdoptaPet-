@@ -1,11 +1,39 @@
 const Pet = require('../models/Pet');
-const AdoptionRequest = require('../models/AdoptionRequest'); // ← NUEVO
+const AdoptionRequest = require('../models/AdoptionRequest');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
 // ============================================
-// FUNCIONES BÁSICAS DEL CONTROLADOR
+// CONFIGURACIÓN MULTER
+// ============================================
+
+const uploadsDir = path.join(__dirname, '../../uploads/pets');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/pets/'),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'pet-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes'));
+    }
+  }
+}).array('imagenes', 5);
+
+// ============================================
+// FUNCIONES BÁSICAS
 // ============================================
 
 exports.getAllPets = async (req, res) => {
@@ -16,17 +44,14 @@ exports.getAllPets = async (req, res) => {
     if (gender) filter.gender = gender.toLowerCase();
     if (size) filter.size = size.toLowerCase();
     if (status) filter.status = status;
-
     const pets = await Pet.find(filter)
       .populate('owner', 'nombre name email avatar')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
-
     const count = await Pet.countDocuments(filter);
     res.json({ success: true, data: pets, totalPages: Math.ceil(count / limit), currentPage: page });
   } catch (error) {
-    console.error('Error al obtener mascotas:', error);
     res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas' });
   }
 };
@@ -60,7 +85,8 @@ exports.getPetById = async (req, res) => {
 exports.getPetsByShelterId = async (req, res) => {
   try {
     const pets = await Pet.find({ owner: req.params.shelterId })
-      .populate('owner', 'nombre name email avatar').sort({ createdAt: -1 });
+      .populate('owner', 'nombre name email avatar')
+      .sort({ createdAt: -1 });
     res.json({ success: true, data: pets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas' });
@@ -102,32 +128,8 @@ exports.deletePet = async (req, res) => {
 };
 
 // ============================================
-// ADOPCIÓN - SUBIDA DE IMÁGENES
+// ADOPCIÓN - PUBLICAR MASCOTA
 // ============================================
-
-const uploadsDir = path.join(__dirname, '../../uploads/pets');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/pets/'),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'pet-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp/;
-    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Solo se permiten imágenes'));
-    }
-  }
-}).array('imagenes', 5);
 
 exports.getMascotasEnAdopcion = async (req, res) => {
   try {
@@ -145,20 +147,16 @@ exports.getMascotasEnAdopcion = async (req, res) => {
 exports.publicarMascotaAdopcion = async (req, res) => {
   upload(req, res, async function (err) {
     if (err) return res.status(400).json({ success: false, message: err.message });
-
     try {
       const { nombre, tipo, raza, edad, sexo, tamano, descripcion, vacunado, esterilizado, ubicacion, telefono } = req.body;
-
       if (!nombre || !tipo || !edad) {
         return res.status(400).json({ success: false, message: 'Nombre, tipo y edad son obligatorios' });
       }
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: 'Debes subir al menos una foto de la mascota' });
       }
-
       const photos = req.files.map(file => `/uploads/pets/${file.filename}`);
       const mainPhoto = photos[0];
-
       let ageValue = 0, ageUnit = 'años';
       if (typeof edad === 'string') {
         const num = parseInt(edad, 10);
@@ -167,7 +165,6 @@ exports.publicarMascotaAdopcion = async (req, res) => {
       } else if (typeof edad === 'number') {
         ageValue = edad;
       }
-
       let finalDescription = descripcion && descripcion.trim().length >= 20
         ? descripcion.trim()
         : `${nombre} busca un hogar amoroso. ${descripcion || 'Es una mascota maravillosa que merece una segunda oportunidad.'} Contáctanos para conocerle.`.trim();
@@ -191,7 +188,6 @@ exports.publicarMascotaAdopcion = async (req, res) => {
         owner: req.user.id,
         status: 'disponible',
       });
-
       res.status(201).json({ success: true, data: nuevaMascota, message: 'Mascota publicada exitosamente en adopción' });
     } catch (error) {
       if (error.name === 'ValidationError') {
@@ -204,13 +200,9 @@ exports.publicarMascotaAdopcion = async (req, res) => {
 };
 
 // ============================================
-// SOLICITUDES DE ADOPCIÓN ← NUEVO
+// SOLICITUDES DE ADOPCIÓN
 // ============================================
 
-/**
- * POST /api/pets/:id/solicitar
- * Enviar solicitud de adopción con mensaje
- */
 exports.solicitarAdopcion = async (req, res) => {
   try {
     const { message } = req.body;
@@ -251,7 +243,6 @@ exports.solicitarAdopcion = async (req, res) => {
       message: `Solicitud enviada exitosamente para adoptar a ${pet.name}`,
       data: solicitud
     });
-
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ success: false, message: 'Ya enviaste una solicitud para esta mascota' });
@@ -261,10 +252,6 @@ exports.solicitarAdopcion = async (req, res) => {
   }
 };
 
-/**
- * GET /api/pets/mis-solicitudes
- * Ver solicitudes enviadas por el usuario autenticado
- */
 exports.getMisSolicitudes = async (req, res) => {
   try {
     const solicitudes = await AdoptionRequest.find({ applicant: req.user.id })
@@ -277,10 +264,6 @@ exports.getMisSolicitudes = async (req, res) => {
   }
 };
 
-/**
- * GET /api/pets/solicitudes-recibidas
- * Ver solicitudes recibidas como dueño
- */
 exports.getSolicitudesRecibidas = async (req, res) => {
   try {
     const solicitudes = await AdoptionRequest.find({ owner: req.user.id })
@@ -293,43 +276,31 @@ exports.getSolicitudesRecibidas = async (req, res) => {
   }
 };
 
-/**
- * PATCH /api/pets/solicitudes/:requestId/responder
- * El dueño acepta o rechaza una solicitud
- */
 exports.responderSolicitud = async (req, res) => {
   try {
     const { status, ownerResponse } = req.body;
     if (!['aceptada', 'rechazada'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Estado inválido. Usa "aceptada" o "rechazada"' });
     }
-
     const solicitud = await AdoptionRequest.findById(req.params.requestId)
       .populate('pet').populate('applicant', 'nombre name email');
     if (!solicitud) return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
     if (solicitud.owner.toString() !== req.user.id.toString()) {
       return res.status(403).json({ success: false, message: 'No tienes permiso para responder esta solicitud' });
     }
-
     solicitud.status = status;
     solicitud.ownerResponse = ownerResponse || '';
     solicitud.respondedAt = new Date();
     await solicitud.save();
-
     if (status === 'aceptada') {
       await Pet.findByIdAndUpdate(solicitud.pet._id, { status: 'en-proceso' });
     }
-
     res.json({ success: true, message: `Solicitud ${status} correctamente`, data: solicitud });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-/**
- * DELETE /api/pets/solicitudes/:requestId
- * El solicitante cancela su propia solicitud
- */
 exports.cancelarSolicitud = async (req, res) => {
   try {
     const solicitud = await AdoptionRequest.findById(req.params.requestId);
@@ -340,12 +311,9 @@ exports.cancelarSolicitud = async (req, res) => {
     if (solicitud.status !== 'pendiente') {
       return res.status(400).json({ success: false, message: 'Solo puedes cancelar solicitudes pendientes' });
     }
-
     await AdoptionRequest.findByIdAndDelete(req.params.requestId);
     res.json({ success: true, message: 'Solicitud cancelada correctamente' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-module.exports = exports;
