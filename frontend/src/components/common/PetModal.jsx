@@ -10,7 +10,6 @@ const PetModal = ({ pet, onClose }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  // Estado del modal de solicitud de adopción
   const [showAdoptionModal, setShowAdoptionModal] = useState(false);
   const [adoptionMessage, setAdoptionMessage] = useState('');
   const [sendingRequest, setSendingRequest] = useState(false);
@@ -18,6 +17,9 @@ const PetModal = ({ pet, onClose }) => {
   const [requestError, setRequestError] = useState('');
 
   if (!pet) return null;
+
+  // ✅ ID seguro — funciona con _id o id
+  const petId = pet._id || pet.id;
 
   const fallbackImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="600" height="400"%3E%3Crect width="600" height="400" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="24" fill="%239ca3af"%3ESin Foto%3C/text%3E%3C/svg%3E';
 
@@ -39,7 +41,6 @@ const PetModal = ({ pet, onClose }) => {
       alert('Debes iniciar sesión para solicitar una adopción');
       return;
     }
-    // Mensaje prellenado por defecto
     setAdoptionMessage(`Estoy interesado en adoptar a ${pet.name}. Me gustaría saber más sobre él/ella y el proceso de adopción.`);
     setRequestError('');
     setShowAdoptionModal(true);
@@ -60,7 +61,8 @@ const PetModal = ({ pet, onClose }) => {
     try {
       const token = localStorage.getItem('token');
 
-      const response = await fetch(`${API_BASE}/api/pets/${pet._id}/solicitar`, {
+      // ✅ FIX: usar petId en lugar de pet._id
+      const response = await fetch(`${API_BASE}/api/pets/${petId}/solicitar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,7 +88,7 @@ const PetModal = ({ pet, onClose }) => {
   };
 
   // =============================================
-  // HANDLER: ENVIAR MENSAJE (CHAT)
+  // HANDLER: ENVIAR MENSAJE (CHAT) ✅ CORREGIDO
   // =============================================
   const handleSendMessage = async () => {
     try {
@@ -107,12 +109,13 @@ const PetModal = ({ pet, onClose }) => {
         alert('No se puede contactar al dueño de esta mascota');
         return;
       }
-      if (ownerId === currentUser.id) {
+      if (String(ownerId) === String(currentUser.id)) {
         alert('No puedes enviarte mensajes a ti mismo');
         return;
       }
 
-      const response = await fetch(`${API_BASE}/api/pets/${pet._id || pet.id}/solicitar`, {
+      // ✅ FIX: apunta a /api/chat, no a /api/pets/.../solicitar
+      const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,7 +127,8 @@ const PetModal = ({ pet, onClose }) => {
       const data = await response.json();
 
       if (response.ok) {
-        navigate(`/mensajes?chat=${data._id || data.id}`);
+        const chatId = data._id || data.id;
+        navigate(`/mensajes?chat=${chatId}`);
         onClose();
       } else {
         throw new Error(data.error || data.message || 'Error al crear chat');
@@ -139,13 +143,11 @@ const PetModal = ({ pet, onClose }) => {
 
   return (
     <>
-      {/* =============================================
-          MODAL PRINCIPAL DE LA MASCOTA
-      ============================================= */}
+      {/* MODAL PRINCIPAL */}
       <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-white rounded-2xl max-w-4xl w-full my-8 shadow-2xl">
 
-          {/* Galería de imágenes */}
+          {/* Galería */}
           <div className="relative">
             <div className="relative h-96 bg-gray-200 rounded-t-2xl overflow-hidden">
               <img
@@ -252,7 +254,6 @@ const PetModal = ({ pet, onClose }) => {
               )}
             </div>
 
-            {/* Confirmación de solicitud enviada */}
             {requestSent && (
               <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2">
                 <Check className="w-5 h-5 flex-shrink-0" />
@@ -260,7 +261,6 @@ const PetModal = ({ pet, onClose }) => {
               </div>
             )}
 
-            {/* Botones de acción */}
             <div className="space-y-3 pt-4 border-t">
               <div className="flex gap-3">
                 <button onClick={handleSendMessage}
@@ -294,14 +294,11 @@ const PetModal = ({ pet, onClose }) => {
         </div>
       </div>
 
-      {/* =============================================
-          MODAL DE SOLICITUD DE ADOPCIÓN
-      ============================================= */}
+      {/* MODAL DE SOLICITUD DE ADOPCIÓN */}
       {showAdoptionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-6">
 
-            {/* Header */}
             <div className="flex justify-between items-center mb-5">
               <div>
                 <h3 className="text-xl font-bold text-gray-800">🐾 Solicitar adopción</h3>
@@ -313,7 +310,6 @@ const PetModal = ({ pet, onClose }) => {
                 className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
             </div>
 
-            {/* Info de la mascota */}
             <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 mb-5">
               <img
                 src={photos[0]}
@@ -327,7 +323,6 @@ const PetModal = ({ pet, onClose }) => {
               </div>
             </div>
 
-            {/* Área de mensaje */}
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Tu mensaje para el dueño
@@ -343,14 +338,12 @@ const PetModal = ({ pet, onClose }) => {
               <p className="text-xs text-gray-400 mt-1 text-right">{adoptionMessage.length}/1000</p>
             </div>
 
-            {/* Error */}
             {requestError && (
               <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
                 ⚠️ {requestError}
               </div>
             )}
 
-            {/* Botones */}
             <div className="flex gap-3">
               <button onClick={() => setShowAdoptionModal(false)}
                 className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all">
