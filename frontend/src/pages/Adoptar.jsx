@@ -25,7 +25,8 @@ export default function Adoptar() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE}/api/pets/adopcion`);
+      // DESPUÉS ✅
+      const response = await fetch(`${API_BASE}/api/pets?status=disponible`);
       if (!response.ok) throw new Error('Error al cargar mascotas');
       const result = await response.json();
 
