@@ -523,7 +523,7 @@ router.post('/avatar', protect, upload.single('avatar'), async (req, res) => {
       });
     }
 
-    const avatarUrl = req.file.secure_url;
+    const avatarUrl = req.file.secure_url || req.file.path;
     console.log(`✅ Avatar subido: ${avatarUrl}`);
 
     const user = await User.findByIdAndUpdate(

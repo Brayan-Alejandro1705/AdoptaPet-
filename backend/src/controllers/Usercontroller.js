@@ -1,409 +1,351 @@
-// =============================================
-// CONTROLADOR DE USUARIOS - ADOPTAPET
-// =============================================
+const Pet = require('../models/Pet');
+const AdoptionRequest = require('../models/AdoptionRequest'); // ← NUEVO
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-const User = require('../models/User');
-const cloudinary = require('cloudinary').v2;
+// ============================================
+// FUNCIONES BÁSICAS DEL CONTROLADOR
+// ============================================
 
-console.log('👤 Controlador de usuarios cargado');
-
-// =============================================
-// OBTENER PERFIL DEL USUARIO ACTUAL
-// =============================================
-
-exports.getProfile = async (req, res) => {
+exports.getAllPets = async (req, res) => {
   try {
-    console.log(`📋 Obteniendo perfil del usuario: ${req.user._id}`);
-    
-    const user = await User.findById(req.user._id)
-      .select('-password -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires');
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
-    }
+    const { species, gender, size, status, page = 1, limit = 10 } = req.query;
+    const filter = {};
+    if (species) filter.species = species.toLowerCase();
+    if (gender) filter.gender = gender.toLowerCase();
+    if (size) filter.size = size.toLowerCase();
+    if (status) filter.status = status;
 
-    res.status(200).json({
-      success: true,
-      user
-    });
+    const pets = await Pet.find(filter)
+      .populate('owner', 'nombre name email avatar')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
 
+    const count = await Pet.countDocuments(filter);
+    res.json({ success: true, data: pets, totalPages: Math.ceil(count / limit), currentPage: page });
   } catch (error) {
-    console.error('❌ Error al obtener perfil:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener el perfil',
-      error: error.message
-    });
+    console.error('Error al obtener mascotas:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas' });
   }
 };
 
-// =============================================
-// ACTUALIZAR PERFIL DEL USUARIO
-// =============================================
-
-exports.updateProfile = async (req, res) => {
+exports.searchPets = async (req, res) => {
   try {
-    console.log('✏️ Actualizando perfil del usuario...');
-    console.log('📥 Datos recibidos:', JSON.stringify(req.body, null, 2));
-
-    const user = await User.findById(req.user._id);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
-    }
-
-    // ✅ ACEPTAR AMBOS: "name" y "nombre"
-    if (req.body.name) {
-      user.name = req.body.name.trim();
-      console.log(`📝 Nombre actualizado (name): ${user.name}`);
-    } else if (req.body.nombre) {
-      user.name = req.body.nombre.trim();
-      console.log(`📝 Nombre actualizado (nombre): ${user.name}`);
-    }
-
-    // Email - NO SE PUEDE CAMBIAR
-    // (comentado intencionalmente)
-
-    // Bio
-    if (req.body.bio !== undefined) {
-      user.bio = req.body.bio.trim();
-      console.log(`📄 Bio actualizada: ${user.bio.substring(0, 30)}...`);
-    }
-
-    // ✅ ACEPTAR AMBOS: "phone" y "telefono"
-    if (req.body.phone) {
-      user.phone = req.body.phone.trim();
-      console.log(`📞 Teléfono actualizado (phone): ${user.phone}`);
-    } else if (req.body.telefono) {
-      user.phone = req.body.telefono.trim();
-      console.log(`📞 Teléfono actualizado (telefono): ${user.phone}`);
-    }
-
-    // ✅ ACEPTAR AMBOS: "location" y "ubicacion"
-    if (req.body.location) {
-      if (typeof req.body.location === 'object') {
-        user.location = { ...user.location, ...req.body.location };
-        console.log(`📍 Ubicación actualizada (location): ${JSON.stringify(user.location)}`);
-      } else {
-        // Si viene como string, asumimos que es la ciudad
-        user.location = user.location || {};
-        user.location.city = req.body.location.trim();
-        console.log(`📍 Ciudad actualizada (location): ${user.location.city}`);
-      }
-    } else if (req.body.ubicacion) {
-      user.location = user.location || {};
-      user.location.city = req.body.ubicacion.trim();
-      console.log(`📍 Ciudad actualizada (ubicacion): ${user.location.city}`);
-    }
-
-    // Guardar cambios
-    await user.save();
-    console.log(`✅ Perfil actualizado exitosamente para: ${user.email}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Perfil actualizado correctamente',
-      user
-    });
-
+    const { q } = req.query;
+    const pets = await Pet.find({
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { breed: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } }
+      ]
+    }).populate('owner', 'nombre name email avatar').sort({ createdAt: -1 });
+    res.json({ success: true, data: pets });
   } catch (error) {
-    console.error('❌ Error al actualizar perfil:', error);
-    
+    res.status(500).json({ success: false, message: error.message || 'Error al buscar mascotas' });
+  }
+};
+
+exports.getPetById = async (req, res) => {
+  try {
+    const pet = await Pet.findById(req.params.id).populate('owner', 'nombre name email avatar');
+    if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
+    res.json({ success: true, data: pet });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Error al obtener mascota' });
+  }
+};
+
+exports.getPetsByShelterId = async (req, res) => {
+  try {
+    const pets = await Pet.find({ owner: req.params.shelterId })
+      .populate('owner', 'nombre name email avatar').sort({ createdAt: -1 });
+    res.json({ success: true, data: pets });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas' });
+  }
+};
+
+exports.createPet = async (req, res) => {
+  try {
+    const petData = { ...req.body, owner: req.user.id, status: 'disponible' };
+    const pet = await Pet.create(petData);
+    res.status(201).json({ success: true, data: pet, message: 'Mascota creada exitosamente' });
+  } catch (error) {
     if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(e => e.message);
-      return res.status(400).json({
-        success: false,
-        message: messages[0]
-      });
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ success: false, message: 'Error de validación', errors });
     }
-
-    res.status(500).json({
-      success: false,
-      message: 'Error al actualizar el perfil',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message || 'Error al crear mascota' });
   }
 };
 
-// =============================================
-// SUBIR AVATAR (FOTO DE PERFIL)
-// =============================================
-
-exports.uploadAvatar = async (req, res) => {
+exports.updatePet = async (req, res) => {
   try {
-    console.log('📸 Subiendo avatar...');
-    
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No se proporcionó ningún archivo'
-      });
-    }
-
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
-    }
-
-    // Subir a Cloudinary
-    console.log(`📤 Subiendo a Cloudinary...`);
-    
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'adopta-pet/avatars',
-      public_id: `avatar_${user._id}`,
-      overwrite: true,
-      quality: 'auto',
-      fetch_format: 'auto'
-    });
-
-    console.log(`✅ Avatar subido a Cloudinary: ${result.secure_url}`);
-
-    // Actualizar usuario
-    user.avatar = result.secure_url;
-    await user.save();
-
-    console.log(`✅ Avatar actualizado para: ${user.email}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Avatar actualizado correctamente',
-      avatar: user.avatar
-    });
-
+    const pet = await Pet.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
+    res.json({ success: true, data: pet, message: 'Mascota actualizada exitosamente' });
   } catch (error) {
-    console.error('❌ Error al subir avatar:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al subir el avatar',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message || 'Error al actualizar mascota' });
   }
 };
 
-// =============================================
-// OBTENER USUARIO POR ID
-// =============================================
-
-exports.getUserById = async (req, res) => {
+exports.deletePet = async (req, res) => {
   try {
-    console.log(`👤 Obteniendo usuario: ${req.params.id}`);
-    
-    const user = await User.findById(req.params.id)
-      .select('-password -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires')
-      .populate('friends', 'name avatar email');
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      user
-    });
-
+    const pet = await Pet.findByIdAndDelete(req.params.id);
+    if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
+    res.json({ success: true, message: 'Mascota eliminada exitosamente' });
   } catch (error) {
-    console.error('❌ Error al obtener usuario:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener el usuario',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message || 'Error al eliminar mascota' });
   }
 };
 
-// =============================================
-// BUSCAR USUARIOS
-// =============================================
+// ============================================
+// ADOPCIÓN - SUBIDA DE IMÁGENES
+// ============================================
 
-exports.searchUsers = async (req, res) => {
-  try {
-    const { q, limit = 10, skip = 0 } = req.query;
+const uploadsDir = path.join(__dirname, '../../uploads/pets');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-    if (!q) {
-      return res.status(400).json({
-        success: false,
-        message: 'Se requiere un término de búsqueda'
-      });
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, 'uploads/pets/'),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'pet-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    if (allowed.test(path.extname(file.originalname).toLowerCase()) && allowed.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes'));
     }
+  }
+}).array('imagenes', 5);
 
-    console.log(`🔍 Buscando usuarios: "${q}"`);
+exports.getMascotasEnAdopcion = async (req, res) => {
+  try {
+    const pets = await Pet.find({ status: 'disponible' })
+      .sort({ createdAt: -1 })
+      .populate('owner', 'nombre name email avatar');
+    console.log('✅ Mascotas en adopción encontradas:', pets.length);
+    return res.json({ success: true, data: pets });
+  } catch (error) {
+    console.error('❌ Error al obtener mascotas:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas en adopción' });
+  }
+};
 
-    const users = await User.find({
-      $or: [
-        { name: { $regex: q, $options: 'i' } },
-        { email: { $regex: q, $options: 'i' } }
-      ],
-      status: 'active'
-    })
-      .select('-password -resetPasswordToken -resetPasswordExpires -verificationToken -verificationTokenExpires')
-      .limit(parseInt(limit))
-      .skip(parseInt(skip));
+exports.publicarMascotaAdopcion = async (req, res) => {
+  upload(req, res, async function (err) {
+    if (err) return res.status(400).json({ success: false, message: err.message });
 
-    const total = await User.countDocuments({
-      $or: [
-        { name: { $regex: q, $options: 'i' } },
-        { email: { $regex: q, $options: 'i' } }
-      ],
-      status: 'active'
-    });
+    try {
+      const { nombre, tipo, raza, edad, sexo, tamano, descripcion, vacunado, esterilizado, ubicacion, telefono } = req.body;
 
-    console.log(`✅ Encontrados ${users.length} usuarios`);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        users,
-        total,
-        limit: parseInt(limit),
-        skip: parseInt(skip)
+      if (!nombre || !tipo || !edad) {
+        return res.status(400).json({ success: false, message: 'Nombre, tipo y edad son obligatorios' });
       }
-    });
-
-  } catch (error) {
-    console.error('❌ Error al buscar usuarios:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al buscar usuarios',
-      error: error.message
-    });
-  }
-};
-
-// =============================================
-// OBTENER ESTADÍSTICAS DEL USUARIO
-// =============================================
-
-exports.getUserStats = async (req, res) => {
-  try {
-    console.log(`📊 Obteniendo estadísticas del usuario: ${req.user._id}`);
-    
-    const user = await User.findById(req.user._id);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        stats: user.stats,
-        verified: user.verified,
-        friends: user.friends.length,
-        profileCompleteness: user.profileCompleteness
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ success: false, message: 'Debes subir al menos una foto de la mascota' });
       }
-    });
 
-  } catch (error) {
-    console.error('❌ Error al obtener estadísticas:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener estadísticas',
-      error: error.message
-    });
-  }
-};
+      const photos = req.files.map(file => `/uploads/pets/${file.filename}`);
+      const mainPhoto = photos[0];
 
-// =============================================
-// CAMBIAR CONTRASEÑA
-// =============================================
-
-exports.changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword, confirmPassword } = req.body;
-
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Todos los campos son obligatorios'
-      });
-    }
-
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Las contraseñas no coinciden'
-      });
-    }
-
-    const user = await User.findById(req.user._id).select('+password');
-    
-    const isPasswordValid = await user.comparePassword(currentPassword);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'La contraseña actual es incorrecta'
-      });
-    }
-
-    user.password = newPassword;
-    await user.save();
-
-    console.log(`✅ Contraseña actualizada para: ${user.email}`);
-
-    res.status(200).json({
-      success: true,
-      message: 'Contraseña actualizada correctamente'
-    });
-
-  } catch (error) {
-    console.error('❌ Error al cambiar contraseña:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al cambiar la contraseña',
-      error: error.message
-    });
-  }
-};
-
-// =============================================
-// OBTENER AMIGOS DEL USUARIO
-// =============================================
-
-exports.getFriends = async (req, res) => {
-  try {
-    console.log(`👥 Obteniendo amigos del usuario: ${req.user._id}`);
-    
-    const user = await User.findById(req.user._id)
-      .populate('friends', 'name avatar email role');
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        friends: user.friends,
-        count: user.friends.length
+      let ageValue = 0, ageUnit = 'años';
+      if (typeof edad === 'string') {
+        const num = parseInt(edad, 10);
+        if (!isNaN(num)) ageValue = num;
+        if (edad.toLowerCase().includes('mes')) ageUnit = 'meses';
+      } else if (typeof edad === 'number') {
+        ageValue = edad;
       }
+
+      let finalDescription = descripcion && descripcion.trim().length >= 20
+        ? descripcion.trim()
+        : `${nombre} busca un hogar amoroso. ${descripcion || 'Es una mascota maravillosa que merece una segunda oportunidad.'} Contáctanos para conocerle.`.trim();
+
+      const nuevaMascota = await Pet.create({
+        name: nombre,
+        species: (tipo || 'otro').toLowerCase(),
+        breed: raza || 'Mestizo',
+        age: { value: ageValue, unit: ageUnit },
+        gender: sexo ? sexo.toLowerCase() : 'desconocido',
+        size: tamano ? tamano.toLowerCase() : 'mediano',
+        description: finalDescription,
+        healthInfo: {
+          vaccinated: vacunado === 'true' || vacunado === true,
+          sterilized: esterilizado === 'true' || esterilizado === true,
+        },
+        location: { country: 'Colombia', city: ubicacion || 'No especificada' },
+        contactInfo: { phone: telefono || '' },
+        photos,
+        mainPhoto,
+        owner: req.user.id,
+        status: 'disponible',
+      });
+
+      res.status(201).json({ success: true, data: nuevaMascota, message: 'Mascota publicada exitosamente en adopción' });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        const errors = Object.values(error.errors).map(e => e.message);
+        return res.status(400).json({ success: false, message: 'Error de validación', errors });
+      }
+      res.status(500).json({ success: false, message: error.message || 'Error al publicar mascota' });
+    }
+  });
+};
+
+// ============================================
+// SOLICITUDES DE ADOPCIÓN ← NUEVO
+// ============================================
+
+/**
+ * POST /api/pets/:id/solicitar
+ * Enviar solicitud de adopción con mensaje
+ */
+exports.solicitarAdopcion = async (req, res) => {
+  try {
+    const { message } = req.body;
+    const petId = req.params.id;
+    const applicantId = req.user.id;
+
+    const pet = await Pet.findById(petId).populate('owner', 'nombre name email');
+    if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
+    if (pet.status !== 'disponible') {
+      return res.status(400).json({ success: false, message: 'Esta mascota ya no está disponible para adopción' });
+    }
+
+    const ownerId = pet.owner._id?.toString() || pet.owner.toString();
+    if (ownerId === applicantId.toString()) {
+      return res.status(400).json({ success: false, message: 'No puedes solicitar adoptar tu propia mascota' });
+    }
+
+    const existing = await AdoptionRequest.findOne({ pet: petId, applicant: applicantId });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Ya enviaste una solicitud para esta mascota', data: existing });
+    }
+
+    const solicitud = await AdoptionRequest.create({
+      pet: petId,
+      applicant: applicantId,
+      owner: ownerId,
+      message: message || `Estoy interesado en adoptar a ${pet.name}.`
+    });
+
+    await solicitud.populate([
+      { path: 'pet', select: 'name species mainPhoto photos' },
+      { path: 'applicant', select: 'nombre name email avatar' }
+    ]);
+
+    console.log(`✅ Solicitud creada: ${solicitud._id} para ${pet.name}`);
+    res.status(201).json({
+      success: true,
+      message: `Solicitud enviada exitosamente para adoptar a ${pet.name}`,
+      data: solicitud
     });
 
   } catch (error) {
-    console.error('❌ Error al obtener amigos:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener amigos',
-      error: error.message
-    });
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Ya enviaste una solicitud para esta mascota' });
+    }
+    console.error('❌ Error al crear solicitud:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error al enviar solicitud' });
   }
 };
 
-console.log('✅ Controlador de usuarios listo');
+/**
+ * GET /api/pets/mis-solicitudes
+ * Ver solicitudes enviadas por el usuario autenticado
+ */
+exports.getMisSolicitudes = async (req, res) => {
+  try {
+    const solicitudes = await AdoptionRequest.find({ applicant: req.user.id })
+      .populate('pet', 'name species mainPhoto photos status location')
+      .populate('owner', 'nombre name email avatar')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, data: solicitudes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/pets/solicitudes-recibidas
+ * Ver solicitudes recibidas como dueño
+ */
+exports.getSolicitudesRecibidas = async (req, res) => {
+  try {
+    const solicitudes = await AdoptionRequest.find({ owner: req.user.id })
+      .populate('pet', 'name species mainPhoto photos status')
+      .populate('applicant', 'nombre name email avatar')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, data: solicitudes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * PATCH /api/pets/solicitudes/:requestId/responder
+ * El dueño acepta o rechaza una solicitud
+ */
+exports.responderSolicitud = async (req, res) => {
+  try {
+    const { status, ownerResponse } = req.body;
+    if (!['aceptada', 'rechazada'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Estado inválido. Usa "aceptada" o "rechazada"' });
+    }
+
+    const solicitud = await AdoptionRequest.findById(req.params.requestId)
+      .populate('pet').populate('applicant', 'nombre name email');
+    if (!solicitud) return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+    if (solicitud.owner.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para responder esta solicitud' });
+    }
+
+    solicitud.status = status;
+    solicitud.ownerResponse = ownerResponse || '';
+    solicitud.respondedAt = new Date();
+    await solicitud.save();
+
+    if (status === 'aceptada') {
+      await Pet.findByIdAndUpdate(solicitud.pet._id, { status: 'en-proceso' });
+    }
+
+    res.json({ success: true, message: `Solicitud ${status} correctamente`, data: solicitud });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * DELETE /api/pets/solicitudes/:requestId
+ * El solicitante cancela su propia solicitud
+ */
+exports.cancelarSolicitud = async (req, res) => {
+  try {
+    const solicitud = await AdoptionRequest.findById(req.params.requestId);
+    if (!solicitud) return res.status(404).json({ success: false, message: 'Solicitud no encontrada' });
+    if (solicitud.applicant.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para cancelar esta solicitud' });
+    }
+    if (solicitud.status !== 'pendiente') {
+      return res.status(400).json({ success: false, message: 'Solo puedes cancelar solicitudes pendientes' });
+    }
+
+    await AdoptionRequest.findByIdAndDelete(req.params.requestId);
+    res.json({ success: true, message: 'Solicitud cancelada correctamente' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = exports;
