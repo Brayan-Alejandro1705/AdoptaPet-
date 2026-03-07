@@ -112,7 +112,7 @@ const PetModal = ({ pet, onClose }) => {
         return;
       }
 
-      const response = await fetch(`${API_BASE}/api/chat`, {
+      const response = await fetch(`${API_BASE}/api/pets/${pet._id || pet.id}/solicitar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
