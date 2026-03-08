@@ -112,8 +112,8 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    content: shareText ? `${shareText}\n\n🔗 ${postLink}` : `📌 Publicación compartida\n\n🔗 ${postLink}`,
-                    sharedPostId: post._id, type: 'share'
+                    contenido: shareText ? `${shareText}\n\n🔗 ${postLink}` : `📌 Publicación compartida\n\n🔗 ${postLink}`,
+                    sharedPostId: post._id, tipo: 'share'
                 })
             });
         } catch { }
@@ -201,9 +201,9 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                                 {snippet}{snippet.length === 100 ? '…' : ''}
                             </p>
                             <div className="px-3 pb-3">
-                                <a href={postLink} target="_blank" rel="noopener noreferrer"
+                                <a href={buildPostLink(post._id)} target="_blank" rel="noopener noreferrer"
                                     className="text-xs underline break-all" style={{ color: PURPLE }}>
-                                    {postLink}
+                                    {buildPostLink(post._id)}
                                 </a>
                             </div>
                         </div>
@@ -212,7 +212,7 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                     <div className="mx-3 mt-2.5">
                         <div className="flex items-center gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50">
                             <span className="flex-1 text-xs truncate select-all cursor-text min-w-0" style={{ color: PURPLE }}>
-                                {postLink}
+                                {buildPostLink(post._id)}
                             </span>
                             <button
                                 onClick={handleCopyLink}
@@ -374,7 +374,16 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
         return [];
     };
 
+    // ✅ NUEVO: Detectar videos
+    const getPostVideos = () => {
+        if (post.media?.videos?.length > 0) return post.media.videos;
+        if (post.video) return [post.video];
+        if (post.videos?.length > 0) return post.videos;
+        return [];
+    };
+
     const postImages = getPostImages();
+    const postVideos = getPostVideos();
 
     useEffect(() => {
         if (post.stats) {
@@ -561,6 +570,25 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                     )}
                 </div>
 
+                {/* ✅ MOSTRAR VIDEOS */}
+                {postVideos.length > 0 && (
+                    <div className="px-3 sm:px-4 py-2 space-y-2">
+                        {postVideos.map((videoUrl, index) => (
+                            <div key={index} className="relative bg-black rounded-lg overflow-hidden">
+                                <video
+                                    controls
+                                    className="w-full max-h-96 object-contain"
+                                    style={{ maxHeight: '500px' }}
+                                >
+                                    <source src={videoUrl} type="video/mp4" />
+                                    Tu navegador no soporta videos HTML5
+                                </video>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* ✅ MOSTRAR IMÁGENES */}
                 {postImages.length > 0 && (
                     <div className={`grid gap-0.5 ${
                         postImages.length === 1 ? 'grid-cols-1' :

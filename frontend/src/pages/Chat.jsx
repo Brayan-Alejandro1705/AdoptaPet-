@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { chatService } from '../services/chatService';
 import Header from '../components/common/Header';
@@ -15,6 +16,12 @@ export default function Chat() {
   const [showChatList, setShowChatList] = useState(false);
 
   const socket = useSocket();
+  const [searchParams] = useSearchParams();
+
+  // ✅ Parámetros de URL: ?chat=ID&autoMsg=texto
+  const targetChatId = searchParams.get('chat');
+  const autoMsg = searchParams.get('autoMsg');
+  const autoMsgSentRef = useRef(false); // evitar doble envío
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const currentUserId = String(user?.id || user?._id || '');
@@ -76,22 +83,38 @@ export default function Chat() {
     loadChats();
   }, []);
 
+  // ✅ Enviar autoMsg cuando el socket y el chat estén listos
+  useEffect(() => {
+    if (!autoMsg || !selectedChat || !socket || autoMsgSentRef.current) return;
+
+    const chatId = getChatId(selectedChat);
+    if (targetChatId && chatId !== targetChatId) return;
+
+    // Pequeño delay para asegurar que el socket esté en la sala
+    const timer = setTimeout(() => {
+      const text = decodeURIComponent(autoMsg);
+      socket.emit('send_message', {
+        chatId,
+        senderId: currentUserId,
+        text
+      });
+      autoMsgSentRef.current = true;
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [autoMsg, selectedChat, socket, targetChatId, currentUserId]);
+
   useEffect(() => {
     const handler = (e) => {
       const payload = e.detail || {};
       const chatId = String(payload.chatId || '');
       if (!chatId) return;
-
       if (!selectedChat || getChatId(selectedChat) !== chatId) return;
 
       setMessages((prev) =>
         prev.map((m) => {
           if (m.sender === 'me') {
-            return {
-              ...m,
-              status: 'read',
-              readAt: payload.readAt || new Date().toISOString()
-            };
+            return { ...m, status: 'read', readAt: payload.readAt || new Date().toISOString() };
           }
           return m;
         })
@@ -106,9 +129,7 @@ export default function Chat() {
     if (!socket || !selectedChat) return;
 
     const chatId = getChatId(selectedChat);
-
     socket.emit('join_chat', chatId);
-
     markChatAsRead(chatId);
     markIncomingAsReadLocally();
 
@@ -130,7 +151,6 @@ export default function Chat() {
             return { ...c, __otherUserId: senderId };
           })
         );
-
         setSelectedChat((prev) => {
           if (!prev || getChatId(prev) !== chatId) return prev;
           return { ...prev, __otherUserId: senderId };
@@ -143,7 +163,6 @@ export default function Chat() {
 
       const esDelOtro = senderId && senderId !== currentUserId;
       const chatAbierto = selectedChat && getChatId(selectedChat) === chatId;
-
       if (chatAbierto && esDelOtro) {
         markChatAsRead(chatId);
         markIncomingAsReadLocally();
@@ -151,10 +170,7 @@ export default function Chat() {
     };
 
     socket.on('receive_message', handleNewMessage);
-
-    return () => {
-      socket.off('receive_message', handleNewMessage);
-    };
+    return () => socket.off('receive_message', handleNewMessage);
   }, [socket, selectedChat, currentUserId, markChatAsRead, markIncomingAsReadLocally]);
 
   useEffect(() => {
@@ -181,7 +197,6 @@ export default function Chat() {
     socket.on('online_users', handleOnlineUsers);
     socket.on('user_online', handleUserOnline);
     socket.on('user_offline', handleUserOffline);
-
     socket.emit('get_online_users');
 
     return () => {
@@ -197,13 +212,32 @@ export default function Chat() {
       const normalized = (data || []).map((c) => ({ ...c, online: !!c.online }));
       setChats(normalized);
 
-      if (normalized.length > 0) {
-        const first = normalized[0];
-        setSelectedChat(first);
-        const firstChatId = getChatId(first);
-        await loadMessages(firstChatId, first);
+      // ✅ Si hay ?chat= en la URL, seleccionar ese chat específico
+      let chatToSelect = null;
 
-        markChatAsRead(firstChatId);
+      if (targetChatId) {
+        chatToSelect = normalized.find((c) => getChatId(c) === targetChatId);
+      }
+
+      // Si no encontramos el chat (puede ser nuevo), recargamos una vez más
+      if (targetChatId && !chatToSelect) {
+        try {
+          const fresh = await chatService.getChats();
+          const freshNorm = (fresh || []).map((c) => ({ ...c, online: !!c.online }));
+          setChats(freshNorm);
+          chatToSelect = freshNorm.find((c) => getChatId(c) === targetChatId) || freshNorm[0];
+        } catch (_) {
+          chatToSelect = normalized[0];
+        }
+      } else if (!chatToSelect && normalized.length > 0) {
+        chatToSelect = normalized[0];
+      }
+
+      if (chatToSelect) {
+        setSelectedChat(chatToSelect);
+        const chatId = getChatId(chatToSelect);
+        await loadMessages(chatId, chatToSelect);
+        markChatAsRead(chatId);
         markIncomingAsReadLocally();
       }
 
@@ -221,31 +255,23 @@ export default function Chat() {
 
       const formatted = (data || []).map((m) => {
         const senderId = String(m.senderId || m.sender?._id || m.sender?.id || '');
-        return {
-          ...m,
-          senderId,
-          sender: senderId === currentUserId ? 'me' : 'other'
-        };
+        return { ...m, senderId, sender: senderId === currentUserId ? 'me' : 'other' };
       });
 
       setMessages(formatted);
-
       markChatAsRead(chatId);
       markIncomingAsReadLocally();
 
       const otherFromMessages = formatted.find((m) => m.senderId && m.senderId !== currentUserId)?.senderId;
-
       if (otherFromMessages) {
         setChats((prev) =>
           prev.map((c) => (getChatId(c) === chatId ? { ...c, __otherUserId: otherFromMessages } : c))
         );
-
         setSelectedChat((prev) => {
           const base = prev || chatObj;
           if (!base || getChatId(base) !== chatId) return prev;
           return { ...base, __otherUserId: otherFromMessages };
         });
-
         socket?.emit('get_online_users');
       }
     } catch (error) {
@@ -255,7 +281,6 @@ export default function Chat() {
 
   const handleSendMessage = (text) => {
     if (!socket || !selectedChat || !text.trim()) return;
-
     socket.emit('send_message', {
       chatId: getChatId(selectedChat),
       senderId: currentUserId,
@@ -266,13 +291,10 @@ export default function Chat() {
   const handleSelectChat = async (chat) => {
     setSelectedChat(chat);
     setShowChatList(false);
-
     const chatId = getChatId(chat);
     await loadMessages(chatId, chat);
-
     markChatAsRead(chatId);
     markIncomingAsReadLocally();
-
     socket?.emit('get_online_users');
   };
 
@@ -280,7 +302,7 @@ export default function Chat() {
     return (
       <div className="h-screen bg-[#efeae2] overflow-hidden flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-00 mx-auto" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto" />
           <p className="mt-4 text-gray-600">Cargando chats...</p>
         </div>
       </div>
@@ -294,26 +316,18 @@ export default function Chat() {
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="max-w-7xl mx-auto px-3 md:px-4 pt-4 md:pt-6">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-              <div className="hidden md:block md:col-span-3">
-                <Sidebar />
-              </div>
+              <div className="hidden md:block md:col-span-3"><Sidebar /></div>
               <main className="col-span-1 md:col-span-9">
                 <div className="bg-white rounded-xl shadow-lg p-8 text-center">
                   <div className="text-6xl mb-4">💬</div>
-                  <h2 className="text-2xl font-bold text-gray-700 mb-2">
-                    No tienes conversaciones
-                  </h2>
-                  <p className="text-gray-500">
-                    Cuando contactes a alguien sobre una mascota, tus chats aparecerán aquí
-                  </p>
+                  <h2 className="text-2xl font-bold text-gray-700 mb-2">No tienes conversaciones</h2>
+                  <p className="text-gray-500">Cuando contactes a alguien sobre una mascota, tus chats aparecerán aquí</p>
                 </div>
               </main>
             </div>
           </div>
         </div>
-        <div className="shrink-0">
-          <BottomNav />
-        </div>
+        <div className="shrink-0"><BottomNav /></div>
       </div>
     );
   }
@@ -325,9 +339,7 @@ export default function Chat() {
       <div className="flex-1 min-h-0">
         <div className="max-w-7xl mx-auto px-3 md:px-4 pt-4 md:pt-6 h-full">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 h-full min-h-0">
-            <div className="hidden md:block md:col-span-3 h-full min-h-0">
-              <Sidebar />
-            </div>
+            <div className="hidden md:block md:col-span-3 h-full min-h-0"><Sidebar /></div>
 
             <main className="col-span-1 md:col-span-9 h-full min-h-0">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 h-full min-h-0">
@@ -355,9 +367,7 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="shrink-0">
-        <BottomNav />
-      </div>
+      <div className="shrink-0"><BottomNav /></div>
     </div>
   );
 }
