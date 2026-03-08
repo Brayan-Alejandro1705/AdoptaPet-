@@ -202,24 +202,28 @@ router.get('/', auth, async (req, res) => {
 });
 
 // ✅ CREAR PUBLICACIÓN — SIN multer, acepta JSON con URLs de Cloudinary
-// CAMBIO 1: Eliminado upload.array('imagenes', 5) — ya no se usan archivos locales
+// ✅ Soporta: contenido, imagenes (array) y videos (string URL o null)
 router.post('/', auth, async (req, res) => {
   try {
     console.log('📝 ===== CREANDO NUEVA PUBLICACIÓN =====');
-    console.log('📦 Body:', req.body);
+    console.log('📦 Body recibido:', req.body);
     console.log('👤 UserId:', req.userId);
 
     const { contenido, tipo, petInfo, disponibleAdopcion } = req.body;
 
-    // CAMBIO 2: Leer URLs de Cloudinary desde req.body.images
-    const imageUrls = Array.isArray(req.body.images) ? req.body.images : [];
-    console.log('🖼️ URLs de Cloudinary recibidas:', imageUrls);
+    // ✅ Leer URLs de Cloudinary desde req.body.imagenes y req.body.videos
+    const imageUrls = Array.isArray(req.body.imagenes) ? req.body.imagenes : [];
+    const videoUrl = req.body.videos || null;
+    
+    console.log('🖼️ URLs de imágenes recibidas:', imageUrls);
+    console.log('🎥 URL de video recibida:', videoUrl);
 
-    if (!contenido && imageUrls.length === 0) {
-      console.log('❌ Validación fallida: Sin contenido ni imagen');
+    // ✅ VALIDACIÓN: Debe tener contenido O al menos una imagen O un video
+    if (!contenido?.trim() && imageUrls.length === 0 && !videoUrl) {
+      console.log('❌ Validación fallida: Sin contenido ni media');
       return res.status(400).json({
         success: false,
-        message: 'Debes proporcionar contenido o una imagen'
+        message: 'Debes proporcionar contenido o una imagen/video'
       });
     }
 
@@ -244,7 +248,7 @@ router.post('/', auth, async (req, res) => {
 
     const postData = {
       author: req.userId,
-      content: contenido || '',
+      content: contenido?.trim() || '',
       type: tipo || 'update',
       status: 'active',
       media: {
@@ -265,10 +269,16 @@ router.post('/', auth, async (req, res) => {
       }
     };
 
-    // ✅ Guardar URLs permanentes de Cloudinary (NO rutas locales /uploads/...)
+    // ✅ Guardar URLs permanentes de Cloudinary para imágenes
     if (imageUrls.length > 0) {
       postData.media.images = imageUrls;
       console.log('✅ Imágenes Cloudinary agregadas:', postData.media.images);
+    }
+
+    // ✅ Guardar URL de video si existe
+    if (videoUrl) {
+      postData.media.videos = [videoUrl];
+      console.log('✅ Video Cloudinary agregado:', videoUrl);
     }
 
     console.log('💾 Datos del post a guardar:', JSON.stringify(postData, null, 2));
