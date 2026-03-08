@@ -178,11 +178,10 @@ const Publicar = () => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          content: momentText,
-          type: "update",
-          media: mediaItems, // ✅ URLs de Cloudinary con tipo
-          images: mediaItems.filter(m => m.type === "image").map(m => m.url), // Compatibilidad
-          video: mediaItems.find(m => m.type === "video")?.url || null
+          contenido: momentText,  // ✅ El backend espera "contenido" (español)
+          tipo: "update",         // ✅ El backend espera "tipo" (español)
+          imagenes: mediaItems.filter(m => m.type === "image").map(m => m.url),  // ✅ Array de URLs
+          videos: mediaItems.find(m => m.type === "video")?.url || null          // ✅ URL o null
         }),
       });
 
