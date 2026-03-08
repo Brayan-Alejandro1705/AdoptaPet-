@@ -18,7 +18,6 @@ const PetModal = ({ pet, onClose }) => {
 
   if (!pet) return null;
 
-  // ✅ ID seguro — funciona con _id o id
   const petId = pet._id || pet.id;
 
   const fallbackImage = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="600" height="400"%3E%3Crect width="600" height="400" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="24" fill="%239ca3af"%3ESin Foto%3C/text%3E%3C/svg%3E';
@@ -32,9 +31,6 @@ const PetModal = ({ pet, onClose }) => {
 
   const photos = getPhotos();
 
-  // =============================================
-  // HANDLER: ABRIR MODAL DE ADOPCIÓN
-  // =============================================
   const handleOpenAdoptionModal = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -47,7 +43,7 @@ const PetModal = ({ pet, onClose }) => {
   };
 
   // =============================================
-  // HANDLER: ENVIAR SOLICITUD DE ADOPCIÓN
+  // HANDLER: ENVIAR SOLICITUD + ABRIR CHAT ✅
   // =============================================
   const handleSendAdoptionRequest = async () => {
     if (!adoptionMessage.trim()) {
@@ -60,9 +56,10 @@ const PetModal = ({ pet, onClose }) => {
 
     try {
       const token = localStorage.getItem('token');
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-      // ✅ FIX: usar petId en lugar de pet._id
-      const response = await fetch(`${API_BASE}/api/pets/${petId}/solicitar`, {
+      // PASO 1: Crear la solicitud de adopción
+      const solicitudRes = await fetch(`${API_BASE}/api/pets/${petId}/solicitar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,14 +68,64 @@ const PetModal = ({ pet, onClose }) => {
         body: JSON.stringify({ message: adoptionMessage.trim() })
       });
 
-      const data = await response.json();
+      const solicitudData = await solicitudRes.json();
 
-      if (response.ok && data.success) {
+      if (!solicitudRes.ok || !solicitudData.success) {
+        setRequestError(solicitudData.message || 'Error al enviar la solicitud');
+        setSendingRequest(false);
+        return;
+      }
+
+      // PASO 2: Obtener el ID del dueño
+      const ownerId = pet.owner?._id || pet.owner?.id || pet.owner;
+
+      if (!ownerId || String(ownerId) === String(currentUser.id)) {
+        // Solicitud creada pero sin chat (dueño no identificado o es el mismo usuario)
         setRequestSent(true);
         setShowAdoptionModal(false);
-      } else {
-        setRequestError(data.message || 'Error al enviar la solicitud');
+        return;
       }
+
+      // PASO 3: Crear o abrir el chat con el dueño
+      const chatRes = await fetch(`${API_BASE}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ otherUserId: ownerId })
+      });
+
+      const chatData = await chatRes.json();
+
+      if (!chatRes.ok) {
+        // La solicitud se creó OK, pero el chat falló — igual mostramos éxito
+        console.warn('⚠️ Solicitud creada pero no se pudo abrir el chat:', chatData);
+        setRequestSent(true);
+        setShowAdoptionModal(false);
+        return;
+      }
+
+      const chatId = chatData._id || chatData.id;
+
+      // PASO 4: Enviar el mensaje de adopción en el chat
+      await fetch(`${API_BASE}/api/chat/${chatId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          content: `🐾 *Solicitud de adopción para ${pet.name}*\n\n${adoptionMessage.trim()}`
+        })
+      });
+
+      // PASO 5: Navegar al chat
+      setRequestSent(true);
+      setShowAdoptionModal(false);
+      onClose();
+      navigate(`/mensajes?chat=${chatId}`);
+
     } catch (error) {
       console.error('❌ Error al enviar solicitud:', error);
       setRequestError('Error de conexión. Intenta de nuevo.');
@@ -88,7 +135,7 @@ const PetModal = ({ pet, onClose }) => {
   };
 
   // =============================================
-  // HANDLER: ENVIAR MENSAJE (CHAT) ✅ CORREGIDO
+  // HANDLER: SOLO ABRIR CHAT (botón "Enviar mensaje")
   // =============================================
   const handleSendMessage = async () => {
     try {
@@ -114,7 +161,6 @@ const PetModal = ({ pet, onClose }) => {
         return;
       }
 
-      // ✅ FIX: apunta a /api/chat, no a /api/pets/.../solicitar
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: {
@@ -154,18 +200,15 @@ const PetModal = ({ pet, onClose }) => {
                 src={photos[currentImageIndex]}
                 alt={pet.name}
                 className="w-full h-full object-cover"
-                onError={(e) => { setImageError(true); e.target.onerror = null; }}
-                onLoad={() => setImageError(false)}
+                onError={(e) => { if (!imageError) { e.target.onerror = null; setImageError(true); } }}
               />
 
               {photos.length > 1 && (
                 <>
-                  <button
-                    onClick={() => setCurrentImageIndex((currentImageIndex - 1 + photos.length) % photos.length)}
+                  <button onClick={() => setCurrentImageIndex((currentImageIndex - 1 + photos.length) % photos.length)}
                     className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition">←
                   </button>
-                  <button
-                    onClick={() => setCurrentImageIndex((currentImageIndex + 1) % photos.length)}
+                  <button onClick={() => setCurrentImageIndex((currentImageIndex + 1) % photos.length)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition">→
                   </button>
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
@@ -257,7 +300,7 @@ const PetModal = ({ pet, onClose }) => {
             {requestSent && (
               <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2">
                 <Check className="w-5 h-5 flex-shrink-0" />
-                <span>¡Solicitud enviada! El dueño de <strong>{pet.name}</strong> recibirá tu mensaje.</span>
+                <span>¡Solicitud enviada! Redirigiendo al chat con el dueño...</span>
               </div>
             )}
 
