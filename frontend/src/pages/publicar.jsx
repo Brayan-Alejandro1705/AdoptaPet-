@@ -1,14 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Header from "../components/common/Header";
 import Sidebar from "../components/common/Sidebar";
-import PublishTextarea from "../components/common/PublishTextarea";
-import PublishFooter from "../components/common/PublishFooter";
 
 const MAX_IMAGES = 5;
 const MAX_VIDEOS = 1;
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
 const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}`;
-
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dn9x4ccqk";
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "adopta_pet_unsigned";
 
@@ -18,23 +15,10 @@ const uploadToCloudinary = async (file, resourceType = "image") => {
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
   formData.append("folder", resourceType === "video" ? "adopta-pet/videos" : "adopta-pet/posts");
   formData.append("resource_type", resourceType);
-
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`,
-    { method: "POST", body: formData }
-  );
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error?.message || `Error al subir ${resourceType} a Cloudinary`);
-  }
-
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`, { method: "POST", body: formData });
+  if (!res.ok) { const err = await res.json(); throw new Error(err.error?.message || "Error al subir"); }
   const data = await res.json();
-  return {
-    url: data.secure_url,
-    type: resourceType,
-    duration: resourceType === "video" ? data.duration : null
-  };
+  return { url: data.secure_url, type: resourceType, duration: resourceType === "video" ? data.duration : null };
 };
 
 const Publicar = () => {
@@ -45,49 +29,51 @@ const Publicar = () => {
   const [momentText, setMomentText] = useState("");
   const [images, setImages] = useState([]);
   const [videos, setVideos] = useState([]);
-  const [dragOver, setDragOver] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const imgInputRef = useRef(null);
+  const vidInputRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const handleImages = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     const remaining = MAX_IMAGES - images.length;
     if (remaining <= 0) { setError(`Máximo ${MAX_IMAGES} imágenes`); return; }
-    const toAdd = files.slice(0, remaining).map(file => ({
-      preview: URL.createObjectURL(file), file, type: "image"
-    }));
+    const toAdd = files.slice(0, remaining).map(file => ({ preview: URL.createObjectURL(file), file, type: "image" }));
     setImages(prev => [...prev, ...toAdd]);
     setError(null);
     e.target.value = '';
+    setMenuOpen(false);
   };
 
   const handleVideos = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    if (videos.length >= MAX_VIDEOS) { setError(`Solo puedes subir 1 video`); return; }
+    if (videos.length >= MAX_VIDEOS) { setError("Solo puedes subir 1 video"); return; }
     const file = files[0];
-    if (file.size > MAX_VIDEO_SIZE) { setError(`El video no puede superar 100MB`); return; }
-    if (!file.type.startsWith('video/')) { setError("Solo se permiten videos (MP4, WebM, etc)"); return; }
+    if (file.size > MAX_VIDEO_SIZE) { setError("El video no puede superar 100MB"); return; }
+    if (!file.type.startsWith("video/")) { setError("Solo se permiten videos"); return; }
     setVideos([{ preview: URL.createObjectURL(file), file, type: "video" }]);
     setError(null);
     e.target.value = '';
+    setMenuOpen(false);
   };
 
-  const clearImage = (index) => {
-    setImages(prev => {
-      const next = [...prev];
-      URL.revokeObjectURL(next[index].preview);
-      next.splice(index, 1);
-      return next;
-    });
-  };
-
-  const clearVideo = () => {
-    if (videos.length > 0) { URL.revokeObjectURL(videos[0].preview); setVideos([]); }
-  };
-
+  const clearImage = (index) => setImages(prev => {
+    const n = [...prev]; URL.revokeObjectURL(n[index].preview); n.splice(index, 1); return n;
+  });
+  const clearVideo = () => { if (videos.length > 0) { URL.revokeObjectURL(videos[0].preview); setVideos([]); } };
   const clearAll = () => {
-    images.forEach(img => URL.revokeObjectURL(img.preview));
-    videos.forEach(vid => URL.revokeObjectURL(vid.preview));
+    images.forEach(i => URL.revokeObjectURL(i.preview));
+    videos.forEach(v => URL.revokeObjectURL(v.preview));
     setImages([]); setVideos([]);
   };
 
@@ -99,21 +85,17 @@ const Publicar = () => {
       }
       const token = localStorage.getItem("token");
       if (!token) { setError("Debes iniciar sesión para publicar"); setLoading(false); return; }
-
       let mediaItems = [];
       if (images.length > 0) {
         setUploadProgress(10);
-        const uploaded = await Promise.all(images.map(({ file }) => uploadToCloudinary(file, "image")));
-        mediaItems = [...mediaItems, ...uploaded];
-        setUploadProgress(40);
+        const up = await Promise.all(images.map(({ file }) => uploadToCloudinary(file, "image")));
+        mediaItems = [...mediaItems, ...up]; setUploadProgress(40);
       }
       if (videos.length > 0) {
         setUploadProgress(40);
-        const videoData = await uploadToCloudinary(videos[0].file, "video");
-        mediaItems = [...mediaItems, videoData];
-        setUploadProgress(70);
+        const vd = await uploadToCloudinary(videos[0].file, "video");
+        mediaItems = [...mediaItems, vd]; setUploadProgress(70);
       }
-
       const response = await fetch(`${API_BASE}/api/posts`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -128,501 +110,343 @@ const Publicar = () => {
       if (!response.ok) throw new Error(data.message || "Error al publicar");
       setMomentText(""); clearAll(); setSuccess(true); setUploadProgress(100);
       setTimeout(() => { window.location.href = "/home"; }, 2000);
-    } catch (err) {
-      setError(err.message || "Error al publicar. Intenta de nuevo.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.message || "Error al publicar. Intenta de nuevo."); }
+    finally { setLoading(false); }
   };
+
+  const hasMedia = images.length > 0 || videos.length > 0;
+  const canPublish = !loading && (momentText.trim().length > 0 || hasMedia);
+  const allFull = images.length >= MAX_IMAGES && videos.length >= MAX_VIDEOS;
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
-        .pub-root {
-          min-height: 100vh;
-          background: #faf7f4;
-          font-family: 'DM Sans', sans-serif;
+        .p-root { min-height:100vh; background:#f5f3ff; font-family:'Plus Jakarta Sans',sans-serif; }
+
+        .p-card {
+          background:#fff;
+          border-radius:20px;
+          border:1px solid #e5e7eb;
+          box-shadow:0 2px 20px rgba(109,40,217,0.08);
+          overflow:visible;
         }
 
-        .pub-card {
-          background: #ffffff;
-          border-radius: 28px;
-          border: 1.5px solid #ede8e3;
-          overflow: hidden;
-          box-shadow: 0 4px 40px rgba(0,0,0,0.06);
+        /* Top */
+        .p-top { display:flex; gap:14px; padding:22px 24px 14px; }
+
+        .p-avatar {
+          width:46px; height:46px; border-radius:50%;
+          background:linear-gradient(135deg,#7c3aed,#a78bfa);
+          display:flex; align-items:center; justify-content:center;
+          font-size:21px; flex-shrink:0;
+          box-shadow:0 2px 12px rgba(124,58,237,0.3);
         }
 
-        .pub-card-header {
-          padding: 32px 32px 0;
-          border-bottom: 1.5px solid #f3ede8;
-          padding-bottom: 24px;
-          display: flex;
-          align-items: center;
-          gap: 14px;
+        .p-textarea-wrap { flex:1; }
+
+        .p-heading { font-size:15px; font-weight:700; color:#111827; margin:0 0 8px; }
+
+        .p-textarea {
+          width:100%; border:none; outline:none; resize:none;
+          font-family:'Plus Jakarta Sans',sans-serif;
+          font-size:15px; color:#1f2937; background:transparent;
+          min-height:90px; line-height:1.65;
+        }
+        .p-textarea::placeholder { color:#9ca3af; }
+
+        .p-divider { height:1px; background:#f3f4f6; margin:0 24px; }
+
+        /* Media previews */
+        .p-previews { padding:14px 24px 0; display:flex; flex-direction:column; gap:12px; }
+
+        .p-gallery-label { font-size:11.5px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:8px; }
+
+        .p-gallery {
+          display:grid; grid-template-columns:repeat(4,1fr); gap:8px;
+        }
+        .p-gallery-item {
+          position:relative; border-radius:12px; overflow:hidden;
+          aspect-ratio:1; background:#ede9fe;
+        }
+        .p-gallery-item img { width:100%; height:100%; object-fit:cover; display:block; }
+        .p-del {
+          position:absolute; top:5px; right:5px;
+          width:22px; height:22px; border-radius:50%;
+          background:rgba(0,0,0,0.55); backdrop-filter:blur(4px);
+          border:none; color:#fff; font-size:11px; cursor:pointer;
+          display:flex; align-items:center; justify-content:center;
+          opacity:0; transition:opacity 0.18s;
+        }
+        .p-gallery-item:hover .p-del { opacity:1; }
+
+        .p-video-wrap { border-radius:14px; overflow:hidden; position:relative; background:#0a0a0a; }
+        .p-video-wrap video { width:100%; max-height:200px; object-fit:contain; display:block; }
+        .p-del-vid {
+          position:absolute; top:8px; right:8px;
+          width:28px; height:28px; border-radius:50%;
+          background:rgba(0,0,0,0.6); backdrop-filter:blur(6px);
+          border:none; color:#fff; font-size:13px; cursor:pointer;
+          display:flex; align-items:center; justify-content:center;
+          opacity:0; transition:opacity 0.18s;
+        }
+        .p-video-wrap:hover .p-del-vid { opacity:1; }
+
+        /* Progress */
+        .p-prog { padding:12px 24px 0; }
+        .p-prog-track { height:5px; background:#ede9fe; border-radius:99px; overflow:hidden; }
+        .p-prog-fill { height:100%; background:linear-gradient(90deg,#7c3aed,#a78bfa); border-radius:99px; transition:width 0.4s ease; }
+        .p-prog-meta { display:flex; justify-content:space-between; font-size:12px; color:#9ca3af; margin-top:5px; }
+
+        /* Alerts */
+        .p-alert {
+          margin:4px 24px 0;
+          border-radius:12px; padding:10px 14px;
+          display:flex; align-items:center; gap:8px;
+          font-size:13.5px; font-weight:500;
+        }
+        .p-alert.err { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+        .p-alert.ok  { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+
+        /* Toolbar */
+        .p-toolbar {
+          display:flex; align-items:center; justify-content:space-between;
+          padding:14px 24px 18px;
+        }
+        .p-tools { display:flex; align-items:center; gap:10px; }
+
+        /* Add button */
+        .p-add-wrap { position:relative; }
+
+        .p-add-btn {
+          width:36px; height:36px; border-radius:50%;
+          border:2px solid #8b5cf6;
+          background:#f5f3ff; color:#7c3aed;
+          font-size:22px; font-weight:400; line-height:1;
+          cursor:pointer;
+          display:flex; align-items:center; justify-content:center;
+          transition:all 0.2s ease;
+          user-select:none;
+        }
+        .p-add-btn:hover:not(:disabled) { background:#ede9fe; border-color:#7c3aed; }
+        .p-add-btn.open { background:#7c3aed; color:#fff; border-color:#7c3aed; transform:rotate(45deg); }
+        .p-add-btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+        /* Popup */
+        @keyframes fadeUp {
+          from { opacity:0; transform:translateY(6px) scale(0.96); }
+          to   { opacity:1; transform:translateY(0) scale(1); }
+        }
+        .p-menu {
+          position:absolute; bottom:calc(100% + 10px); left:0;
+          background:#fff; border:1px solid #e5e7eb;
+          border-radius:16px;
+          box-shadow:0 8px 32px rgba(109,40,217,0.14);
+          overflow:hidden; width:200px;
+          animation:fadeUp 0.18s ease forwards;
+          z-index:100;
+        }
+        .p-menu-item {
+          display:flex; align-items:center; gap:11px;
+          padding:12px 16px; cursor:pointer;
+          font-size:14px; font-weight:500; color:#1f2937;
+          transition:background 0.14s;
+          border:none; background:none; width:100%;
+          text-align:left; font-family:'Plus Jakarta Sans',sans-serif;
+        }
+        .p-menu-item:hover { background:#f5f3ff; color:#7c3aed; }
+        .p-menu-item + .p-menu-item { border-top:1px solid #f9fafb; }
+
+        .p-menu-icon {
+          width:34px; height:34px; border-radius:10px;
+          display:flex; align-items:center; justify-content:center;
+          font-size:17px; flex-shrink:0;
+        }
+        .p-menu-icon.img { background:#fef9c3; }
+        .p-menu-icon.vid { background:#ede9fe; }
+
+        .p-menu-sub { font-size:11px; color:#9ca3af; font-weight:400; display:block; margin-top:1px; }
+
+        /* Badge */
+        .p-badge {
+          font-size:12px; color:#7c3aed;
+          background:#f5f3ff; border:1px solid #ddd6fe;
+          border-radius:20px; padding:4px 10px; font-weight:600;
         }
 
-        .pub-avatar-wrap {
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #f5a623, #f87c6e);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 22px;
-          flex-shrink: 0;
-          box-shadow: 0 2px 12px rgba(248,124,110,0.3);
+        /* Clear */
+        .p-clear {
+          background:none; border:none; font-size:12px; color:#9ca3af;
+          cursor:pointer; font-family:inherit; padding:0; transition:color 0.18s;
         }
+        .p-clear:hover { color:#dc2626; }
 
-        .pub-title {
-          font-family: 'Fraunces', serif;
-          font-size: 22px;
-          font-weight: 700;
-          color: #1a1410;
-          line-height: 1.2;
-          margin: 0;
+        /* Publish btn */
+        .p-pub-btn {
+          display:inline-flex; align-items:center; gap:7px;
+          background:linear-gradient(135deg,#7c3aed 0%,#a78bfa 100%);
+          color:#fff; border:none; border-radius:50px;
+          padding:10px 22px;
+          font-family:'Plus Jakarta Sans',sans-serif;
+          font-size:14px; font-weight:600; cursor:pointer;
+          transition:all 0.22s ease;
+          box-shadow:0 3px 16px rgba(124,58,237,0.38);
         }
+        .p-pub-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 6px 24px rgba(124,58,237,0.45); }
+        .p-pub-btn:disabled { opacity:0.4; cursor:not-allowed; box-shadow:none; transform:none; }
 
-        .pub-subtitle {
-          font-size: 13px;
-          color: #a89e96;
-          margin: 2px 0 0;
-        }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .p-spin { width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.4); border-top-color:#fff; animation:spin 0.7s linear infinite; }
 
-        .pub-body {
-          padding: 24px 32px;
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .pub-textarea {
-          width: 100%;
-          border: none;
-          outline: none;
-          resize: none;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 16px;
-          color: #2d2520;
-          background: transparent;
-          min-height: 110px;
-          line-height: 1.65;
-          placeholder-color: #c4bbb5;
-        }
-
-        .pub-textarea::placeholder {
-          color: #c4bbb5;
-          font-style: italic;
-          font-size: 15px;
-        }
-
-        /* Upload zones */
-        .upload-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-        }
-
-        .upload-zone {
-          border: 2px dashed #e8e1db;
-          border-radius: 18px;
-          padding: 20px 16px;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.25s ease;
-          background: #fdfcfb;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .upload-zone:hover {
-          border-color: #f0856a;
-          background: #fff8f6;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 24px rgba(240,133,106,0.12);
-        }
-
-        .upload-zone.video-zone:hover {
-          border-color: #8b5cf6;
-          background: #faf5ff;
-          box-shadow: 0 6px 24px rgba(139,92,246,0.12);
-        }
-
-        .upload-zone input[type="file"] { display: none; }
-
-        .upload-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 10px;
-          font-size: 20px;
-        }
-
-        .upload-icon.img-icon { background: #ffeee9; }
-        .upload-icon.vid-icon { background: #f0e8ff; }
-
-        .upload-label {
-          font-size: 13.5px;
-          font-weight: 600;
-          color: #3d3530;
-          margin: 0 0 4px;
-        }
-
-        .upload-hint {
-          font-size: 11.5px;
-          color: #b0a59d;
-          margin: 0;
-        }
-
-        /* Image gallery */
-        .gallery-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
-        }
-
-        .gallery-item {
-          position: relative;
-          border-radius: 14px;
-          overflow: hidden;
-          aspect-ratio: 1;
-          background: #f0ebe7;
-        }
-
-        .gallery-item img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .gallery-remove {
-          position: absolute;
-          top: 6px;
-          right: 6px;
-          width: 26px;
-          height: 26px;
-          border-radius: 50%;
-          background: rgba(0,0,0,0.55);
-          backdrop-filter: blur(4px);
-          border: none;
-          color: white;
-          font-size: 13px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          opacity: 0;
-          transition: opacity 0.2s;
-          line-height: 1;
-        }
-
-        .gallery-item:hover .gallery-remove { opacity: 1; }
-
-        /* Video preview */
-        .video-wrap {
-          border-radius: 18px;
-          overflow: hidden;
-          position: relative;
-          background: #0a0a0a;
-        }
-
-        .video-wrap video {
-          width: 100%;
-          max-height: 220px;
-          object-fit: contain;
-          display: block;
-        }
-
-        .video-remove {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: rgba(0,0,0,0.6);
-          backdrop-filter: blur(6px);
-          border: none;
-          color: white;
-          font-size: 15px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        /* Media section label */
-        .section-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #b0a59d;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          margin: 0 0 10px;
-        }
-
-        /* Divider */
-        .pub-divider {
-          height: 1.5px;
-          background: #f3ede8;
-          border: none;
-          margin: 0;
-        }
-
-        /* Footer */
-        .pub-footer {
-          padding: 18px 32px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .pub-counter {
-          font-size: 13px;
-          color: #c4bbb5;
-          font-weight: 400;
-        }
-
-        .pub-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: linear-gradient(135deg, #f0856a 0%, #e85d7c 100%);
-          color: white;
-          border: none;
-          border-radius: 50px;
-          padding: 12px 28px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 14.5px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.25s ease;
-          box-shadow: 0 4px 20px rgba(232,93,124,0.35);
-          letter-spacing: 0.01em;
-        }
-
-        .pub-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 28px rgba(232,93,124,0.4);
-        }
-
-        .pub-btn:disabled {
-          opacity: 0.45;
-          cursor: not-allowed;
-          box-shadow: none;
-        }
-
-        /* Alert */
-        .pub-alert {
-          border-radius: 14px;
-          padding: 13px 18px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 13.5px;
-          font-weight: 500;
-        }
-        .pub-alert.error { background: #fff1ef; color: #d04040; border: 1.5px solid #fcd5cc; }
-        .pub-alert.success { background: #edfaf3; color: #277a52; border: 1.5px solid #b8f0d0; }
-
-        /* Progress bar */
-        .prog-wrap {
-          background: #f3ede8;
-          border-radius: 99px;
-          height: 6px;
-          overflow: hidden;
-        }
-        .prog-bar {
-          height: 100%;
-          border-radius: 99px;
-          background: linear-gradient(90deg, #f0856a, #e85d7c);
-          transition: width 0.4s ease;
-        }
-
-        /* Loading state */
-        .pub-loading {
-          text-align: center;
-          padding: 16px 0 4px;
-        }
-        .pub-loading p { font-size: 13.5px; color: #a89e96; margin: 0 0 10px; }
-        .pub-pct { font-size: 12px; color: #c4bbb5; font-weight: 600; margin-top: 6px !important; }
-
-        /* Spinner */
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spinner {
-          width: 32px; height: 32px;
-          border-radius: 50%;
-          border: 3px solid #f3ede8;
-          border-top-color: #f0856a;
-          animation: spin 0.75s linear infinite;
-          margin: 0 auto 10px;
-        }
-
-        /* Clear all */
-        .clear-btn {
-          background: none;
-          border: none;
-          font-size: 12.5px;
-          color: #c4bbb5;
-          cursor: pointer;
-          font-family: 'DM Sans', sans-serif;
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          padding: 0;
-          transition: color 0.2s;
-        }
-        .clear-btn:hover { color: #d04040; }
-
-        @media (max-width: 640px) {
-          .pub-card-header, .pub-body, .pub-footer { padding-left: 20px; padding-right: 20px; }
-          .upload-row { grid-template-columns: 1fr; }
-          .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+        @media (max-width:640px) {
+          .p-top { padding:16px 16px 12px; }
+          .p-toolbar { padding:12px 16px 16px; }
+          .p-divider { margin:0 16px; }
+          .p-previews { padding:12px 16px 0; }
+          .p-alert { margin:4px 16px 0; }
+          .p-prog { padding:10px 16px 0; }
+          .p-gallery { grid-template-columns:repeat(3,1fr); }
         }
       `}</style>
 
-      <div className="pub-root">
+      <div className="p-root">
         <Header />
 
         <div className="max-w-7xl mx-auto px-4 pt-20 pb-24 lg:pb-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="hidden lg:block lg:col-span-3">
-              <Sidebar />
-            </div>
+            <div className="hidden lg:block lg:col-span-3"><Sidebar /></div>
 
             <div className="lg:col-span-9">
-              <div className="pub-card">
+              <div className="p-card">
 
-                {/* Header */}
-                <div className="pub-card-header">
-                  <div className="pub-avatar-wrap">🐾</div>
-                  <div>
-                    <p className="pub-title">Comparte un momento</p>
-                    <p className="pub-subtitle">Cuéntanos sobre tu mascota hoy ✨</p>
+                {/* Top */}
+                <div className="p-top">
+                  <div className="p-avatar">🐾</div>
+                  <div className="p-textarea-wrap">
+                    <p className="p-heading">Comparte un momento</p>
+                    <textarea
+                      className="p-textarea"
+                      placeholder="¿Qué está haciendo tu peludo hoy?"
+                      value={momentText}
+                      onChange={e => setMomentText(e.target.value)}
+                      disabled={loading}
+                      rows={4}
+                    />
                   </div>
                 </div>
 
-                <div className="pub-body">
-                  {/* Alerts */}
-                  {error && (
-                    <div className="pub-alert error">
-                      <span>⚠️</span><span>{error}</span>
-                    </div>
-                  )}
-                  {success && (
-                    <div className="pub-alert success">
-                      <span>✅</span><span>¡Publicado exitosamente! Redirigiendo...</span>
-                    </div>
-                  )}
+                {/* Alerts */}
+                {error && <div className="p-alert err">⚠️ {error}</div>}
+                {success && <div className="p-alert ok">✅ ¡Publicado exitosamente! Redirigiendo...</div>}
 
-                  {/* Textarea */}
-                  <textarea
-                    className="pub-textarea"
-                    placeholder="¿Qué está haciendo tu peludo hoy?"
-                    value={momentText}
-                    onChange={e => setMomentText(e.target.value)}
-                    disabled={loading}
-                    rows={4}
-                  />
-
-                  {/* Images gallery */}
-                  {images.length > 0 && (
-                    <div>
-                      <p className="section-label">📸 Imágenes ({images.length}/{MAX_IMAGES})</p>
-                      <div className="gallery-grid">
-                        {images.map((img, idx) => (
-                          <div className="gallery-item" key={idx}>
-                            <img src={img.preview} alt={`img-${idx}`} />
-                            <button className="gallery-remove" onClick={() => clearImage(idx)} disabled={loading}>✕</button>
-                          </div>
-                        ))}
+                {/* Previews */}
+                {(images.length > 0 || videos.length > 0) && (
+                  <div className="p-previews">
+                    {images.length > 0 && (
+                      <div>
+                        <p className="p-gallery-label">📸 Fotos ({images.length}/{MAX_IMAGES})</p>
+                        <div className="p-gallery">
+                          {images.map((img, idx) => (
+                            <div className="p-gallery-item" key={idx}>
+                              <img src={img.preview} alt={`img-${idx}`} />
+                              <button className="p-del" onClick={() => clearImage(idx)} disabled={loading}>✕</button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Video preview */}
-                  {videos.length > 0 && (
-                    <div>
-                      <p className="section-label">🎥 Video</p>
-                      <div className="video-wrap">
-                        <video src={videos[0].preview} controls />
-                        <button className="video-remove" onClick={clearVideo} disabled={loading}>✕</button>
+                    )}
+                    {videos.length > 0 && (
+                      <div>
+                        <p className="p-gallery-label">🎬 Video</p>
+                        <div className="p-video-wrap">
+                          <video src={videos[0].preview} controls />
+                          <button className="p-del-vid" onClick={clearVideo} disabled={loading}>✕</button>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Progress */}
+                {loading && (
+                  <div className="p-prog">
+                    <div className="p-prog-track">
+                      <div className="p-prog-fill" style={{ width:`${uploadProgress}%` }} />
                     </div>
-                  )}
-
-                  {/* Upload zones */}
-                  {(images.length < MAX_IMAGES || videos.length === 0) && (
-                    <div className={`upload-row ${images.length >= MAX_IMAGES || videos.length > 0 ? 'grid-cols-1' : ''}`}
-                      style={{ gridTemplateColumns: images.length >= MAX_IMAGES && videos.length > 0 ? 'none' : undefined }}>
-
-                      {images.length < MAX_IMAGES && videos.length === 0 && (
-                        <label className="upload-zone">
-                          <div className="upload-icon img-icon">📸</div>
-                          <p className="upload-label">Agregar imagen</p>
-                          <p className="upload-hint">Hasta {MAX_IMAGES - images.length} más · JPG, PNG, WEBP</p>
-                          <input type="file" multiple accept="image/*" onChange={handleImages} disabled={loading} />
-                        </label>
-                      )}
-
-                      {videos.length === 0 && (
-                        <label className="upload-zone video-zone">
-                          <div className="upload-icon vid-icon">🎬</div>
-                          <p className="upload-label">Agregar video</p>
-                          <p className="upload-hint">Hasta 100MB · MP4, WebM</p>
-                          <input type="file" accept="video/*" onChange={handleVideos} disabled={loading} />
-                        </label>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Clear all */}
-                  {(images.length > 0 || videos.length > 0) && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                      <button className="clear-btn" onClick={clearAll} disabled={loading}>
-                        🗑️ Limpiar todo
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Loading */}
-                  {loading && (
-                    <div className="pub-loading">
-                      <div className="spinner" />
-                      <p>
+                    <div className="p-prog-meta">
+                      <span>
                         {uploadProgress < 40 ? "Subiendo imágenes..." :
-                          uploadProgress < 70 ? "Subiendo video..." :
-                            uploadProgress < 90 ? "Guardando publicación..." : "¡Casi listo!"}
-                      </p>
-                      <div className="prog-wrap">
-                        <div className="prog-bar" style={{ width: `${uploadProgress}%` }} />
-                      </div>
-                      <p className="pub-pct">{uploadProgress}%</p>
+                         uploadProgress < 70 ? "Subiendo video..." :
+                         uploadProgress < 90 ? "Guardando publicación..." : "¡Casi listo!"}
+                      </span>
+                      <span>{uploadProgress}%</span>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                <hr className="pub-divider" />
+                <div className="p-divider" style={{ marginTop:'14px' }} />
 
-                {/* Footer */}
-                <div className="pub-footer">
-                  <span className="pub-counter">
-                    {images.length > 0 || videos.length > 0
-                      ? `${images.length} imagen${images.length !== 1 ? 'es' : ''}${videos.length > 0 ? ' · 1 video' : ''}`
-                      : momentText.length > 0 ? `${momentText.length} caracteres` : 'Comparte algo con la comunidad'}
-                  </span>
-                  <button
-                    className="pub-btn"
-                    onClick={publishMoment}
-                    disabled={loading || (!momentText.trim() && images.length === 0 && videos.length === 0)}
-                  >
-                    {loading ? '...' : '🐾 Publicar'}
+                {/* Toolbar */}
+                <div className="p-toolbar">
+                  <div className="p-tools">
+                    {/* + button */}
+                    <div className="p-add-wrap" ref={menuRef}>
+                      <button
+                        className={`p-add-btn${menuOpen ? ' open' : ''}`}
+                        onClick={() => setMenuOpen(o => !o)}
+                        disabled={loading || allFull}
+                        title="Agregar foto o video"
+                      >
+                        +
+                      </button>
+
+                      {menuOpen && (
+                        <div className="p-menu">
+                          {images.length < MAX_IMAGES && (
+                            <button className="p-menu-item" onClick={() => imgInputRef.current?.click()}>
+                              <span className="p-menu-icon img">📷</span>
+                              <span>
+                                Foto
+                                <span className="p-menu-sub">Hasta {MAX_IMAGES - images.length} más · JPG, PNG</span>
+                              </span>
+                            </button>
+                          )}
+                          {videos.length === 0 && (
+                            <button className="p-menu-item" onClick={() => vidInputRef.current?.click()}>
+                              <span className="p-menu-icon vid">🎬</span>
+                              <span>
+                                Video
+                                <span className="p-menu-sub">Hasta 100MB · MP4, WebM</span>
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Hidden inputs */}
+                    <input ref={imgInputRef} type="file" multiple accept="image/*" onChange={handleImages} style={{ display:'none' }} />
+                    <input ref={vidInputRef} type="file" accept="video/*" onChange={handleVideos} style={{ display:'none' }} />
+
+                    {hasMedia && (
+                      <span className="p-badge">
+                        {images.length > 0 && `${images.length} foto${images.length > 1 ? 's' : ''}`}
+                        {images.length > 0 && videos.length > 0 && ' · '}
+                        {videos.length > 0 && '1 video'}
+                      </span>
+                    )}
+
+                    {hasMedia && (
+                      <button className="p-clear" onClick={clearAll} disabled={loading}>
+                        Limpiar todo
+                      </button>
+                    )}
+                  </div>
+
+                  <button className="p-pub-btn" onClick={publishMoment} disabled={!canPublish}>
+                    {loading && <span className="p-spin" />}
+                    {loading ? 'Publicando...' : 'Publicar'}
                   </button>
                 </div>
 

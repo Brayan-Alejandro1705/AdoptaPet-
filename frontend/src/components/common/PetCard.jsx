@@ -117,7 +117,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
             alt={pet.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => {
-              e.target.src = `https://via.placeholder.com/300x200?text=${pet.name}`;
+              e.target.parentElement.style.display = 'none';
             }}
           />
         ) : (
