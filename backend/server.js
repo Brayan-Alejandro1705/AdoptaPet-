@@ -8,7 +8,6 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
-const favoritesRoutes = require("./src/routes/favoritos");
 
 console.log('🚀 Iniciando Adoptapet Backend v2.0...');
 
@@ -528,16 +527,46 @@ try {
 }
 
 // ============================================
-// RUTAS DE FAVORITOS
+// RUTAS DE FAVORITOS - ✅ VERSIÓN CORREGIDA
 // ============================================
 try {
   console.log('\n⭐ Cargando rutas de favoritos...');
+  
+  let favoritesRoutes;
+  try {
+    favoritesRoutes = require('./src/routes/favoritos');
+    console.log('   📂 Archivo cargado: ./src/routes/favoritos.js');
+  } catch (loadError) {
+    console.error('   ❌ Error al cargar archivo:', loadError.message);
+    throw loadError;
+  }
+  
+  if (!favoritesRoutes) {
+    throw new Error('favoritesRoutes es null o undefined - verifica module.exports');
+  }
+  
+  if (typeof favoritesRoutes !== 'object' && typeof favoritesRoutes !== 'function') {
+    throw new Error(`favoritesRoutes debe ser un objeto o función, pero es: ${typeof favoritesRoutes}`);
+  }
+  
   app.use('/api/favoritos', favoritesRoutes);
-  console.log('✅ Rutas de favoritos cargadas');
-  console.log('   ⭐ POST /api/favoritos/:id');
-  console.log('   💔 DELETE /api/favoritos/:id');
+  console.log('✅ Rutas de favoritos cargadas correctamente');
+  console.log('   🔍 GET    /api/favoritos/check/:postId');
+  console.log('   ⭐ GET    /api/favoritos');
+  console.log('   ⭐ POST   /api/favoritos/:postId');
+  console.log('   💔 DELETE /api/favoritos/:postId');
+  console.log('   🔍 GET    /api/favoritos/check-pet/:petId');
+  console.log('   ⭐ POST   /api/favoritos/pet/:petId');
+  console.log('   💔 DELETE /api/favoritos/pet/:petId');
 } catch (error) {
-  console.error('⚠️  Error cargando rutas de favoritos:', error.message);
+  console.error('❌ ERROR CRÍTICO AL CARGAR RUTAS DE FAVORITOS:');
+  console.error('   Mensaje:', error.message);
+  console.error('   Archivo esperado: ./src/routes/favoritos.js');
+  console.error('   Verifica que el archivo exista y tenga: module.exports = router;');
+  if (process.env.NODE_ENV === 'development') {
+    console.error('   Stack:', error.stack);
+  }
+  process.exit(1);  // ← Detener si hay error crítico
 }
 
 // ============================================
