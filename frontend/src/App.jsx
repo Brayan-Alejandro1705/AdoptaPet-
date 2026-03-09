@@ -11,7 +11,7 @@ import Publicar from './pages/publicar';
 import Chat from './pages/Chat';
 import Ajustes from './pages/ajustes';
 import Amigos from './pages/amigos';
-import Favoritos from './pages/favoritos';
+import Favoritos from './pages/Favoritos';
 import Adminpanel from './pages/AdminPanel';
 import CrearAdopcion from './pages/CrearAdopcion';
 import AIAssistant from './pages/AIAssistant';
@@ -91,7 +91,7 @@ function App() {
 
         {/* Rutas privadas */}
         <Route path="/adoptar" element={<PrivateRoute><Adoptar /></PrivateRoute>} />
-        <Route path="/adoptar/crear" element={<PrivateRoute><CrearAdopcion /></PrivateRoute>} />
+        <Route path="/crear-adopcion" element={<PrivateRoute><CrearAdopcion /></PrivateRoute>} />
 
         {/* ✅ Perfil propio y perfil de otro usuario */}
         <Route path="/perfil" element={<PrivateRoute><Perfil /></PrivateRoute>} />
@@ -102,10 +102,10 @@ function App() {
         <Route path="/mensajes" element={<PrivateRoute><Chat /></PrivateRoute>} />
         <Route path="/ajustes" element={<PrivateRoute><Ajustes /></PrivateRoute>} />
         <Route path="/amigos" element={<PrivateRoute><Amigos /></PrivateRoute>} />
+        <Route path="/favoritos" element={<PrivateRoute><Favoritos /></PrivateRoute>} />
         <Route path="/admin" element={<PrivateRoute><Adminpanel /></PrivateRoute>} />
         <Route path="/ai-assistant" element={<PrivateRoute><AIAssistant /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><Feedback /></PrivateRoute>} />
-        <Route path="/favoritos" element={<PrivateRoute><Favoritos /></PrivateRoute>} />
       </Routes>
 
       <FloatingAIChatCondicional />
