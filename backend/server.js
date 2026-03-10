@@ -491,7 +491,20 @@ try {
 // ============================================
 try {
   console.log('\n📋 Cargando rutas de solicitudes de adopción...');
-  const applicationRoutes = require('./src/routes/applicationRoutes');
+  let applicationRoutes;
+  try {
+    applicationRoutes = require('./src/routes/applicationRoutes');
+  } catch (loadError) {
+    // Si el archivo no existe, crear una ruta placeholder
+    const express = require('express');
+    const placeholderRouter = express.Router();
+    placeholderRouter.get('/', (req, res) => {
+      res.json({ success: true, message: 'Rutas de solicitudes de adopción no configuradas aún' });
+    });
+    applicationRoutes = placeholderRouter;
+    console.log('   ⏸️  Usando placeholder para solicitudes de adopción');
+  }
+  
   app.use('/api/applications', applicationRoutes);
   console.log('✅ Rutas de solicitudes de adopción cargadas');
 } catch (error) {
@@ -588,21 +601,48 @@ try {
 // ============================================
 try {
   console.log('\n🤖 Cargando módulo de IA (Google Gemini)...');
-  const geminiRoutes = require('./src/routes/geminiRoutes');
+  let geminiRoutes;
+  try {
+    geminiRoutes = require('./src/routes/geminiRoutes');
+  } catch (loadError) {
+    if (loadError.code === 'MODULE_NOT_FOUND') {
+      console.log('   ⏸️  Archivo geminiRoutes.js no encontrado');
+      console.log('   💡 Para habilitar Gemini, copia:');
+      console.log('      - geminiService.js en ./src/services/');
+      console.log('      - geminiRoutes.js en ./src/routes/');
+      // Crear una ruta placeholder
+      const express = require('express');
+      const placeholderRouter = express.Router();
+      placeholderRouter.post('*', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Google Gemini no está configurado. Por favor, configura los archivos necesarios.' 
+        });
+      });
+      geminiRoutes = placeholderRouter;
+    } else {
+      throw loadError;
+    }
+  }
+  
   app.use('/api/ai', geminiRoutes);
-  services.geminiLoaded = true;
-  console.log('✅ Rutas de IA (Google Gemini) cargadas correctamente');
-  console.log('   💬 POST /api/ai/chatbot');
-  console.log('   🔍 POST /api/ai/analyze-pet');
-  console.log('   🛡️  POST /api/ai/moderate');
-  console.log('   ✅ POST /api/ai/validate-posting');
-  console.log('   📝 POST /api/ai/generate-description');
-  console.log('   🔄 POST /api/ai/check-duplicate');
+  
+  // Solo marcar como cargado si es el archivo real (no placeholder)
+  if (geminiRoutes.stack && geminiRoutes.stack.length > 1) {
+    services.geminiLoaded = true;
+    console.log('✅ Rutas de IA (Google Gemini) cargadas correctamente');
+    console.log('   💬 POST /api/ai/chatbot');
+    console.log('   🔍 POST /api/ai/analyze-pet');
+    console.log('   🛡️  POST /api/ai/moderate');
+    console.log('   ✅ POST /api/ai/validate-posting');
+    console.log('   📝 POST /api/ai/generate-description');
+    console.log('   🔄 POST /api/ai/check-duplicate');
+  } else {
+    console.log('⏸️  Google Gemini usando placeholder (archivos no configurados)');
+  }
 } catch (error) {
   console.error('⚠️  Error cargando rutas de IA:', error.message);
   console.error('   Detalles:', error.stack);
-  console.log('   💡 Verifica que exista: ./src/routes/geminiRoutes.js');
-  console.log('   💡 O comenta esta sección si usas aiRoutes de Groq');
 }
 
 // ============================================
