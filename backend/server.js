@@ -18,7 +18,8 @@ const server = http.createServer(app);
 const services = {
   mongoConnected: false,
   passportLoaded: false,
-  socketLoaded: false
+  socketLoaded: false,
+  geminiLoaded: false
 };
 
 const uploadsDir = path.join(__dirname, 'uploads/avatars');
@@ -272,6 +273,7 @@ app.get('/health', (req, res) => {
       mongodb: services.mongoConnected ? 'connected' : 'disconnected',
       googleAuth: services.passportLoaded ? 'enabled' : 'disabled',
       socketio: services.socketLoaded ? 'active' : 'inactive',
+      gemini: services.geminiLoaded ? 'active' : 'inactive',
       uploads: fs.existsSync(uploadsDir) ? 'enabled' : 'disabled'
     },
     memory: {
@@ -566,7 +568,7 @@ try {
   if (process.env.NODE_ENV === 'development') {
     console.error('   Stack:', error.stack);
   }
-  process.exit(1);  // ← Detener si hay error crítico
+  process.exit(1);
 }
 
 // ============================================
@@ -582,21 +584,25 @@ try {
 }
 
 // ============================================
-// RUTAS DE IA
+// RUTAS DE IA - GOOGLE GEMINI ✅ NUEVA
 // ============================================
 try {
-  console.log('\n🤖 Cargando módulo de IA...');
-  const aiRoutes = require('./src/routes/aiRoutes');
-  app.use('/api/ai', aiRoutes);
-  console.log('✅ Rutas de IA cargadas correctamente');
-  console.log('   💬 POST /api/ai/chat');
-  console.log('   🔍 POST /api/ai/identify-breed');
-  console.log('   💡 POST /api/ai/advice');
-  console.log('   🔄 POST /api/ai/compatibility');
+  console.log('\n🤖 Cargando módulo de IA (Google Gemini)...');
+  const geminiRoutes = require('./src/routes/geminiRoutes');
+  app.use('/api/ai', geminiRoutes);
+  services.geminiLoaded = true;
+  console.log('✅ Rutas de IA (Google Gemini) cargadas correctamente');
+  console.log('   💬 POST /api/ai/chatbot');
+  console.log('   🔍 POST /api/ai/analyze-pet');
+  console.log('   🛡️  POST /api/ai/moderate');
+  console.log('   ✅ POST /api/ai/validate-posting');
   console.log('   📝 POST /api/ai/generate-description');
+  console.log('   🔄 POST /api/ai/check-duplicate');
 } catch (error) {
   console.error('⚠️  Error cargando rutas de IA:', error.message);
   console.error('   Detalles:', error.stack);
+  console.log('   💡 Verifica que exista: ./src/routes/geminiRoutes.js');
+  console.log('   💡 O comenta esta sección si usas aiRoutes de Groq');
 }
 
 // ============================================
@@ -663,12 +669,14 @@ server.listen(PORT, HOST, () => {
   console.log(`   ${services.mongoConnected ? '✅' : '⚠️'} MongoDB ${services.mongoConnected ? 'conectado' : 'desconectado'}`);
   console.log(`   ${services.passportLoaded ? '✅' : '⚠️'} Google OAuth ${services.passportLoaded ? 'activo' : 'inactivo'}`);
   console.log(`   ${services.socketLoaded ? '✅' : '⚠️'} Socket.io ${services.socketLoaded ? 'activo' : 'inactivo'}`);
+  console.log(`   ${services.geminiLoaded ? '✅' : '⚠️'} Google Gemini ${services.geminiLoaded ? 'activo' : 'inactivo'}`);
   console.log('\n📂 Uploads:');
   console.log(`   URL: http://localhost:${PORT}/uploads`);
   console.log(`   Directorio: ${uploadsDir}`);
   console.log('\n🤖 Inteligencia Artificial:');
   console.log(`   ${process.env.GROQ_API_KEY ? '✅' : '❌'} Groq API Key ${process.env.GROQ_API_KEY ? 'configurada' : 'NO configurada'}`);
-  console.log(`   Modelo: llama-3.3-70b-versatile`);
+  console.log(`   ${process.env.GOOGLE_API_KEY ? '✅' : '❌'} Google Gemini Key ${process.env.GOOGLE_API_KEY ? 'configurada' : 'NO configurada'}`);
+  console.log(`   Modelos: llama-3.3-70b-versatile (Groq) + Gemini 1.5 (Google)`);
   console.log('\n📚 Documentación:');
   console.log(`   http://${HOST}:${PORT}/api/info`);
   console.log(`   http://${HOST}:${PORT}/health`);
