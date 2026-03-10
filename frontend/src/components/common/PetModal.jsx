@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Calendar, Heart, MessageCircle, Phone, Check, Send } from 'lucide-react';
+import { X, MapPin, Calendar, Heart, MessageCircle, Phone, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -9,12 +9,6 @@ const PetModal = ({ pet, onClose }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
-
-  const [showAdoptionModal, setShowAdoptionModal] = useState(false);
-  const [adoptionMessage, setAdoptionMessage] = useState('');
-  const [sendingRequest, setSendingRequest] = useState(false);
-  const [requestSent, setRequestSent] = useState(false);
-  const [requestError, setRequestError] = useState('');
 
   if (!pet) return null;
 
@@ -30,109 +24,6 @@ const PetModal = ({ pet, onClose }) => {
   };
 
   const photos = getPhotos();
-
-  const handleOpenAdoptionModal = () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      alert('Debes iniciar sesión para solicitar una adopción');
-      return;
-    }
-    setAdoptionMessage(`Estoy interesado en adoptar a ${pet.name}. Me gustaría saber más sobre él/ella y el proceso de adopción.`);
-    setRequestError('');
-    setShowAdoptionModal(true);
-  };
-
-  // =============================================
-  // HANDLER: ENVIAR SOLICITUD + ABRIR CHAT ✅
-  // =============================================
-  const handleSendAdoptionRequest = async () => {
-    if (!adoptionMessage.trim()) {
-      setRequestError('Por favor escribe un mensaje');
-      return;
-    }
-
-    setSendingRequest(true);
-    setRequestError('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-
-      // PASO 1: Crear la solicitud de adopción
-      const solicitudRes = await fetch(`${API_BASE}/api/pets/${petId}/solicitar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ message: adoptionMessage.trim() })
-      });
-
-      const solicitudData = await solicitudRes.json();
-
-      if (!solicitudRes.ok || !solicitudData.success) {
-        setRequestError(solicitudData.message || 'Error al enviar la solicitud');
-        setSendingRequest(false);
-        return;
-      }
-
-      // PASO 2: Obtener el ID del dueño
-      const ownerId = pet.owner?._id || pet.owner?.id || pet.owner;
-
-      if (!ownerId || String(ownerId) === String(currentUser.id)) {
-        // Solicitud creada pero sin chat (dueño no identificado o es el mismo usuario)
-        setRequestSent(true);
-        setShowAdoptionModal(false);
-        return;
-      }
-
-      // PASO 3: Crear o abrir el chat con el dueño
-      const chatRes = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ otherUserId: ownerId })
-      });
-
-      const chatData = await chatRes.json();
-
-      if (!chatRes.ok) {
-        // La solicitud se creó OK, pero el chat falló — igual mostramos éxito
-        console.warn('⚠️ Solicitud creada pero no se pudo abrir el chat:', chatData);
-        setRequestSent(true);
-        setShowAdoptionModal(false);
-        return;
-      }
-
-      const chatId = chatData._id || chatData.id;
-
-      // PASO 4: Enviar el mensaje de adopción en el chat
-      await fetch(`${API_BASE}/api/chat/${chatId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          content: `🐾 *Solicitud de adopción para ${pet.name}*\n\n${adoptionMessage.trim()}`
-        })
-      });
-
-      // PASO 5: Navegar al chat
-      setRequestSent(true);
-      setShowAdoptionModal(false);
-      onClose();
-      navigate(`/mensajes?chat=${chatId}`);
-
-    } catch (error) {
-      console.error('❌ Error al enviar solicitud:', error);
-      setRequestError('Error de conexión. Intenta de nuevo.');
-    } finally {
-      setSendingRequest(false);
-    }
-  };
 
   // =============================================
   // HANDLER: SOLO ABRIR CHAT (botón "Enviar mensaje")
@@ -193,7 +84,6 @@ const PetModal = ({ pet, onClose }) => {
       <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-white rounded-2xl max-w-4xl w-full my-8 shadow-2xl">
 
-          {/* Galería */}
           <div className="relative">
             <div className="relative h-96 bg-gray-200 rounded-t-2xl overflow-hidden">
               <img
@@ -238,9 +128,7 @@ const PetModal = ({ pet, onClose }) => {
             </div>
           </div>
 
-          {/* Contenido */}
           <div className="p-6 md:p-8">
-
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{pet.name}</h2>
@@ -297,28 +185,12 @@ const PetModal = ({ pet, onClose }) => {
               )}
             </div>
 
-            {requestSent && (
-              <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2">
-                <Check className="w-5 h-5 flex-shrink-0" />
-                <span>¡Solicitud enviada! Redirigiendo al chat con el dueño...</span>
-              </div>
-            )}
-
             <div className="space-y-3 pt-4 border-t">
               <div className="flex gap-3">
                 <button onClick={handleSendMessage}
                   className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2">
                   <MessageCircle className="w-5 h-5" />
                   Enviar mensaje
-                </button>
-
-                <button
-                  onClick={handleOpenAdoptionModal}
-                  disabled={requestSent || pet.status === 'en-proceso' || pet.status === 'adoptado'}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Heart className="w-5 h-5" />
-                  {requestSent ? '✅ Solicitud enviada' : 'Solicitar adopción'}
                 </button>
               </div>
 
@@ -336,83 +208,6 @@ const PetModal = ({ pet, onClose }) => {
           </div>
         </div>
       </div>
-
-      {/* MODAL DE SOLICITUD DE ADOPCIÓN */}
-      {showAdoptionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl p-6">
-
-            <div className="flex justify-between items-center mb-5">
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">🐾 Solicitar adopción</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Adoptando a <span className="font-semibold text-purple-600">{pet.name}</span>
-                </p>
-              </div>
-              <button onClick={() => setShowAdoptionModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-            </div>
-
-            <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 mb-5">
-              <img
-                src={photos[0]}
-                alt={pet.name}
-                className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                onError={(e) => { e.target.onerror = null; e.target.src = fallbackImage; }}
-              />
-              <div>
-                <p className="font-bold text-gray-800">{pet.name}</p>
-                <p className="text-sm text-gray-500">{pet.type} • {pet.ageFormatted || pet.age} • {pet.location?.city}</p>
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Tu mensaje para el dueño
-              </label>
-              <textarea
-                value={adoptionMessage}
-                onChange={(e) => setAdoptionMessage(e.target.value)}
-                rows={5}
-                maxLength={1000}
-                placeholder={`Estoy interesado en adoptar a ${pet.name}...`}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 outline-none resize-none text-gray-700"
-              />
-              <p className="text-xs text-gray-400 mt-1 text-right">{adoptionMessage.length}/1000</p>
-            </div>
-
-            {requestError && (
-              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                ⚠️ {requestError}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button onClick={() => setShowAdoptionModal(false)}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-all">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSendAdoptionRequest}
-                disabled={sendingRequest || !adoptionMessage.trim()}
-                className="flex-1 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {sendingRequest ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Enviar solicitud
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
