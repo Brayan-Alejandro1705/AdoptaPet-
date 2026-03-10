@@ -613,7 +613,7 @@ try {
       // Crear una ruta placeholder
       const express = require('express');
       const placeholderRouter = express.Router();
-      placeholderRouter.post('*', (req, res) => {
+      placeholderRouter.all('/', (req, res) => {
         res.status(503).json({ 
           success: false, 
           message: 'Google Gemini no está configurado. Por favor, configura los archivos necesarios.' 
@@ -642,7 +642,9 @@ try {
   }
 } catch (error) {
   console.error('⚠️  Error cargando rutas de IA:', error.message);
-  console.error('   Detalles:', error.stack);
+  console.log('   💡 Verifica que los archivos existan:');
+  console.log('      - ./src/routes/geminiRoutes.js');
+  console.log('      - ./src/services/geminiService.js');
 }
 
 // ============================================
