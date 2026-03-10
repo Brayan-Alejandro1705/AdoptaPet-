@@ -18,6 +18,7 @@ import AIAssistant from './pages/AIAssistant';
 import FloatingAIChat from './components/common/FloatingAIChat';
 import Feedback from './pages/Feedback';
 import RecuperarPassword from './pages/RecuperarPassword';
+
 // ✅ Maneja /home con o sin token de Google en la URL
 const GoogleCallbackOrHome = () => {
   const [searchParams] = useSearchParams();
@@ -81,6 +82,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/recuperar-password" element={<RecuperarPassword />} />
 
         {/* Redirigir raíz al login */}
         <Route path="/" element={<Navigate to="/login" replace />} />
@@ -106,11 +108,6 @@ function App() {
         <Route path="/admin" element={<PrivateRoute><Adminpanel /></PrivateRoute>} />
         <Route path="/ai-assistant" element={<PrivateRoute><AIAssistant /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><Feedback /></PrivateRoute>} />
-<<<<<<< HEAD
-        <Route path="/favoritos" element={<PrivateRoute><Favoritos /></PrivateRoute>} />
-        <Route path="/recuperar-password" element={<RecuperarPassword />} />
-=======
->>>>>>> 462f2953419fd670eee11e04d63497fc288cbb07
       </Routes>
 
       <FloatingAIChatCondicional />
