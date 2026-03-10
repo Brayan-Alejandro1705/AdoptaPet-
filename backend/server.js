@@ -229,19 +229,93 @@ try {
 })();
 
 // ============================================
-// 9. SOCKET.IO
+// 9. SOCKET.IO (CHAT TIEMPO REAL)
 // ============================================
 let io;
 
 try {
-  const { initializeSocket } = require('./src/utils/socket');
-  io = initializeSocket(server);
+
+  const { Server } = require("socket.io");
+
+  io = new Server(server, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
   services.socketLoaded = true;
+
   app.set('io', io);
+
   console.log('✅ Socket.io inicializado correctamente');
+
+
+  // ===============================
+  // USUARIOS CONECTADOS
+  // ===============================
+  const onlineUsers = new Map();
+
+
+  io.on("connection", (socket) => {
+
+    console.log("🟢 Usuario conectado:", socket.id);
+
+
+    // registrar usuario
+    socket.on("register", (userId) => {
+
+      onlineUsers.set(userId, socket.id);
+
+      console.log("👤 Usuario registrado en socket:", userId);
+
+    });
+
+
+    // ===============================
+    // MENSAJE EN TIEMPO REAL
+    // ===============================
+    socket.on("sendMessage", (data) => {
+
+      const { receiverId } = data;
+
+      const receiverSocket = onlineUsers.get(receiverId);
+
+      if (receiverSocket) {
+
+        io.to(receiverSocket).emit("newMessage", data);
+
+      }
+
+    });
+
+
+    // ===============================
+    // USUARIO DESCONECTADO
+    // ===============================
+    socket.on("disconnect", () => {
+
+      for (let [userId, socketId] of onlineUsers.entries()) {
+
+        if (socketId === socket.id) {
+          onlineUsers.delete(userId);
+          break;
+        }
+
+      }
+
+      console.log("🔴 Usuario desconectado:", socket.id);
+
+    });
+
+  });
+
 } catch (error) {
+
   console.error('❌ Error al cargar Socket.io:', error.message);
+
   console.log('⚠️  El chat no estará disponible');
+
 }
 
 // ============================================

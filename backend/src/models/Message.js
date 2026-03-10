@@ -1,7 +1,10 @@
 // backend/models/Message.js
+
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
+
+  // chat al que pertenece el mensaje
   chat: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Chat',
@@ -9,14 +12,16 @@ const messageSchema = new mongoose.Schema({
     index: true
   },
 
+  // usuario que envía
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
+    index: true
   },
 
-  // ✅ NO required para no romper tu chat actual
-  // (cuando actualices tu envío, ya lo puedes volver required)
+  // usuario que recibe
+  // no required para mantener compatibilidad con tu chat actual
   receiver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -24,13 +29,28 @@ const messageSchema = new mongoose.Schema({
     index: true
   },
 
+  // contenido del mensaje
   text: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    maxlength: 2000
   },
 
-  // ✅ Estado del mensaje tipo WhatsApp
+  // tipo de mensaje (por si luego agregas imágenes o archivos)
+  type: {
+    type: String,
+    enum: ['text', 'image', 'file'],
+    default: 'text'
+  },
+
+  // url de archivo si el mensaje tiene imagen
+  fileUrl: {
+    type: String,
+    default: null
+  },
+
+  // estado del mensaje estilo WhatsApp
   status: {
     type: String,
     enum: ['sent', 'delivered', 'read'],
@@ -48,8 +68,14 @@ const messageSchema = new mongoose.Schema({
     default: null
   },
 
-  // 🔹 Compatibilidad con tu lógica actual
+  // compatibilidad con lógica antigua
   read: {
+    type: Boolean,
+    default: false
+  },
+
+  // mensaje eliminado
+  deleted: {
     type: Boolean,
     default: false
   }
@@ -58,22 +84,43 @@ const messageSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// ✅ Mantener compatibilidad: si tu código antiguo marca read=true,
-// también dejamos status/readAt consistentes.
+
+// 🔹 Mantener compatibilidad con código antiguo
 messageSchema.pre('save', function (next) {
+
   if (this.read === true && !this.readAt) {
     this.readAt = new Date();
   }
+
   if (this.readAt) {
     this.status = 'read';
     this.read = true;
   }
+
   next();
 });
 
-// Índices para rendimiento
+
+// 🚀 Índices para rendimiento del chat
 messageSchema.index({ chat: 1, createdAt: -1 });
 messageSchema.index({ receiver: 1, status: 1 });
+messageSchema.index({ sender: 1, createdAt: -1 });
+
+
+// 🚀 Método para marcar como entregado
+messageSchema.methods.markDelivered = function () {
+  this.status = 'delivered';
+  this.deliveredAt = new Date();
+};
+
+
+// 🚀 Método para marcar como leído
+messageSchema.methods.markRead = function () {
+  this.status = 'read';
+  this.read = true;
+  this.readAt = new Date();
+};
+
 
 const Message = mongoose.model('Message', messageSchema);
 

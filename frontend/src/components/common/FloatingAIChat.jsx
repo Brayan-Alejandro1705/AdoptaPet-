@@ -16,7 +16,7 @@ export default function FloatingAIChat() {
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
-  const [hasNewMessage, setHasNewMessage] = useState(false);
+
   
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);

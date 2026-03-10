@@ -17,7 +17,7 @@ import CrearAdopcion from './pages/CrearAdopcion';
 import AIAssistant from './pages/AIAssistant';
 import FloatingAIChat from './components/common/FloatingAIChat';
 import Feedback from './pages/Feedback';
-
+import RecuperarPassword from './pages/RecuperarPassword';
 // ✅ Maneja /home con o sin token de Google en la URL
 const GoogleCallbackOrHome = () => {
   const [searchParams] = useSearchParams();
@@ -102,6 +102,7 @@ function App() {
         <Route path="/ai-assistant" element={<PrivateRoute><AIAssistant /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><Feedback /></PrivateRoute>} />
         <Route path="/favoritos" element={<PrivateRoute><Favoritos /></PrivateRoute>} />
+        <Route path="/recuperar-password" element={<RecuperarPassword />} />
       </Routes>
 
       <FloatingAIChatCondicional />
