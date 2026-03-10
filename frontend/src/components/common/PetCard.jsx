@@ -1,193 +1,229 @@
-import React, { useState } from 'react';
-import { Heart, MapPin, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, Trash2, MapPin, Info } from 'lucide-react';
 
-const PetCard = ({ pet, onClick }) => {
-    const [imageError, setImageError] = useState(false);
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-    if (!pet) return null;
+const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoadingFav, setIsLoadingFav] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-    // Obtener la primera foto con fallback mejorado
-    const getPetImage = () => {
-        // Si hay error de imagen, usar fallback
-        if (imageError) {
-            return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect width="300" height="300" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="20" fill="%239ca3af"%3ESin Foto%3C/text%3E%3C/svg%3E';
+  // ✅ Verificar si está en favoritos
+  useEffect(() => {
+    const checkFavorite = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token || !pet._id) return;
+        
+        const res = await fetch(`${API_BASE}/api/favoritos/check/${pet._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success) setIsFavorite(data.isFavorite);
+      } catch (error) {
+        console.error('Error verificando favorito:', error);
+      }
+    };
+    
+    checkFavorite();
+  }, [pet._id]);
+
+  // ✅ Manejar click en corazón para agregar/quitar de favoritos
+  const handleFavoriteClick = async (e) => {
+    e.stopPropagation();
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Debes iniciar sesión para guardar favoritos');
+        return;
+      }
+
+      setIsLoadingFav(true);
+
+      const method = isFavorite ? 'DELETE' : 'POST';
+      const res = await fetch(`${API_BASE}/api/favoritos/${pet._id}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
+      });
 
-        // Intentar con photos array
-        if (pet.photos && Array.isArray(pet.photos) && pet.photos.length > 0) {
-            return pet.photos[0];
-        }
+      const data = await res.json();
+      if (data.success) {
+        setIsFavorite(!isFavorite);
+        alert(isFavorite ? '💔 Quitado de favoritos' : '⭐ Agregado a favoritos');
+      } else {
+        alert(data.message || 'Error al procesar favorito');
+      }
+    } catch (error) {
+      console.error('Error en favorito:', error);
+      alert('Error al procesar favorito');
+    } finally {
+      setIsLoadingFav(false);
+    }
+  };
 
-        // Intentar con mainPhoto
-        if (pet.mainPhoto) {
-            return pet.mainPhoto;
-        }
+  // ✅ Manejar eliminación de mascota
+  const handleDelete = async (e) => {
+    e.stopPropagation();
 
-        // Fallback SVG
-        return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="300"%3E%3Crect width="300" height="300" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="20" fill="%239ca3af"%3ESin Foto%3C/text%3E%3C/svg%3E';
-    };
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar a ${pet.name}?`)) return;
 
-    const petImage = getPetImage();
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Debes iniciar sesión');
+        return;
+      }
 
-    // Calcular edad
-    const getAge = () => {
-        if (pet.ageFormatted) return pet.ageFormatted;
-        if (!pet.age) return 'Edad desconocida';
-        if (pet.age < 1) return `${Math.round(pet.age * 12)} meses`;
-        return `${Math.round(pet.age)} años`;
-    };
+      setIsDeleting(true);
 
-    // Color según género
-    const getGenderColor = () => {
-        const gender = (pet.gender || '').toLowerCase();
-        if (gender === 'macho' || gender === 'male') return 'text-blue-600 bg-blue-100';
-        if (gender === 'hembra' || gender === 'female') return 'text-pink-600 bg-pink-100';
-        return 'text-gray-600 bg-gray-100';
-    };
+      const res = await fetch(`${API_BASE}/api/pets/${pet._id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    // Color según estado
-    const getStatusBadge = () => {
-        const statuses = {
-            available: { text: 'Disponible', color: 'bg-green-100 text-green-700' },
-            disponible: { text: 'Disponible', color: 'bg-green-100 text-green-700' },
-            pending: { text: 'En proceso', color: 'bg-yellow-100 text-yellow-700' },
-            adopted: { text: 'Adoptado', color: 'bg-blue-100 text-blue-700' },
-            adoptado: { text: 'Adoptado', color: 'bg-blue-100 text-blue-700' },
-            unavailable: { text: 'No disponible', color: 'bg-gray-100 text-gray-700' }
-        };
-        return statuses[pet.status] || statuses.available;
-    };
+      const data = await res.json();
+      if (data.success) {
+        alert('✅ Mascota eliminada correctamente');
+        if (onDelete) onDelete(pet._id);
+      } else {
+        alert(data.message || 'Error al eliminar mascota');
+      }
+    } catch (error) {
+      console.error('Error eliminando mascota:', error);
+      alert('Error al eliminar mascota');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-    const statusBadge = getStatusBadge();
+  // ✅ Verificar si el usuario actual es el propietario
+  const isOwner = currentUser && pet.owner && 
+    (String(currentUser._id || currentUser.id) === String(pet.owner._id || pet.owner.id));
 
-    const getGenderDisplay = () => {
-        const gender = (pet.gender || '').toLowerCase();
-        if (gender === 'macho' || gender === 'male') return '♂ Macho';
-        if (gender === 'hembra' || gender === 'female') return '♀ Hembra';
-        return 'N/A';
-    };
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group relative"
+    >
+      {/* ✅ Imagen de la mascota */}
+      <div className="relative h-56 bg-gray-200 overflow-hidden">
+        {pet.mainPhoto || (pet.photos && pet.photos.length > 0) ? (
+          <img
+            src={pet.mainPhoto || pet.photos?.[0] || ''}
+            alt={pet.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              e.target.parentElement.style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100 text-4xl">
+            🐾
+          </div>
+        )}
 
-    return (
-        <div 
-            className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer"
-            onClick={() => onClick && onClick(pet)}
+        {/* ✅ Estado disponible/Adoptado */}
+        {pet.status && (
+          <div className="absolute top-3 right-3">
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${
+              pet.status === 'disponible' ? 'bg-green-500' : 'bg-red-500'
+            }`}>
+              {pet.status === 'disponible' ? 'Disponible' : 'Adoptado'}
+            </span>
+          </div>
+        )}
+
+        {/* ✅ CORAZÓN PARA FAVORITOS - en la esquina superior izquierda */}
+        <button
+          onClick={handleFavoriteClick}
+          disabled={isLoadingFav}
+          className="absolute top-3 left-3 p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all active:scale-95"
+          title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
         >
-            {/* Imagen */}
-            <div className="relative h-64 overflow-hidden bg-gray-100">
-                <img
-                    src={petImage}
-                    alt={pet.name || 'Mascota'}
-                    className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
-                    onError={(e) => {
-                        console.error('Error cargando imagen:', petImage);
-                        setImageError(true);
-                        e.target.onerror = null; // Prevenir loop infinito
-                    }}
-                    onLoad={() => setImageError(false)}
-                />
-                
-                {/* Badge de estado */}
-                <div className="absolute top-3 right-3">
-                    <span className={`${statusBadge.color} px-3 py-1 rounded-full text-xs font-semibold shadow-md`}>
-                        {statusBadge.text}
-                    </span>
-                </div>
+          <Heart
+            className={`w-6 h-6 transition-colors ${
+              isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'
+            }`}
+            style={{
+              opacity: isLoadingFav ? 0.6 : 1
+            }}
+          />
+        </button>
 
-                {/* Botón de favorito */}
-                <button 
-                    className="absolute top-3 left-3 bg-white p-2 rounded-full shadow-md hover:bg-red-50 transition-colors"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        // Lógica de favoritos
-                    }}
-                >
-                    <Heart className="w-5 h-5 text-gray-600 hover:text-red-500" />
-                </button>
-            </div>
+        {/* ✅ BOTÓN ELIMINAR - solo si eres propietario */}
+        {isOwner && (
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="absolute bottom-3 right-3 p-2 rounded-full bg-red-500 text-white shadow-md hover:bg-red-600 transition-all active:scale-95 opacity-0 group-hover:opacity-100"
+            title="Eliminar mascota"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        )}
+      </div>
 
-            {/* Contenido */}
-            <div className="p-4">
-                {/* Nombre y género */}
-                <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xl font-bold text-gray-900 truncate">
-                        {pet.name || 'Sin nombre'}
-                    </h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getGenderColor()} whitespace-nowrap`}>
-                        {getGenderDisplay()}
-                    </span>
-                </div>
-
-                {/* Especie y raza */}
-                <p className="text-gray-600 text-sm mb-3 truncate">
-                    {pet.type || (pet.species ? pet.species.charAt(0).toUpperCase() + pet.species.slice(1) : 'Especie')}
-                    {pet.breed && ` • ${pet.breed}`}
-                </p>
-
-                {/* Información adicional */}
-                <div className="space-y-2">
-                    {/* Edad */}
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Calendar className="w-4 h-4 flex-shrink-0" />
-                        <span>{getAge()}</span>
-                    </div>
-
-                    {/* Ubicación */}
-                    {pet.location?.city && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <MapPin className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate">{pet.location.city}</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Descripción corta */}
-                {pet.description && (
-                    <p className="text-gray-600 text-sm mt-3 line-clamp-2">
-                        {pet.description}
-                    </p>
-                )}
-
-                {/* Características destacadas */}
-                {pet.characteristics && pet.characteristics.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                        {pet.characteristics.slice(0, 3).map((char, index) => (
-                            <span 
-                                key={index}
-                                className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full"
-                            >
-                                {char}
-                            </span>
-                        ))}
-                    </div>
-                )}
-
-                {/* Info de salud */}
-                <div className="flex gap-2 mt-3">
-                    {pet.vaccinated && (
-                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                            ✓ Vacunado
-                        </span>
-                    )}
-                    {pet.sterilized && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                            ✓ Esterilizado
-                        </span>
-                    )}
-                </div>
-
-                {/* Botón de acción */}
-                <button 
-                    className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onClick && onClick(pet);
-                    }}
-                >
-                    Ver detalles
-                </button>
-            </div>
+      {/* ✅ Información de la mascota */}
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">{pet.name}</h3>
+            <p className="text-sm text-gray-500">{pet.breed}</p>
+          </div>
+          {pet.gender && (
+            <span className="text-sm font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+              {pet.gender === 'macho' ? '♂️ Macho' : '♀️ Hembra'}
+            </span>
+          )}
         </div>
-    );
+
+        {/* Información detallada */}
+        <div className="space-y-1 mb-4">
+          {pet.ageFormatted && (
+            <p className="text-sm text-gray-600">
+              <span className="font-semibold">Edad:</span> {pet.ageFormatted}
+            </p>
+          )}
+          {pet.sizeFormatted && (
+            <p className="text-sm text-gray-600">
+              <span className="font-semibold">Tamaño:</span> {pet.sizeFormatted}
+            </p>
+          )}
+          {pet.location?.city && (
+            <div className="flex items-center gap-1 text-sm text-gray-600">
+              <MapPin className="w-4 h-4 text-gray-500" />
+              <span>{pet.location.city}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Health info badges */}
+        {(pet.vaccinated || pet.sterilized) && (
+          <div className="flex gap-2 mb-4">
+            {pet.vaccinated && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+                ✓ Vacunado
+              </span>
+            )}
+            {pet.sterilized && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+                ✓ Esterilizado
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Botón Ver detalles */}
+        <button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold py-2.5 rounded-xl hover:shadow-lg transition-all active:scale-95">
+          Ver detalles
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default PetCard;

@@ -1,41 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-
-// Crear carpeta uploads si no existe
-const uploadsDir = path.join(__dirname, '../../uploads/posts');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log('📁 Carpeta uploads/posts creada');
-}
-
-// Configuración de multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'post-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: function (req, file, cb) {
-    const filetypes = /jpeg|jpg|png|gif|webp/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    }
-    cb(new Error('Solo se permiten imágenes'));
-  }
-});
 
 // Middleware de autenticación mejorado
 const auth = async (req, res, next) => {
@@ -237,21 +201,29 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// ✅ CORRECCIÓN PRINCIPAL: upload.array('imagenes', 5) en lugar de upload.single('imagen')
-router.post('/', auth, upload.array('imagenes', 5), async (req, res) => {
+// ✅ CREAR PUBLICACIÓN — SIN multer, acepta JSON con URLs de Cloudinary
+// ✅ Soporta: contenido, imagenes (array) y videos (string URL o null)
+router.post('/', auth, async (req, res) => {
   try {
     console.log('📝 ===== CREANDO NUEVA PUBLICACIÓN =====');
-    console.log('📦 Body:', req.body);
-    console.log('📸 Archivos:', req.files ? req.files.map(f => f.filename) : 'Sin imágenes');
+    console.log('📦 Body recibido:', req.body);
     console.log('👤 UserId:', req.userId);
 
     const { contenido, tipo, petInfo, disponibleAdopcion } = req.body;
 
-    if (!contenido && (!req.files || req.files.length === 0)) {
-      console.log('❌ Validación fallida: Sin contenido ni imagen');
+    // ✅ Leer URLs de Cloudinary desde req.body.imagenes y req.body.videos
+    const imageUrls = Array.isArray(req.body.imagenes) ? req.body.imagenes : [];
+    const videoUrl = req.body.videos || null;
+    
+    console.log('🖼️ URLs de imágenes recibidas:', imageUrls);
+    console.log('🎥 URL de video recibida:', videoUrl);
+
+    // ✅ VALIDACIÓN: Debe tener contenido O al menos una imagen O un video
+    if (!contenido?.trim() && imageUrls.length === 0 && !videoUrl) {
+      console.log('❌ Validación fallida: Sin contenido ni media');
       return res.status(400).json({
         success: false,
-        message: 'Debes proporcionar contenido o una imagen'
+        message: 'Debes proporcionar contenido o una imagen/video'
       });
     }
 
@@ -276,7 +248,7 @@ router.post('/', auth, upload.array('imagenes', 5), async (req, res) => {
 
     const postData = {
       author: req.userId,
-      content: contenido || '',
+      content: contenido?.trim() || '',
       type: tipo || 'update',
       status: 'active',
       media: {
@@ -297,12 +269,16 @@ router.post('/', auth, upload.array('imagenes', 5), async (req, res) => {
       }
     };
 
-    // ✅ Procesar múltiples imágenes
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        postData.media.images.push(`/uploads/posts/${file.filename}`);
-      });
-      console.log('✅ Imágenes agregadas:', postData.media.images);
+    // ✅ Guardar URLs permanentes de Cloudinary para imágenes
+    if (imageUrls.length > 0) {
+      postData.media.images = imageUrls;
+      console.log('✅ Imágenes Cloudinary agregadas:', postData.media.images);
+    }
+
+    // ✅ Guardar URL de video si existe
+    if (videoUrl) {
+      postData.media.videos = [videoUrl];
+      console.log('✅ Video Cloudinary agregado:', videoUrl);
     }
 
     console.log('💾 Datos del post a guardar:', JSON.stringify(postData, null, 2));
@@ -998,7 +974,7 @@ router.get('/:postId', auth, async (req, res) => {
 });
 
 console.log('✅ Rutas de posts configuradas con notificaciones automáticas');
-console.log('   📝 POST   /api/posts - Crear publicación');
+console.log('   📝 POST   /api/posts - Crear publicación (Cloudinary URLs vía JSON)');
 console.log('   📰 GET    /api/posts - TODAS las publicaciones (con privacidad)');
 console.log('   📰 GET    /api/posts/feed - Feed de publicaciones (con privacidad)');
 console.log('   👤 GET    /api/posts/user/my-posts - Mis publicaciones');

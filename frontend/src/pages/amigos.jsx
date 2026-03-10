@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
-
 import FriendCard from '../components/common/FriendCard';
 import ProfileModal from '../components/common/ProfileModal';
 import MessageModal from '../components/common/MessageModal';
@@ -13,6 +13,7 @@ export default function Amigos() {
   const [messageModalFriend, setMessageModalFriend] = useState(null);
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => { loadFriends(); }, []);
 
@@ -45,6 +46,7 @@ export default function Amigos() {
     }
   };
 
+  // ✅ FIX: usar otherUserId + navegar con ?autoMsg= en vez de llamar /messages REST
   const handleSendMessage = async (friend, message) => {
     try {
       const token = localStorage.getItem('token');
@@ -52,30 +54,25 @@ export default function Amigos() {
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-      // FIX 1: fetch estaba roto — faltaba `await fetch(...)` y la URL mal formada
+      // Crear o abrir el chat
       const chatResponse = await fetch(`${API_URL}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ participantId: friend.id })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ otherUserId: friend.id || friend._id }) // ✅ otherUserId
       });
 
       const chatData = await chatResponse.json();
-      if (!chatData.success) throw new Error(chatData.message);
+      const chatId = chatData.id || chatData._id || chatData.data?.chat?._id;
 
-      const chatId = chatData.data.chat._id;
+      if (!chatId) throw new Error(chatData.error || chatData.message || 'Error al crear chat');
 
-      // FIX 2: URL duplicaba `http://` al concatenar con VITE_API_URL que ya lo incluye
-      const messageResponse = await fetch(`${API_URL}/api/chat/${chatId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ content: message })
-      });
-
-      const messageData = await messageResponse.json();
-      if (!messageData.success) throw new Error(messageData.message);
-
+      // Navegar al chat con el mensaje en la URL — Chat.jsx lo envía via socket
       setMessageModalFriend(null);
-      alert(`✅ Mensaje enviado a ${friend.name}!`);
+      navigate(`/mensajes?chat=${chatId}&autoMsg=${encodeURIComponent(message)}`);
+
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
       alert(`Error: ${error.message}`);
@@ -109,7 +106,6 @@ export default function Amigos() {
       <div className="md:ml-64 pb-20 md:pb-8">
         <div className="max-w-5xl mx-auto px-3 md:px-6 pt-4 md:pt-6">
 
-          {/* Título */}
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-1">
               <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2.5 rounded-2xl shadow-lg">
@@ -122,7 +118,6 @@ export default function Amigos() {
             </p>
           </div>
 
-          {/* Grid de amigos */}
           {friends.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {friends.map(friend => (

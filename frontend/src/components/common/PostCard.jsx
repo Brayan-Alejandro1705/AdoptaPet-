@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, MoreVertical, Trash2, Edit2, X, Globe, Smile, Send, Search, Copy, Check } from 'lucide-react';
 
 const PURPLE   = '#7C3AED';
@@ -111,8 +112,8 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    content: shareText ? `${shareText}\n\n🔗 ${postLink}` : `📌 Publicación compartida\n\n🔗 ${postLink}`,
-                    sharedPostId: post._id, type: 'share'
+                    contenido: shareText ? `${shareText}\n\n🔗 ${postLink}` : `📌 Publicación compartida\n\n🔗 ${postLink}`,
+                    sharedPostId: post._id, tipo: 'share'
                 })
             });
         } catch { }
@@ -126,7 +127,6 @@ const ShareModal = ({ post, currentUser, onClose }) => {
             className="fixed inset-0 flex items-center justify-center"
             style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999 }}
         >
-            {/* Modal: full-screen en móvil, centrado en desktop */}
             <style>{`
                     .share-modal-box {
                         height: 100dvh;
@@ -142,18 +142,14 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                 `}</style>
                 <div className="share-modal-box relative bg-white flex flex-col w-full sm:max-w-lg sm:shadow-2xl sm:mx-4">
 
-                {/* ─── HEADER ─── */}
                 <div
                     className="flex-shrink-0 relative flex items-center justify-between px-4 py-4"
                     style={{ background: GRADIENT }}
                 >
-                    {/* Pill decorativo solo móvil */}
                     <div className="sm:hidden absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-white/40 rounded-full" />
-
                     <h2 className="text-base font-bold text-white tracking-wide mx-auto">
                         Compartir publicación
                     </h2>
-
                     <button
                         onClick={onClose}
                         className="absolute right-4 w-9 h-9 rounded-full flex items-center justify-center transition hover:bg-white/30"
@@ -163,13 +159,8 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                     </button>
                 </div>
 
-                {/* ─── CONTENIDO SCROLLEABLE ─── */}
                 <div className="overflow-y-auto flex-1 pb-6">
-
-                    {/* Bloque de usuario + texto + preview */}
                     <div className="mx-3 mt-3 rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
-
-                        {/* Quién comparte */}
                         <div className="flex items-center gap-3 px-3 py-2.5 bg-gray-50">
                             <img src={sharerAvatar} alt={sharerName}
                                 className="w-9 h-9 rounded-full object-cover border-2 flex-shrink-0"
@@ -184,7 +175,6 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                             </div>
                         </div>
 
-                        {/* Textarea */}
                         <div className="px-3 py-2 relative bg-white">
                             <textarea
                                 value={shareText}
@@ -196,7 +186,6 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                             <Smile className="absolute right-4 bottom-3 w-5 h-5 text-gray-400 cursor-pointer hover:text-yellow-400 transition" />
                         </div>
 
-                        {/* Post original */}
                         <div className="mx-3 mb-3 rounded-xl overflow-hidden bg-gray-50"
                             style={{ border: '1px solid #e5e7eb', borderLeft: `4px solid ${PURPLE}` }}>
                             <div className="flex items-center gap-2 px-3 pt-3 pb-1.5">
@@ -212,19 +201,18 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                                 {snippet}{snippet.length === 100 ? '…' : ''}
                             </p>
                             <div className="px-3 pb-3">
-                                <a href={postLink} target="_blank" rel="noopener noreferrer"
+                                <a href={buildPostLink(post._id)} target="_blank" rel="noopener noreferrer"
                                     className="text-xs underline break-all" style={{ color: PURPLE }}>
-                                    {postLink}
+                                    {buildPostLink(post._id)}
                                 </a>
                             </div>
                         </div>
                     </div>
 
-                    {/* Link copiable */}
                     <div className="mx-3 mt-2.5">
                         <div className="flex items-center gap-2 p-2 rounded-xl border border-gray-200 bg-gray-50">
                             <span className="flex-1 text-xs truncate select-all cursor-text min-w-0" style={{ color: PURPLE }}>
-                                {postLink}
+                                {buildPostLink(post._id)}
                             </span>
                             <button
                                 onClick={handleCopyLink}
@@ -238,7 +226,6 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                         </div>
                     </div>
 
-                    {/* Botón Compartir en feed */}
                     <div className="px-3 pt-3 pb-1 flex justify-end">
                         {shared ? (
                             <span className="px-5 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold flex items-center gap-1.5">
@@ -256,10 +243,8 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                         )}
                     </div>
 
-                    {/* Divider */}
                     <div className="mx-3 mt-3 border-t border-gray-200" />
 
-                    {/* Sección Enviar a chat */}
                     <div className="px-3 pt-3">
                         <h3 className="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2">
                             <span
@@ -269,7 +254,6 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                             Enviar
                         </h3>
 
-                        {/* Buscador */}
                         <div className="flex items-center gap-2 px-3 py-2.5 rounded-full mb-3 bg-gray-100 border border-gray-200">
                             <Search className="w-4 h-4 flex-shrink-0 text-gray-400" />
                             <input
@@ -281,7 +265,6 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                             />
                         </div>
 
-                        {/* Lista de chats */}
                         {loadingChats ? (
                             <div className="flex justify-center py-6">
                                 <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
@@ -355,6 +338,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
     if (!post)        { console.error('PostCard: post es null o undefined'); return null; }
     if (!currentUser) { console.error('PostCard: currentUser es null o undefined'); return null; }
 
+    const navigate = useNavigate();
     const author = post.author || { nombre: 'Usuario eliminado', name: 'Usuario eliminado', avatar: null, verified: { email: false } };
 
     const [isFavorite, setIsFavorite]         = useState(false);
@@ -376,8 +360,12 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
 
     const getImageUrl = (imagePath) => {
         if (!imagePath) return null;
-        if (imagePath.startsWith('http')) return imagePath;
-        return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+        const imageStr = typeof imagePath === 'string' ? imagePath : (imagePath.url || imagePath);
+        if (!imageStr) return null;
+        if (typeof imageStr === 'string' && (imageStr.startsWith('http://') || imageStr.startsWith('https://'))) {
+            return imageStr;
+        }
+        return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${imageStr.startsWith('/') ? '' : '/'}${imageStr}`;
     };
 
     const getPostImages = () => {
@@ -386,7 +374,16 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
         return [];
     };
 
+    // ✅ NUEVO: Detectar videos
+    const getPostVideos = () => {
+        if (post.media?.videos?.length > 0) return post.media.videos;
+        if (post.video) return [post.video];
+        if (post.videos?.length > 0) return post.videos;
+        return [];
+    };
+
     const postImages = getPostImages();
+    const postVideos = getPostVideos();
 
     useEffect(() => {
         if (post.stats) {
@@ -431,13 +428,23 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
     };
 
     const getPostTypeIcon = (type) => {
-        const icons = { story:'📖', tip:'💡', adoption:'🏠', update:'📢', question:'❓', celebration:'🎉' };
-        return icons[type] || '📝';
+        const icons = { story:'', tip:'', adoption:'', update:'', question:'', celebration:'' };
+        return icons[type] || '';
     };
 
     const authorId      = post.author?._id || null;
     const currentUserId = currentUser._id || currentUser.id || currentUser;
     const isOwner       = authorId !== null && String(authorId) === String(currentUserId);
+
+    // ✅ Navegar al perfil del autor al hacer click en su nombre o avatar
+    const handleGoToProfile = () => {
+        if (!authorId) return;
+        if (isOwner) {
+            navigate('/perfil');
+        } else {
+            navigate(`/perfil/${authorId}`);
+        }
+    };
 
     const handleFavorite = async () => {
         try {
@@ -494,12 +501,22 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
 
                 <div className="p-3 sm:p-4 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <img src={getAvatarUrl(author)} alt={author.nombre || author.name || 'Usuario'}
-                             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-gray-100"
-                             onError={e => { e.target.onError = null; e.target.src = generateAvatarSVG(author.nombre || author.name || 'U'); }} />
+                        {/* ✅ Avatar clickeable */}
+                        <img
+                            src={getAvatarUrl(author)}
+                            alt={author.nombre || author.name || 'Usuario'}
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-gray-100 cursor-pointer hover:opacity-80 transition"
+                            onClick={handleGoToProfile}
+                            onError={e => { e.target.onError = null; e.target.src = generateAvatarSVG(author.nombre || author.name || 'U'); }}
+                        />
                         <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                                <h3 className="font-semibold text-gray-900 text-sm sm:text-base leading-tight">
+                                {/* ✅ Nombre clickeable → va al perfil */}
+                                <h3
+                                    className="font-semibold text-gray-900 text-sm sm:text-base leading-tight cursor-pointer hover:underline"
+                                    style={{ color: authorId ? 'inherit' : 'gray' }}
+                                    onClick={handleGoToProfile}
+                                >
                                     {author.nombre || author.name || 'Usuario eliminado'}
                                 </h3>
                                 {author.verified?.email && <span className="text-blue-500 text-xs">✓</span>}
@@ -553,6 +570,25 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                     )}
                 </div>
 
+                {/* ✅ MOSTRAR VIDEOS */}
+                {postVideos.length > 0 && (
+                    <div className="px-3 sm:px-4 py-2 space-y-2">
+                        {postVideos.map((videoUrl, index) => (
+                            <div key={index} className="relative bg-black rounded-lg overflow-hidden">
+                                <video
+                                    controls
+                                    className="w-full max-h-96 object-contain"
+                                    style={{ maxHeight: '500px' }}
+                                >
+                                    <source src={videoUrl} type="video/mp4" />
+                                    Tu navegador no soporta videos HTML5
+                                </video>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* ✅ MOSTRAR IMÁGENES */}
                 {postImages.length > 0 && (
                     <div className={`grid gap-0.5 ${
                         postImages.length === 1 ? 'grid-cols-1' :
@@ -566,10 +602,16 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                     className={`relative overflow-hidden bg-gray-100 cursor-zoom-in ${getImageHeight(postImages.length)}`}
                                     onClick={() => setLightbox({ images: postImages.map(img => getImageUrl(img.url || img)), index })}
                                 >
-                                    <img src={imageUrl} alt={`Imagen ${index + 1}`}
-                                        className="w-full h-full object-cover hover:opacity-90 transition"
-                                        onError={e => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">Error cargando imagen</div>'; }}
-                                    />
+                                    {imageUrl ? (
+                                        <img src={imageUrl} alt={`Imagen ${index + 1}`}
+                                            className="w-full h-full object-cover hover:opacity-90 transition"
+                                            onError={e => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">Error cargando imagen</div>'; }}
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">
+                                            URL inválida
+                                        </div>
+                                    )}
                                     {index === 3 && postImages.length > 4 && (
                                         <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
                                             <span className="text-white text-xl font-bold">+{postImages.length - 4}</span>

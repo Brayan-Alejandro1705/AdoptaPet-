@@ -493,7 +493,7 @@ commentSchema.pre('save', async function(next) {
     if (mentions.length > 0) {
         // Aquí podrías buscar los usuarios mencionados en la BD
         // Por ahora solo guardamos que hay menciones
-        console.log(`   📢 ${mentions.length} menciones detectadas`);
+        console.log(`    ${mentions.length} menciones detectadas`);
     }
     
     // Si es una respuesta, calcular profundidad

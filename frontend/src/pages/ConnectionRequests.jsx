@@ -136,7 +136,7 @@ export default function ConnectionRequests() {
                           className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition"
                         >
                           <img
-                            src={request.sender?.avatar || 'https://via.placeholder.com/64'}
+                            src={request.sender?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(request.sender?.nombre || 'Usuario')}&background=random`}
                             alt={request.sender?.nombre}
                             className="w-16 h-16 rounded-full object-cover"
                           />
@@ -194,7 +194,7 @@ export default function ConnectionRequests() {
                           className="flex items-center gap-4 p-4 border rounded-lg bg-gray-50"
                         >
                           <img
-                            src={request.receiver?.avatar || 'https://via.placeholder.com/64'}
+                            src={request.receiver?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(request.receiver?.nombre || 'Usuario')}&background=random`}
                             alt={request.receiver?.nombre}
                             className="w-16 h-16 rounded-full object-cover"
                           />

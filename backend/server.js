@@ -8,7 +8,6 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
-const favoritesRoutes = require("./src/routes/favoritos");
 
 console.log('🚀 Iniciando Adoptapet Backend v2.0...');
 
@@ -19,7 +18,8 @@ const server = http.createServer(app);
 const services = {
   mongoConnected: false,
   passportLoaded: false,
-  socketLoaded: false
+  socketLoaded: false,
+  geminiLoaded: false
 };
 
 const uploadsDir = path.join(__dirname, 'uploads/avatars');
@@ -347,6 +347,7 @@ app.get('/health', (req, res) => {
       mongodb: services.mongoConnected ? 'connected' : 'disconnected',
       googleAuth: services.passportLoaded ? 'enabled' : 'disabled',
       socketio: services.socketLoaded ? 'active' : 'inactive',
+      gemini: services.geminiLoaded ? 'active' : 'inactive',
       uploads: fs.existsSync(uploadsDir) ? 'enabled' : 'disabled'
     },
     memory: {
@@ -486,97 +487,238 @@ if (services.passportLoaded) {
 // RUTAS DE AUTENTICACIÓN TRADICIONAL
 // ============================================
 try {
+  console.log('\n🔐 Cargando rutas de autenticación...');
   const authRoutes = require('./src/routes/authRoutes');
   app.use('/api/auth', authLimiter, authRoutes);
-  console.log('✅ authRoutes cargadas correctamente');
+  console.log('✅ Rutas de autenticación cargadas correctamente');
+  console.log('   📝 POST /api/auth/registro');
+  console.log('   🔑 POST /api/auth/login');
+  console.log('   ✉️  POST /api/auth/verify-email');
+  console.log('   🔄 POST /api/auth/resend-verification');
 } catch (error) {
-  console.error('❌ ERROR CARGANDO authRoutes:', error.message);
-  console.error(error.stack);
+  console.error('❌ ERROR CARGANDO RUTAS DE AUTENTICACIÓN:');
+  console.error('   Mensaje:', error.message);
+  console.error('   Stack:', error.stack);
 }
 
 // ============================================
-// RUTAS DE LA APLICACIÓN
+// RUTAS DE USUARIOS ✅ CORREGIDO
 // ============================================
 try {
-  const petRoutes = require('./src/routes/petRoutes');
-  app.use('/api/pets', petRoutes);
-  logger.log.success('Rutas de mascotas cargadas');
-} catch (error) { logger.log.warning('Rutas de mascotas no disponibles'); }
-
-try {
+  console.log('\n👤 Cargando rutas de usuarios...');
   const userRoutes = require('./src/routes/userRoutes');
+  
+  if (!userRoutes) {
+    throw new Error('userRoutes no está exportado correctamente');
+  }
+  
   app.use('/api/users/avatar', uploadLimiter);
   app.use('/api/users', userRoutes);
-  logger.log.success('Rutas de usuarios cargadas');
+  console.log('✅ Rutas de usuarios cargadas correctamente');
+  console.log('   📋 GET /api/users/profile');
+  console.log('   ✏️  PUT /api/users/profile');
+  console.log('   📸 POST /api/users/avatar');
+  console.log('   🔐 PATCH /api/users/me/password');
+  console.log('   ⚙️  GET /api/users/notification-settings');
+  console.log('   ⚙️  PUT /api/users/notification-settings');
+  console.log('   📝 GET /api/users/me/post-settings');
+  console.log('   📝 PUT /api/users/me/post-settings');
 } catch (error) {
-  logger.log.warning('Rutas de usuarios no disponibles');
-  console.error('Error detallado:', error.message);
+  console.error('❌ ERROR AL CARGAR RUTAS DE USUARIOS:');
+  console.error('   Mensaje:', error.message);
+  console.error('   Stack:', error.stack);
+  process.exit(1);
 }
 
+// ============================================
+// RUTAS DE SOLICITUDES DE AMISTAD
+// ============================================
 try {
+  console.log('\n👥 Cargando rutas de solicitudes de amistad...');
   const friendRequestRoutes = require('./src/routes/friendRequestRoutes');
   app.use('/api/friend-requests', friendRequestRoutes);
-  logger.log.success('Rutas de solicitudes de amistad cargadas');
+  console.log('✅ Rutas de solicitudes de amistad cargadas');
+  console.log('   📨 POST /api/friend-requests');
+  console.log('   ✅ PATCH /api/friend-requests/:id/accept');
+  console.log('   ❌ PATCH /api/friend-requests/:id/reject');
 } catch (error) {
-  logger.log.warning('Rutas de solicitudes de amistad no disponibles');
-  console.error('Error detallado:', error.message);
+  console.error('⚠️  Error cargando rutas de solicitudes de amistad:', error.message);
 }
 
+// ============================================
+// RUTAS DE MASCOTAS
+// ============================================
 try {
-  const applicationRoutes = require('./src/routes/applicationRoutes');
-  app.use('/api/applications', applicationRoutes);
-  logger.log.success('Rutas de solicitudes cargadas');
-} catch (error) { logger.log.warning('Rutas de solicitudes no disponibles'); }
+  console.log('\n🐾 Cargando rutas de mascotas...');
+  const petRoutes = require('./src/routes/petRoutes');
+  app.use('/api/pets', petRoutes);
+  console.log('✅ Rutas de mascotas cargadas');
+  console.log('   📝 POST /api/pets');
+  console.log('   📋 GET /api/pets');
+  console.log('   🔍 GET /api/pets/:id');
+} catch (error) {
+  console.error('⚠️  Error cargando rutas de mascotas:', error.message);
+}
 
+// ============================================
+// RUTAS DE SOLICITUDES DE ADOPCIÓN
+// ============================================
 try {
+  console.log('\n📋 Cargando rutas de solicitudes de adopción...');
+  let applicationRoutes;
+  try {
+    applicationRoutes = require('./src/routes/applicationRoutes');
+  } catch (loadError) {
+    // Si el archivo no existe, crear una ruta placeholder
+    const express = require('express');
+    const placeholderRouter = express.Router();
+    placeholderRouter.get('/', (req, res) => {
+      res.json({ success: true, message: 'Rutas de solicitudes de adopción no configuradas aún' });
+    });
+    applicationRoutes = placeholderRouter;
+    console.log('   ⏸️  Usando placeholder para solicitudes de adopción');
+  }
+  
+  app.use('/api/applications', applicationRoutes);
+  console.log('✅ Rutas de solicitudes de adopción cargadas');
+} catch (error) {
+  console.error('⚠️  Error cargando rutas de solicitudes:', error.message);
+}
+
+// ============================================
+// RUTAS DE PUBLICACIONES
+// ============================================
+try {
+  console.log('\n📱 Cargando rutas de publicaciones...');
   const postRoutes = require('./src/routes/postRoutes');
   app.use('/api/posts', postRoutes);
-  logger.log.success('Rutas de posts cargadas');
+  console.log('✅ Rutas de publicaciones cargadas');
+  console.log('   📝 POST /api/posts');
+  console.log('   📰 GET /api/posts');
+  console.log('   ❤️  POST /api/posts/:id/like');
 } catch (error) {
-  logger.log.warning('Rutas de posts no disponibles');
-  console.error('Error detallado:', error.message);
+  console.error('❌ ERROR CARGANDO RUTAS DE PUBLICACIONES:', error.message);
+  console.error('   Stack:', error.stack);
 }
 
+// ============================================
+// RUTAS DE CHAT
+// ============================================
 try {
+  console.log('\n💬 Cargando rutas de chat...');
   const chatRoutes = require('./src/routes/chatRoutes');
   app.use('/api/chat', chatRoutes);
-  logger.log.success('Rutas de chat cargadas');
+  console.log('✅ Rutas de chat cargadas');
+  console.log('   📨 GET /api/chat');
+  console.log('   💬 POST /api/chat/:id/messages');
 } catch (error) {
-  logger.log.warning('Rutas de chat no disponibles');
-  console.error('Error detallado:', error.message);
+  console.error('⚠️  Error cargando rutas de chat:', error.message);
 }
 
+// ============================================
+// RUTAS DE FAVORITOS - ✅ VERSIÓN CORREGIDA
+// ============================================
 try {
+  console.log('\n⭐ Cargando rutas de favoritos...');
+  
+  let favoritesRoutes;
+  try {
+    favoritesRoutes = require('./src/routes/favoritos');
+    console.log('   📂 Archivo cargado: ./src/routes/favoritos.js');
+  } catch (loadError) {
+    console.error('   ❌ Error al cargar archivo:', loadError.message);
+    throw loadError;
+  }
+  
+  if (!favoritesRoutes) {
+    throw new Error('favoritesRoutes es null o undefined - verifica module.exports');
+  }
+  
+  if (typeof favoritesRoutes !== 'object' && typeof favoritesRoutes !== 'function') {
+    throw new Error(`favoritesRoutes debe ser un objeto o función, pero es: ${typeof favoritesRoutes}`);
+  }
+  
   app.use('/api/favoritos', favoritesRoutes);
-  logger.log.success('Rutas de favoritos cargadas');
-} catch (error) { logger.log.warning('Rutas de favoritos no disponibles'); }
+  console.log('✅ Rutas de favoritos cargadas correctamente');
+  console.log('   🔍 GET    /api/favoritos/check/:postId');
+  console.log('   ⭐ GET    /api/favoritos');
+  console.log('   ⭐ POST   /api/favoritos/:postId');
+  console.log('   💔 DELETE /api/favoritos/:postId');
+  console.log('   🔍 GET    /api/favoritos/check-pet/:petId');
+  console.log('   ⭐ POST   /api/favoritos/pet/:petId');
+  console.log('   💔 DELETE /api/favoritos/pet/:petId');
+} catch (error) {
+  console.error('❌ ERROR CRÍTICO AL CARGAR RUTAS DE FAVORITOS:');
+  console.error('   Mensaje:', error.message);
+  console.error('   Archivo esperado: ./src/routes/favoritos.js');
+  console.error('   Verifica que el archivo exista y tenga: module.exports = router;');
+  if (process.env.NODE_ENV === 'development') {
+    console.error('   Stack:', error.stack);
+  }
+  process.exit(1);
+}
 
+// ============================================
+// RUTAS DE NOTIFICACIONES
+// ============================================
 try {
+  console.log('\n🔔 Cargando rutas de notificaciones...');
   const notificationRoutes = require('./src/routes/Notificationroutes');
   app.use('/api/notifications', notificationRoutes);
-  logger.log.success('Rutas de notificaciones cargadas');
+  console.log('✅ Rutas de notificaciones cargadas');
 } catch (error) {
-  logger.log.warning('Rutas de notificaciones no disponibles');
-  console.error('Error detallado:', error.message);
+  console.error('⚠️  Error cargando rutas de notificaciones:', error.message);
 }
 
 // ============================================
-// 🤖 RUTAS DE IA
+// RUTAS DE IA - GOOGLE GEMINI ✅ NUEVA
 // ============================================
 try {
-  console.log('\n🤖 Cargando módulo de IA...');
-  const aiRoutes = require('./src/routes/aiRoutes');
-  app.use('/api/ai', aiRoutes);
-  logger.log.success('✨ Rutas de IA cargadas correctamente');
-  console.log('   💬 POST /api/ai/chat');
-  console.log('   🔍 POST /api/ai/identify-breed');
-  console.log('   💡 POST /api/ai/advice');
-  console.log('   🔄 POST /api/ai/compatibility');
-  console.log('   📝 POST /api/ai/generate-description');
+  console.log('\n🤖 Cargando módulo de IA (Google Gemini)...');
+  let geminiRoutes;
+  try {
+    geminiRoutes = require('./src/routes/geminiRoutes');
+  } catch (loadError) {
+    if (loadError.code === 'MODULE_NOT_FOUND') {
+      console.log('   ⏸️  Archivo geminiRoutes.js no encontrado');
+      console.log('   💡 Para habilitar Gemini, copia:');
+      console.log('      - geminiService.js en ./src/services/');
+      console.log('      - geminiRoutes.js en ./src/routes/');
+      // Crear una ruta placeholder
+      const express = require('express');
+      const placeholderRouter = express.Router();
+      placeholderRouter.all('/', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Google Gemini no está configurado. Por favor, configura los archivos necesarios.' 
+        });
+      });
+      geminiRoutes = placeholderRouter;
+    } else {
+      throw loadError;
+    }
+  }
+  
+  app.use('/api/ai', geminiRoutes);
+  
+  // Solo marcar como cargado si es el archivo real (no placeholder)
+  if (geminiRoutes.stack && geminiRoutes.stack.length > 1) {
+    services.geminiLoaded = true;
+    console.log('✅ Rutas de IA (Google Gemini) cargadas correctamente');
+    console.log('   💬 POST /api/ai/chatbot');
+    console.log('   🔍 POST /api/ai/analyze-pet');
+    console.log('   🛡️  POST /api/ai/moderate');
+    console.log('   ✅ POST /api/ai/validate-posting');
+    console.log('   📝 POST /api/ai/generate-description');
+    console.log('   🔄 POST /api/ai/check-duplicate');
+  } else {
+    console.log('⏸️  Google Gemini usando placeholder (archivos no configurados)');
+  }
 } catch (error) {
-  logger.log.warning('⚠️  Rutas de IA NO disponibles');
-  console.error('❌ ERROR al cargar aiRoutes:', error.message);
-  console.error('   Stack:', error.stack);
+  console.error('⚠️  Error cargando rutas de IA:', error.message);
+  console.log('   💡 Verifica que los archivos existan:');
+  console.log('      - ./src/routes/geminiRoutes.js');
+  console.log('      - ./src/services/geminiService.js');
 }
 
 // ============================================
@@ -632,46 +774,69 @@ const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  logger.showStartupBanner({
-    port: PORT, host: HOST,
-    env: process.env.NODE_ENV || 'development',
-    passportLoaded: services.passportLoaded,
-    mongoConnected: services.mongoConnected,
-    socketLoaded: services.socketLoaded
-  });
-  console.log('\n📂 Uploads configurado:');
-  console.log(`   • URL: http://localhost:${PORT}/uploads`);
-  console.log(`   • Directorio: ${uploadsDir}`);
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ ADOPTAPET BACKEND INICIADO CORRECTAMENTE');
+  console.log('='.repeat(60));
+  console.log(`🚀 Servidor escuchando en: http://${HOST}:${PORT}`);
+  console.log(`📍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+  console.log('\n📊 Estado de servicios:');
+  console.log(`   ✅ Express API`);
+  console.log(`   ${services.mongoConnected ? '✅' : '⚠️'} MongoDB ${services.mongoConnected ? 'conectado' : 'desconectado'}`);
+  console.log(`   ${services.passportLoaded ? '✅' : '⚠️'} Google OAuth ${services.passportLoaded ? 'activo' : 'inactivo'}`);
+  console.log(`   ${services.socketLoaded ? '✅' : '⚠️'} Socket.io ${services.socketLoaded ? 'activo' : 'inactivo'}`);
+  console.log(`   ${services.geminiLoaded ? '✅' : '⚠️'} Google Gemini ${services.geminiLoaded ? 'activo' : 'inactivo'}`);
+  console.log('\n📂 Uploads:');
+  console.log(`   URL: http://localhost:${PORT}/uploads`);
+  console.log(`   Directorio: ${uploadsDir}`);
   console.log('\n🤖 Inteligencia Artificial:');
-  console.log(`   • Groq API Key: ${process.env.GROQ_API_KEY ? '✅ Configurada' : '❌ NO configurada'}`);
-  console.log(`   • Modelo: llama-3.3-70b-versatile`);
-  console.log(`   • Endpoint Chat: http://localhost:${PORT}/api/ai/chat`);
+  console.log(`   ${process.env.GROQ_API_KEY ? '✅' : '❌'} Groq API Key ${process.env.GROQ_API_KEY ? 'configurada' : 'NO configurada'}`);
+  console.log(`   ${process.env.GOOGLE_API_KEY ? '✅' : '❌'} Google Gemini Key ${process.env.GOOGLE_API_KEY ? 'configurada' : 'NO configurada'}`);
+  console.log(`   Modelos: llama-3.3-70b-versatile (Groq) + Gemini 1.5 (Google)`);
+  console.log('\n📚 Documentación:');
+  console.log(`   http://${HOST}:${PORT}/api/info`);
+  console.log(`   http://${HOST}:${PORT}/health`);
+  console.log('='.repeat(60) + '\n');
 });
 
 // ============================================
 // CIERRE GRACEFUL
 // ============================================
 const gracefulShutdown = (signal) => {
-  logger.showShutdown(signal);
+  console.log(`\n⚠️  Recibida señal de cierre: ${signal}`);
   server.close(async () => {
-    logger.log.success('Servidor HTTP cerrado');
-    if (services.socketLoaded && io) io.close(() => { logger.log.success('Socket.io cerrado'); });
+    console.log('✅ Servidor HTTP cerrado');
+    if (services.socketLoaded && io) {
+      io.close(() => {
+        console.log('✅ Socket.io cerrado');
+      });
+    }
     if (services.mongoConnected) {
       try {
         const mongoose = require('mongoose');
         await mongoose.connection.close();
-        logger.log.success('MongoDB desconectado');
-      } catch (error) { logger.log.error('Error al cerrar MongoDB', error); }
+        console.log('✅ MongoDB desconectado');
+      } catch (error) {
+        console.error('❌ Error al cerrar MongoDB:', error.message);
+      }
     }
     console.log('👋 Adiós!\n');
     process.exit(0);
   });
-  setTimeout(() => { logger.log.warning('Forzando cierre después de timeout'); process.exit(1); }, 10000);
+  setTimeout(() => {
+    console.log('❌ Forzando cierre después de timeout');
+    process.exit(1);
+  }, 10000);
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('unhandledRejection', (reason) => { console.error('❌ Unhandled Rejection:', reason); });
-process.on('uncaughtException', (error) => { console.error('❌ Uncaught Exception:', error); gracefulShutdown('UNCAUGHT_EXCEPTION'); });
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  gracefulShutdown('UNCAUGHT_EXCEPTION');
+});
 
 module.exports = app;

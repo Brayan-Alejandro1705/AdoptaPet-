@@ -37,11 +37,20 @@ export default function Adoptar() {
       if (!Array.isArray(data)) throw new Error('El servidor no devolvió un array de mascotas');
 
       const formattedPets = data.map(pet => {
+        // ✅ FIX: el modelo Pet hace delete _id en toJSON, solo queda pet.id
+        const petId = pet.id || pet._id;
+
         let photos = [];
-        if (pet.photos?.length > 0) photos = pet.photos.map(p => `${API_BASE}${p}`);
-        else if (pet.mainPhoto) photos = [`${API_BASE}${pet.mainPhoto}`];
+        if (pet.photos?.length > 0) photos = pet.photos.map(p =>
+          p.startsWith('http') ? p : `${API_BASE}${p}`
+        );
+        else if (pet.mainPhoto) photos = [
+          pet.mainPhoto.startsWith('http') ? pet.mainPhoto : `${API_BASE}${pet.mainPhoto}`
+        ];
+
         return {
-          _id: pet._id, id: pet._id,
+          _id: petId,   // ✅ ambos apuntan al mismo ID válido
+          id: petId,
           name: pet.name || 'Sin nombre',
           species: pet.species || 'desconocido',
           type: pet.species ? (pet.species.charAt(0).toUpperCase() + pet.species.slice(1)) : 'Desconocido',
@@ -54,20 +63,25 @@ export default function Adoptar() {
           genderFormatted: pet.gender ? (pet.gender.charAt(0).toUpperCase() + pet.gender.slice(1)) : 'Desconocido',
           location: pet.location || { city: 'No especificada' },
           description: pet.description || 'Sin descripción',
-          photos, mainPhoto: pet.mainPhoto ? `${API_BASE}${pet.mainPhoto}` : null,
+          photos,
+          mainPhoto: pet.mainPhoto
+            ? (pet.mainPhoto.startsWith('http') ? pet.mainPhoto : `${API_BASE}${pet.mainPhoto}`)
+            : null,
           vaccinated: pet.healthInfo?.vaccinated || false,
           sterilized: pet.healthInfo?.sterilized || false,
           featured: pet.featured || false,
-          status: pet.status || 'available',
+          status: pet.status || 'disponible',
           adoptionFee: pet.adoptionFee || '$0',
           healthInfo: pet.healthInfo || {},
           contact: {
             organization: pet.shelter?.name || pet.owner?.nombre || pet.owner?.name || 'Contacto no disponible',
             phone: pet.contactInfo?.phone || 'No disponible'
           },
-          owner: pet.owner, createdAt: pet.createdAt
+          owner: pet.owner,
+          createdAt: pet.createdAt
         };
       });
+
       setPets(formattedPets);
     } catch (err) {
       setError(err.message || 'Error al cargar las mascotas');
@@ -98,7 +112,10 @@ export default function Adoptar() {
   const filteredPets = filterPets();
 
   const handleFilterChange = (field, value) => setFilters(prev => ({ ...prev, [field]: value }));
-  const handleClearFilters = () => setFilters({ search: '', type: 'all', size: 'all', age: 'all', location: '', featured: false, vaccinated: false, sterilized: false });
+  const handleClearFilters = () => setFilters({
+    search: '', type: 'all', size: 'all', age: 'all', location: '',
+    featured: false, vaccinated: false, sterilized: false
+  });
 
   if (loading) {
     return (
@@ -119,7 +136,6 @@ export default function Adoptar() {
       <div className="md:ml-64 pb-20 md:pb-8">
         <div className="max-w-5xl mx-auto px-3 md:px-6 pt-4 md:pt-6">
 
-          {/* Título */}
           <div className="mb-5">
             <div className="flex items-center gap-3 mb-1">
               <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2.5 rounded-2xl shadow-lg">
@@ -132,7 +148,6 @@ export default function Adoptar() {
             </p>
           </div>
 
-          {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 text-sm">
               <p className="font-semibold">Error al cargar mascotas</p>
@@ -143,14 +158,12 @@ export default function Adoptar() {
             </div>
           )}
 
-          {/* Filtros */}
           <FilterSection
             filters={filters}
             onFilterChange={handleFilterChange}
             onClearFilters={handleClearFilters}
           />
 
-          {/* Grid mascotas */}
           {filteredPets.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredPets.map(pet => (

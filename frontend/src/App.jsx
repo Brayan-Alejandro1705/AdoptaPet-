@@ -91,18 +91,26 @@ function App() {
 
         {/* Rutas privadas */}
         <Route path="/adoptar" element={<PrivateRoute><Adoptar /></PrivateRoute>} />
-        <Route path="/adoptar/crear" element={<PrivateRoute><CrearAdopcion /></PrivateRoute>} />
+        <Route path="/adoptar/crear-adopcion" element={<PrivateRoute><CrearAdopcion /></PrivateRoute>} />
+
+        {/* ✅ Perfil propio y perfil de otro usuario */}
         <Route path="/perfil" element={<PrivateRoute><Perfil /></PrivateRoute>} />
+        <Route path="/perfil/:userId" element={<PrivateRoute><Perfil /></PrivateRoute>} />
+
         <Route path="/notificaciones" element={<PrivateRoute><Notificaciones /></PrivateRoute>} />
         <Route path="/publicar" element={<PrivateRoute><Publicar /></PrivateRoute>} />
         <Route path="/mensajes" element={<PrivateRoute><Chat /></PrivateRoute>} />
         <Route path="/ajustes" element={<PrivateRoute><Ajustes /></PrivateRoute>} />
         <Route path="/amigos" element={<PrivateRoute><Amigos /></PrivateRoute>} />
+        <Route path="/favoritos" element={<PrivateRoute><Favoritos /></PrivateRoute>} />
         <Route path="/admin" element={<PrivateRoute><Adminpanel /></PrivateRoute>} />
         <Route path="/ai-assistant" element={<PrivateRoute><AIAssistant /></PrivateRoute>} />
         <Route path="/feedback" element={<PrivateRoute><Feedback /></PrivateRoute>} />
+<<<<<<< HEAD
         <Route path="/favoritos" element={<PrivateRoute><Favoritos /></PrivateRoute>} />
         <Route path="/recuperar-password" element={<RecuperarPassword />} />
+=======
+>>>>>>> 462f2953419fd670eee11e04d63497fc288cbb07
       </Routes>
 
       <FloatingAIChatCondicional />

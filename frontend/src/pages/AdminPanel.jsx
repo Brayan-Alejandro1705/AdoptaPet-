@@ -285,7 +285,7 @@ export default function AdminPanel() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                       <img
-                        src={post.author?.avatar || 'https://via.placeholder.com/50'}
+                        src={post.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.name || post.author?.nombre || 'Usuario')}&background=random`}
                         alt={post.author?.name || post.author?.nombre}
                         className="w-12 h-12 rounded-full border-2 border-purple-500"
                       />
