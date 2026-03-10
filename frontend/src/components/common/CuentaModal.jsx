@@ -176,13 +176,16 @@ const CuentaModal = ({ isOpen, onClose }) => {
 
           <div className="flex items-center justify-between">
 
-            <div></div>
+            {/* Ícono de cuenta para balancear el layout */}
+            <span className="text-2xl">👤</span>
 
             <h2 className="text-2xl font-bold">Cuenta</h2>
 
+            {/* Botón X para cerrar — igual al modal de Notificaciones */}
             <button
               onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 text-xl"
+              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-9 h-9 flex items-center justify-center transition-colors"
+              aria-label="Cerrar"
             >
               ✕
             </button>
@@ -196,7 +199,7 @@ const CuentaModal = ({ isOpen, onClose }) => {
 
           <button
             onClick={() => setShowPasswordModal(true)}
-            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl"
+            className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors"
           >
 
             <span className="text-lg font-medium text-gray-800">
@@ -209,21 +212,19 @@ const CuentaModal = ({ isOpen, onClose }) => {
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M9 5l7 7-7 7"
               />
-
             </svg>
 
           </button>
 
           <button
             onClick={() => setShowDeactivateModal(true)}
-            className="w-full flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 rounded-xl"
+            className="w-full flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 rounded-xl transition-colors"
           >
 
             <span className="text-lg font-medium text-red-600">
@@ -236,14 +237,12 @@ const CuentaModal = ({ isOpen, onClose }) => {
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M9 5l7 7-7 7"
               />
-
             </svg>
 
           </button>
@@ -308,7 +307,7 @@ const PasswordModal = ({
 
           <div className="flex items-center justify-between">
 
-            <div></div>
+            <span className="text-2xl">🔒</span>
 
             <h3 className="text-xl font-bold">
               Cambiar Contraseña
@@ -316,7 +315,8 @@ const PasswordModal = ({
 
             <button
               onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 text-xl"
+              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-9 h-9 flex items-center justify-center transition-colors"
+              aria-label="Cerrar"
             >
               ✕
             </button>
@@ -332,7 +332,7 @@ const PasswordModal = ({
             placeholder="Contraseña actual"
             value={currentPassword}
             onChange={(e) => onCurrentPasswordChange(e.target.value)}
-            className="w-full px-4 py-3 border rounded-lg"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
 
           <input
@@ -340,7 +340,7 @@ const PasswordModal = ({
             placeholder="Nueva contraseña"
             value={newPassword}
             onChange={(e) => onNewPasswordChange(e.target.value)}
-            className="w-full px-4 py-3 border rounded-lg"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
 
           <input
@@ -348,17 +348,15 @@ const PasswordModal = ({
             placeholder="Confirmar contraseña"
             value={confirmPassword}
             onChange={(e) => onConfirmPasswordChange(e.target.value)}
-            className="w-full px-4 py-3 border rounded-lg"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
 
           <button
             onClick={onSubmit}
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg"
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-
             {loading ? 'Cambiando...' : 'Cambiar Contraseña'}
-
           </button>
 
         </div>
@@ -395,7 +393,7 @@ const DeactivateModal = ({
 
           <div className="flex items-center justify-between">
 
-            <div></div>
+            <span className="text-2xl">⚠️</span>
 
             <h3 className="text-xl font-bold">
               Desactivar Cuenta
@@ -403,7 +401,8 @@ const DeactivateModal = ({
 
             <button
               onClick={onClose}
-              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 text-xl"
+              className="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-9 h-9 flex items-center justify-center transition-colors"
+              aria-label="Cerrar"
             >
               ✕
             </button>
@@ -417,7 +416,7 @@ const DeactivateModal = ({
           <textarea
             value={deactivateReason}
             onChange={(e) => onReasonChange(e.target.value)}
-            className="w-full px-4 py-3 border rounded-lg"
+            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
             rows={4}
             placeholder="Motivo de desactivación"
           />
@@ -426,7 +425,7 @@ const DeactivateModal = ({
 
             <button
               onClick={onClose}
-              className="flex-1 bg-gray-200 py-3 rounded-lg"
+              className="flex-1 bg-gray-200 hover:bg-gray-300 py-3 rounded-lg font-medium transition-colors"
             >
               Cancelar
             </button>
@@ -434,11 +433,9 @@ const DeactivateModal = ({
             <button
               onClick={onSubmit}
               disabled={loading}
-              className="flex-1 bg-red-600 text-white py-3 rounded-lg"
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
             >
-
               {loading ? 'Desactivando...' : 'Desactivar'}
-
             </button>
 
           </div>
