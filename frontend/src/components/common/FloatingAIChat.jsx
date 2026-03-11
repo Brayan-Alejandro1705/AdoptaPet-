@@ -16,8 +16,8 @@ export default function FloatingAIChat() {
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
+  const [hasNewMessage, setHasNewMessage] = useState(false); // ✅ FIX: estado declarado
 
-  
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -191,8 +191,8 @@ export default function FloatingAIChat() {
         }`}>
           <div className="bg-white rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
             
-            {/* HEADER — gradiente púrpura a rosa */}
-            <div className="bg-gradient-to-r  to-blue-500 from-blue-700 p-4 flex items-center justify-between">
+            {/* HEADER */}
+            <div className="bg-gradient-to-r to-blue-500 from-blue-700 p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center p-1">
                   <img 
@@ -223,7 +223,7 @@ export default function FloatingAIChat() {
               </div>
             </div>
 
-            {/* CONTENIDO (solo si no está minimizado) */}
+            {/* CONTENIDO */}
             {!isMinimized && (
               <>
                 {/* MENSAJES */}
@@ -247,11 +247,9 @@ export default function FloatingAIChat() {
                             className="w-full rounded-lg mb-2 max-h-48 object-cover"
                           />
                         )}
-                        
                         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                           {message.text}
                         </p>
-                        
                         <div className="flex items-center justify-end gap-1 mt-1">
                           <span className="text-[10px] text-gray-500">
                             {message.timestamp.toLocaleTimeString('es-ES', { 
@@ -269,7 +267,8 @@ export default function FloatingAIChat() {
                       <div className="bg-white rounded-lg px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
-                          
+                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce delay-100"></div>
+                          <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce delay-200"></div>
                         </div>
                       </div>
                     </div>
@@ -328,7 +327,6 @@ export default function FloatingAIChat() {
                       disabled={loading}
                     />
 
-                    {/* Botón enviar — gradiente púrpura a rosa */}
                     <button
                       onClick={handleSendMessage}
                       disabled={(!inputMessage.trim() && !imageFile) || loading}
