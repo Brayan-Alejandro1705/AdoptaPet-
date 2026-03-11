@@ -372,7 +372,7 @@ const Publicar = () => {
                       disabled={loading || mediaFull}
                       title="Agregar foto o video"
                     >
-                      <span className="p-media-btn-icon">📎</span>
+                      <span className="p-media-btn-icon"></span>
                       Foto / Video
                     </button>
 

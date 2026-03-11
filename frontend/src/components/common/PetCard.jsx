@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Trash2, MapPin, Info } from 'lucide-react';
+import { Heart, Trash2, MapPin } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -7,14 +7,13 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoadingFav, setIsLoadingFav] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [imgError, setImgError] = useState(false); // ✅ FIX: estado para error de imagen
 
-  // ✅ Verificar si está en favoritos
   useEffect(() => {
     const checkFavorite = async () => {
       try {
         const token = localStorage.getItem('token');
         if (!token || !pet._id) return;
-        
         const res = await fetch(`${API_BASE}/api/favoritos/check/${pet._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -24,32 +23,20 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
         console.error('Error verificando favorito:', error);
       }
     };
-    
     checkFavorite();
   }, [pet._id]);
 
-  // ✅ Manejar click en corazón para agregar/quitar de favoritos
   const handleFavoriteClick = async (e) => {
     e.stopPropagation();
-    
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Debes iniciar sesión para guardar favoritos');
-        return;
-      }
-
+      if (!token) { alert('Debes iniciar sesión para guardar favoritos'); return; }
       setIsLoadingFav(true);
-
       const method = isFavorite ? 'DELETE' : 'POST';
       const res = await fetch(`${API_BASE}/api/favoritos/${pet._id}`, {
         method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
-
       const data = await res.json();
       if (data.success) {
         setIsFavorite(!isFavorite);
@@ -65,26 +52,17 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
     }
   };
 
-  // ✅ Manejar eliminación de mascota
   const handleDelete = async (e) => {
     e.stopPropagation();
-
     if (!window.confirm(`¿Estás seguro de que deseas eliminar a ${pet.name}?`)) return;
-
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        alert('Debes iniciar sesión');
-        return;
-      }
-
+      if (!token) { alert('Debes iniciar sesión'); return; }
       setIsDeleting(true);
-
       const res = await fetch(`${API_BASE}/api/pets/${pet._id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
-
       const data = await res.json();
       if (data.success) {
         alert('✅ Mascota eliminada correctamente');
@@ -100,33 +78,37 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
     }
   };
 
-  // ✅ Verificar si el usuario actual es el propietario
-  const isOwner = currentUser && pet.owner && 
+  const isOwner = currentUser && pet.owner &&
     (String(currentUser._id || currentUser.id) === String(pet.owner._id || pet.owner.id));
+
+  // ✅ FIX: determina si hay una foto válida para mostrar
+  const photoUrl = pet.mainPhoto || pet.photos?.[0] || null;
+  const showImage = photoUrl && !imgError;
 
   return (
     <div
       onClick={onClick}
       className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group relative"
     >
-      {/* ✅ Imagen de la mascota */}
+      {/* Imagen de la mascota */}
       <div className="relative h-56 bg-gray-200 overflow-hidden">
-        {pet.mainPhoto || (pet.photos && pet.photos.length > 0) ? (
+
+        {/* ✅ FIX: siempre muestra el placeholder si no hay foto o hubo error */}
+        {showImage ? (
           <img
-            src={pet.mainPhoto || pet.photos?.[0] || ''}
+            src={photoUrl}
             alt={pet.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => {
-              e.target.parentElement.style.display = 'none';
-            }}
+            onError={() => setImgError(true)} // ✅ FIX: activa el placeholder en vez de ocultar
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100 text-4xl">
-            🐾
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100 gap-2">
+            <span className="text-5xl">🐾</span>
+            <span className="text-xs text-gray-400 font-medium">Sin foto</span>
           </div>
         )}
 
-        {/* ✅ Estado disponible/Adoptado */}
+        {/* Estado disponible/Adoptado */}
         {pet.status && (
           <div className="absolute top-3 right-3">
             <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${
@@ -137,7 +119,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
           </div>
         )}
 
-        {/* ✅ CORAZÓN PARA FAVORITOS - en la esquina superior izquierda */}
+        {/* Corazón favoritos */}
         <button
           onClick={handleFavoriteClick}
           disabled={isLoadingFav}
@@ -148,13 +130,11 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
             className={`w-6 h-6 transition-colors ${
               isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'
             }`}
-            style={{
-              opacity: isLoadingFav ? 0.6 : 1
-            }}
+            style={{ opacity: isLoadingFav ? 0.6 : 1 }}
           />
         </button>
 
-        {/* ✅ BOTÓN ELIMINAR - solo si eres propietario */}
+        {/* Botón eliminar — solo propietario */}
         {isOwner && (
           <button
             onClick={handleDelete}
@@ -167,7 +147,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
         )}
       </div>
 
-      {/* ✅ Información de la mascota */}
+      {/* Información de la mascota */}
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -181,7 +161,6 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
           )}
         </div>
 
-        {/* Información detallada */}
         <div className="space-y-1 mb-4">
           {pet.ageFormatted && (
             <p className="text-sm text-gray-600">
@@ -201,7 +180,6 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
           )}
         </div>
 
-        {/* Health info badges */}
         {(pet.vaccinated || pet.sterilized) && (
           <div className="flex gap-2 mb-4">
             {pet.vaccinated && (
@@ -217,7 +195,6 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
           </div>
         )}
 
-        {/* Botón Ver detalles */}
         <button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold py-2.5 rounded-xl hover:shadow-lg transition-all active:scale-95">
           Ver detalles
         </button>
