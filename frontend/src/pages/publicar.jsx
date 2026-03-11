@@ -29,42 +29,46 @@ const Publicar = () => {
   const [momentText, setMomentText] = useState("");
   const [images, setImages] = useState([]);
   const [videos, setVideos] = useState([]);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-  const imgInputRef = useRef(null);
-  const vidInputRef = useRef(null);
+  const mediaInputRef = useRef(null);
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const handleImages = (e) => {
+  // Acepta tanto imágenes como videos en un solo input
+  const handleMediaFiles = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    const remaining = MAX_IMAGES - images.length;
-    if (remaining <= 0) { setError(`Máximo ${MAX_IMAGES} imágenes`); return; }
-    const toAdd = files.slice(0, remaining).map(file => ({ preview: URL.createObjectURL(file), file, type: "image" }));
-    setImages(prev => [...prev, ...toAdd]);
-    setError(null);
-    e.target.value = '';
-    setMenuOpen(false);
-  };
 
-  const handleVideos = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    if (videos.length >= MAX_VIDEOS) { setError("Solo puedes subir 1 video"); return; }
-    const file = files[0];
-    if (file.size > MAX_VIDEO_SIZE) { setError("El video no puede superar 100MB"); return; }
-    if (!file.type.startsWith("video/")) { setError("Solo se permiten videos"); return; }
-    setVideos([{ preview: URL.createObjectURL(file), file, type: "video" }]);
-    setError(null);
+    const imageFiles = files.filter(f => f.type.startsWith("image/"));
+    const videoFiles = files.filter(f => f.type.startsWith("video/"));
+
+    // Procesar imágenes
+    if (imageFiles.length > 0) {
+      const remaining = MAX_IMAGES - images.length;
+      if (remaining <= 0) {
+        setError(`Máximo ${MAX_IMAGES} imágenes permitidas`);
+      } else {
+        const toAdd = imageFiles.slice(0, remaining).map(file => ({
+          preview: URL.createObjectURL(file), file, type: "image"
+        }));
+        setImages(prev => [...prev, ...toAdd]);
+        setError(null);
+      }
+    }
+
+    // Procesar video (solo 1)
+    if (videoFiles.length > 0) {
+      if (videos.length >= MAX_VIDEOS) {
+        setError("Solo puedes subir 1 video");
+      } else {
+        const file = videoFiles[0];
+        if (file.size > MAX_VIDEO_SIZE) {
+          setError("El video no puede superar 100MB");
+        } else {
+          setVideos([{ preview: URL.createObjectURL(file), file, type: "video" }]);
+          setError(null);
+        }
+      }
+    }
+
     e.target.value = '';
-    setMenuOpen(false);
   };
 
   const clearImage = (index) => setImages(prev => {
@@ -116,7 +120,7 @@ const Publicar = () => {
 
   const hasMedia = images.length > 0 || videos.length > 0;
   const canPublish = !loading && (momentText.trim().length > 0 || hasMedia);
-  const allFull = images.length >= MAX_IMAGES && videos.length >= MAX_VIDEOS;
+  const mediaFull = images.length >= MAX_IMAGES && videos.length >= MAX_VIDEOS;
 
   return (
     <>
@@ -216,57 +220,27 @@ const Publicar = () => {
         }
         .p-tools { display:flex; align-items:center; gap:10px; }
 
-        /* Add button */
-        .p-add-wrap { position:relative; }
-
-        .p-add-btn {
-          width:36px; height:36px; border-radius:50%;
+        /* Single media button */
+        .p-media-btn {
+          display:inline-flex; align-items:center; gap:6px;
+          padding:7px 14px;
+          border-radius:50px;
           border:2px solid #8b5cf6;
           background:#f5f3ff; color:#7c3aed;
-          font-size:22px; font-weight:400; line-height:1;
+          font-family:'Plus Jakarta Sans',sans-serif;
+          font-size:13px; font-weight:600;
           cursor:pointer;
-          display:flex; align-items:center; justify-content:center;
           transition:all 0.2s ease;
           user-select:none;
         }
-        .p-add-btn:hover:not(:disabled) { background:#ede9fe; border-color:#7c3aed; }
-        .p-add-btn.open { background:#7c3aed; color:#fff; border-color:#7c3aed; transform:rotate(45deg); }
-        .p-add-btn:disabled { opacity:0.35; cursor:not-allowed; }
-
-        /* Popup */
-        @keyframes fadeUp {
-          from { opacity:0; transform:translateY(6px) scale(0.96); }
-          to   { opacity:1; transform:translateY(0) scale(1); }
+        .p-media-btn:hover:not(:disabled) {
+          background:#ede9fe;
+          border-color:#7c3aed;
+          transform:translateY(-1px);
+          box-shadow:0 3px 12px rgba(124,58,237,0.2);
         }
-        .p-menu {
-          position:absolute; bottom:calc(100% + 10px); left:0;
-          background:#fff; border:1px solid #e5e7eb;
-          border-radius:16px;
-          box-shadow:0 8px 32px rgba(109,40,217,0.14);
-          overflow:hidden; width:200px;
-          animation:fadeUp 0.18s ease forwards;
-          z-index:100;
-        }
-        .p-menu-item {
-          display:flex; align-items:center; gap:11px;
-          padding:12px 16px; cursor:pointer;
-          font-size:14px; font-weight:500; color:#1f2937;
-          transition:background 0.14s;
-          border:none; background:none; width:100%;
-          text-align:left; font-family:'Plus Jakarta Sans',sans-serif;
-        }
-        .p-menu-item:hover { background:#f5f3ff; color:#7c3aed; }
-        .p-menu-item + .p-menu-item { border-top:1px solid #f9fafb; }
-
-        .p-menu-icon {
-          width:34px; height:34px; border-radius:10px;
-          display:flex; align-items:center; justify-content:center;
-          font-size:17px; flex-shrink:0;
-        }
-        .p-menu-icon.img { background:#fef9c3; }
-        .p-menu-icon.vid { background:#ede9fe; }
-
-        .p-menu-sub { font-size:11px; color:#9ca3af; font-weight:400; display:block; margin-top:1px; }
+        .p-media-btn:disabled { opacity:0.35; cursor:not-allowed; }
+        .p-media-btn-icon { font-size:15px; }
 
         /* Badge */
         .p-badge {
@@ -390,44 +364,27 @@ const Publicar = () => {
                 {/* Toolbar */}
                 <div className="p-toolbar">
                   <div className="p-tools">
-                    {/* + button */}
-                    <div className="p-add-wrap" ref={menuRef}>
-                      <button
-                        className={`p-add-btn${menuOpen ? ' open' : ''}`}
-                        onClick={() => setMenuOpen(o => !o)}
-                        disabled={loading || allFull}
-                        title="Agregar foto o video"
-                      >
-                        +
-                      </button>
 
-                      {menuOpen && (
-                        <div className="p-menu">
-                          {images.length < MAX_IMAGES && (
-                            <button className="p-menu-item" onClick={() => imgInputRef.current?.click()}>
-                              <span className="p-menu-icon img">📷</span>
-                              <span>
-                                Foto
-                                <span className="p-menu-sub">Hasta {MAX_IMAGES - images.length} más · JPG, PNG</span>
-                              </span>
-                            </button>
-                          )}
-                          {videos.length === 0 && (
-                            <button className="p-menu-item" onClick={() => vidInputRef.current?.click()}>
-                              <span className="p-menu-icon vid">🎬</span>
-                              <span>
-                                Video
-                                <span className="p-menu-sub">Hasta 100MB · MP4, WebM</span>
-                              </span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    {/* Botón único para foto/video */}
+                    <button
+                      className="p-media-btn"
+                      onClick={() => mediaInputRef.current?.click()}
+                      disabled={loading || mediaFull}
+                      title="Agregar foto o video"
+                    >
+                      <span className="p-media-btn-icon">📎</span>
+                      Foto / Video
+                    </button>
 
-                    {/* Hidden inputs */}
-                    <input ref={imgInputRef} type="file" multiple accept="image/*" onChange={handleImages} style={{ display:'none' }} />
-                    <input ref={vidInputRef} type="file" accept="video/*" onChange={handleVideos} style={{ display:'none' }} />
+                    {/* Input unificado: acepta imagen y video */}
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      onChange={handleMediaFiles}
+                      style={{ display:'none' }}
+                    />
 
                     {hasMedia && (
                       <span className="p-badge">
