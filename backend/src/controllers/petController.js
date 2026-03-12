@@ -1,5 +1,5 @@
 const Pet = require('../models/Pet');
-const AdoptionRequest = require('../models/AdoptionRequest'); // ✅ NUEVO
+const AdoptionRequest = require('../models/AdoptionRequest');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -118,7 +118,7 @@ exports.deletePet = async (req, res) => {
 };
 
 // ============================================
-// ADOPCIÓN - FUNCIONES PARA USUARIOS
+// ADOPCIÓN - MULTER CON SOPORTE DE VIDEO ✅
 // ============================================
 
 const uploadsDir = path.join(__dirname, '../../uploads/pets');
@@ -134,17 +134,35 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({
+// ✅ FIX: acepta imágenes Y video, con límites distintos por tipo
+const uploadMixed = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB máximo (cubre videos)
+  },
   fileFilter: function (req, file, cb) {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    if (mimetype && extname) return cb(null, true);
-    cb(new Error('Solo se permiten imágenes'));
+    const allowedImages = /jpeg|jpg|png|gif|webp/;
+    const allowedVideos = /mp4|webm|ogg|mov|avi/;
+
+    if (file.mimetype.startsWith('image/')) {
+      const ext = allowedImages.test(path.extname(file.originalname).toLowerCase());
+      const mime = allowedImages.test(file.mimetype.replace('image/', ''));
+      if (ext && mime) return cb(null, true);
+      return cb(new Error('Formato de imagen no permitido. Usa JPG, PNG, GIF o WEBP'));
+    }
+
+    if (file.mimetype.startsWith('video/')) {
+      const ext = allowedVideos.test(path.extname(file.originalname).toLowerCase());
+      if (ext || file.mimetype.startsWith('video/')) return cb(null, true);
+      return cb(new Error('Formato de video no permitido. Usa MP4, WEBM o MOV'));
+    }
+
+    cb(new Error('Tipo de archivo no permitido'));
   }
-}).array('imagenes', 5);
+}).fields([
+  { name: 'imagenes', maxCount: 5 }, // ✅ hasta 5 imágenes
+  { name: 'video', maxCount: 1 }     // ✅ hasta 1 video
+]);
 
 exports.getMascotasEnAdopcion = async (req, res) => {
   try {
@@ -161,67 +179,96 @@ exports.getMascotasEnAdopcion = async (req, res) => {
 };
 
 exports.publicarMascotaAdopcion = async (req, res) => {
-  upload(req, res, async function (err) {
+  // ✅ FIX: usa uploadMixed en vez de upload
+  uploadMixed(req, res, async function (err) {
     if (err) {
-      console.error('❌ Error al subir imágenes:', err);
+      console.error('❌ Error al subir archivos:', err);
       return res.status(400).json({ success: false, message: err.message });
     }
 
     try {
-      const { nombre, tipo, raza, edad, sexo, tamano, descripcion, vacunado, esterilizado, ubicacion, telefono } = req.body;
+      const {
+        nombre, tipo, raza, edad, sexo, tamano,
+        descripcion, vacunado, esterilizado, ubicacion, telefono
+      } = req.body;
 
-      console.log('📝 Datos recibidos:', { nombre, tipo, edad, archivos: req.files?.length });
+      // ✅ req.files ahora es un objeto: { imagenes: [...], video: [...] }
+      const imageFiles = req.files?.imagenes || [];
+      const videoFile  = req.files?.video?.[0] || null;
+
+      console.log('📝 Datos recibidos:', {
+        nombre, tipo, edad,
+        imagenes: imageFiles.length,
+        video: videoFile ? videoFile.filename : 'ninguno'
+      });
 
       if (!nombre || !tipo || !edad) {
         return res.status(400).json({ success: false, message: 'Nombre, tipo y edad son obligatorios' });
       }
 
-      if (!req.files || req.files.length === 0) {
+      if (imageFiles.length === 0) {
         return res.status(400).json({ success: false, message: 'Debes subir al menos una foto de la mascota' });
       }
 
-      const photos = req.files.map((file) => `/uploads/pets/${file.filename}`);
-      const mainPhoto = photos[0];
+      // ✅ Validar tamaño de imágenes individualmente (máx 5MB c/u)
+      for (const file of imageFiles) {
+        if (file.size > 5 * 1024 * 1024) {
+          return res.status(400).json({
+            success: false,
+            message: `La imagen "${file.originalname}" supera 5MB`
+          });
+        }
+      }
 
+      const photos   = imageFiles.map(f => `/uploads/pets/${f.filename}`);
+      const mainPhoto = photos[0];
+      const videoUrl = videoFile ? `/uploads/pets/${videoFile.filename}` : null;
+
+      // Parsear edad
       let ageValue = 0;
-      let ageUnit = "años";
-      if (typeof edad === "string") {
+      let ageUnit  = 'años';
+      if (typeof edad === 'string') {
         const num = parseInt(edad, 10);
         if (!isNaN(num)) ageValue = num;
-        if (edad.toLowerCase().includes("mes")) ageUnit = "meses";
-      } else if (typeof edad === "number") {
+        if (edad.toLowerCase().includes('mes')) ageUnit = 'meses';
+      } else if (typeof edad === 'number') {
         ageValue = edad;
       }
 
-      let finalDescription = descripcion && descripcion.trim().length >= 20
+      const finalDescription = descripcion && descripcion.trim().length >= 20
         ? descripcion.trim()
         : `${nombre} busca un hogar amoroso. ${descripcion || 'Es una mascota maravillosa que merece una segunda oportunidad.'} Contáctanos para conocerle.`.trim();
 
       const nuevaMascota = await Pet.create({
         name: nombre,
-        species: (tipo || "otro").toLowerCase(),
-        breed: raza || "Mestizo",
+        species: (tipo || 'otro').toLowerCase(),
+        breed: raza || 'Mestizo',
         age: { value: ageValue, unit: ageUnit },
-        gender: sexo ? sexo.toLowerCase() : "desconocido",
-        size: tamano ? tamano.toLowerCase() : "mediano",
+        gender: sexo ? sexo.toLowerCase() : 'desconocido',
+        size: tamano ? tamano.toLowerCase() : 'mediano',
         description: finalDescription,
         healthInfo: {
-          vaccinated: vacunado === "true" || vacunado === true,
-          sterilized: esterilizado === "true" || esterilizado === true,
+          vaccinated: vacunado === 'true' || vacunado === true,
+          sterilized: esterilizado === 'true' || esterilizado === true,
         },
         location: {
-          country: "Colombia",
-          city: ubicacion || "No especificada",
+          country: 'Colombia',
+          city: ubicacion || 'No especificada',
         },
-        contactInfo: { phone: telefono || "" },
+        contactInfo: { phone: telefono || '' },
         photos,
         mainPhoto,
+        video: videoUrl, // ✅ guarda la URL del video
         owner: req.user.id,
-        status: "disponible",
+        status: 'disponible',
       });
 
-      console.log('✅ Mascota creada exitosamente:', nuevaMascota._id);
-      res.status(201).json({ success: true, data: nuevaMascota, message: 'Mascota publicada exitosamente en adopción' });
+      console.log('✅ Mascota creada:', nuevaMascota._id, videoUrl ? '(con video)' : '(sin video)');
+      res.status(201).json({
+        success: true,
+        data: nuevaMascota,
+        message: 'Mascota publicada exitosamente en adopción'
+      });
 
     } catch (error) {
       console.error('❌ Error al crear mascota:', error);
@@ -235,7 +282,7 @@ exports.publicarMascotaAdopcion = async (req, res) => {
 };
 
 // ============================================
-// SOLICITUDES DE ADOPCIÓN ✅ NUEVO
+// SOLICITUDES DE ADOPCIÓN
 // ============================================
 
 exports.solicitarAdopcion = async (req, res) => {
@@ -271,7 +318,11 @@ exports.solicitarAdopcion = async (req, res) => {
     ]);
 
     console.log(`✅ Solicitud de adopción creada: ${solicitud._id} para mascota ${pet.name}`);
-    res.status(201).json({ success: true, message: `Solicitud enviada exitosamente para adoptar a ${pet.name}`, data: solicitud });
+    res.status(201).json({
+      success: true,
+      message: `Solicitud enviada exitosamente para adoptar a ${pet.name}`,
+      data: solicitud
+    });
 
   } catch (error) {
     if (error.code === 11000) {
