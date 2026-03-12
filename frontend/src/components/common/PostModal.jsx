@@ -4,6 +4,15 @@ import { useNavigate } from 'react-router-dom';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+const formatPetField = (field) => {
+  if (!field) return '';
+  if (typeof field === 'string') return field;
+  if (typeof field === 'object' && field.value !== undefined && field.unit !== undefined) {
+    return `${field.value} ${field.unit}`;
+  }
+  return String(field);
+};
+
 const PetModal = ({ pet, onClose }) => {
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -242,8 +251,8 @@ const PetModal = ({ pet, onClose }) => {
 
             <div className="flex gap-2 flex-wrap mb-6">
               <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">{pet.type}</span>
-              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">{pet.sizeFormatted || pet.size}</span>
-              <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-semibold">{pet.ageFormatted || pet.age}</span>
+              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">{pet.sizeFormatted || formatPetField(pet.size)}</span>
+              <span className="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-sm font-semibold">{pet.ageFormatted || formatPetField(pet.age)}</span>
               {pet.vaccinated && (
                 <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold flex items-center gap-1">
                   <Check className="w-4 h-4" /> Vacunado
@@ -270,7 +279,7 @@ const PetModal = ({ pet, onClose }) => {
               )}
               <div className="flex items-start gap-3">
                 <div className="bg-blue-100 p-2 rounded-lg"><Calendar className="w-5 h-5 text-blue-600" /></div>
-                <div><p className="font-semibold text-gray-800">Edad</p><p className="text-gray-600">{pet.ageFormatted || pet.age}</p></div>
+                <div><p className="font-semibold text-gray-800">Edad</p><p className="text-gray-600">{pet.ageFormatted || formatPetField(pet.age)}</p></div>
               </div>
               {pet.contact?.phone && pet.contact.phone !== 'No disponible' && (
                 <div className="flex items-start gap-3">
@@ -351,7 +360,7 @@ const PetModal = ({ pet, onClose }) => {
               />
               <div>
                 <p className="font-bold text-gray-800">{pet.name}</p>
-                <p className="text-sm text-gray-500">{pet.type} • {pet.ageFormatted || pet.age} • {pet.location?.city}</p>
+                <p className="text-sm text-gray-500">{pet.type} • {pet.ageFormatted || formatPetField(pet.age)} • {pet.location?.city}</p>
               </div>
             </div>
 

@@ -38,7 +38,15 @@ export default function Favoritos() {
         axios.get(`${API}/api/favoritos/pets`,   { headers }).catch(() => ({ data: { success: false } })),
         axios.get(`${API}/api/favoritos`,        { headers }).catch(() => ({ data: { success: false } })),
       ]);
-      setPets(petsRes.data.success  ? petsRes.data.data  || [] : []);
+      
+      // Format pets data
+      const formattedPets = petsRes.data.success ? (petsRes.data.data || []).map(pet => ({
+        ...pet,
+        ageFormatted: pet.age ? `${pet.age.value} ${pet.age.unit}` : 'Desconocida',
+        sizeFormatted: pet.size ? (pet.size.charAt(0).toUpperCase() + pet.size.slice(1)) : 'Mediano'
+      })) : [];
+      
+      setPets(formattedPets);
       setPosts(postsRes.data.success ? postsRes.data.data || [] : []);
     } catch (err) {
       console.error('Error cargando favoritos:', err);

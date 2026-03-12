@@ -113,7 +113,7 @@ export default function Adoptar() {
     if (filters.type && filters.type !== 'all' && pet.species !== filters.type.toLowerCase()) return false;
     if (filters.size && filters.size !== 'all' && pet.size !== filters.size.toLowerCase()) return false;
     if (filters.age && filters.age !== 'all') {
-      const ageNum = parseInt(pet.age);
+      const ageNum = typeof pet.age === 'object' && pet.age?.value ? parseInt(pet.age.value) : parseInt(pet.age);
       if (filters.age === 'puppy' && ageNum > 1) return false;
       if (filters.age === 'young' && (ageNum < 1 || ageNum > 3)) return false;
       if (filters.age === 'adult' && (ageNum < 3 || ageNum > 7)) return false;
