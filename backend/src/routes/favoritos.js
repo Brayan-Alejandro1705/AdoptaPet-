@@ -73,6 +73,20 @@ router.delete('/:postId', protect, async (req, res) => {
 // MASCOTAS FAVORITAS ✅ RUTAS NUEVAS
 // ============================================
 
+// 5b. Obtener mascotas favoritas
+router.get("/pets", protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: "Usuario no encontrado" });
+    const favoritePets = await Pet.find({ _id: { $in: user.favoritesPets || [] } })
+      .populate("owner", "nombre name email avatar")
+      .sort({ createdAt: -1 }).lean();
+    res.json({ success: true, data: favoritePets, count: favoritePets.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // 5. Verificar si una mascota está en favoritos
 router.get('/check-pet/:petId', protect, async (req, res) => {
   try {
