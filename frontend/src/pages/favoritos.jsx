@@ -5,7 +5,7 @@ import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
 import BottomNav from '../components/layout/BottomNav';
 import { MapPin, Heart } from 'lucide-react';
-import PostCard from '../components/PostCard';
+import PostCard from '../components/common/PostCard';
 import PetModal from '../components/common/PetModal';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
