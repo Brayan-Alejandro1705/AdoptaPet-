@@ -224,12 +224,20 @@ export default function Favoritos() {
               <div className="space-y-4">
                 {posts.map(post => {
                   const removing = removingId === post._id;
-                  const imageUrl = post.media?.images?.[0]
-                    || (post.images?.[0]?.url || post.images?.[0])
-                    || null;
-                  const fullImageUrl = imageUrl
-                    ? imageUrl.startsWith('http') ? imageUrl : `${API}${imageUrl}`
+
+                  // ✅ Imagen: soporta Cloudinary (URL absoluta) y rutas relativas
+                  const rawImage = post.media?.images?.[0] || post.images?.[0]?.url || post.images?.[0] || null;
+                  const imageUrl = rawImage
+                    ? rawImage.startsWith('http') ? rawImage : `${API}${rawImage}`
                     : null;
+
+                  // ✅ Video: post.media.videos[0]
+                  const rawVideo = post.media?.videos?.[0] || null;
+                  const videoUrl = rawVideo
+                    ? rawVideo.startsWith('http') ? rawVideo : `${API}${rawVideo}`
+                    : null;
+
+                  const authorName = post.author?.nombre || post.author?.name || 'Usuario';
 
                   return (
                     <div
@@ -241,13 +249,13 @@ export default function Favoritos() {
                       <div className="p-4 flex items-center justify-between border-b">
                         <div className="flex items-center gap-3">
                           <img
-                            src={post.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.nombre || 'U')}&background=random`}
-                            alt={post.author?.nombre}
+                            src={post.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`}
+                            alt={authorName}
                             className="w-10 h-10 rounded-full object-cover"
                             onError={e => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=U&background=random`; }}
                           />
                           <div>
-                            <p className="font-semibold text-gray-800">{post.author?.nombre || post.author?.name || 'Usuario'}</p>
+                            <p className="font-semibold text-gray-800">{authorName}</p>
                             <p className="text-xs text-gray-400">{timeAgo(post.createdAt)}</p>
                           </div>
                         </div>
@@ -260,31 +268,45 @@ export default function Favoritos() {
                         </button>
                       </div>
 
-                      {/* Imagen del post */}
-                      {fullImageUrl && (
+                      {/* Texto */}
+                      {post.content && (
+                        <div className="px-4 pt-4 pb-2">
+                          <p className="text-gray-800 whitespace-pre-wrap">{post.content}</p>
+                        </div>
+                      )}
+
+                      {/* ✅ Imagen */}
+                      {imageUrl && !videoUrl && (
                         <img
-                          src={fullImageUrl}
+                          src={imageUrl}
                           alt="Publicación"
-                          className="w-full max-h-96 object-cover"
+                          className="w-full max-h-[480px] object-cover mt-2"
                           onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
                         />
                       )}
 
-                      {/* Texto */}
-                      <div className="p-4">
-                        {post.title   && <h3 className="text-lg font-bold text-gray-800 mb-1">{post.title}</h3>}
-                        {post.content && <p className="text-gray-700 whitespace-pre-wrap">{post.content}</p>}
-                      </div>
+                      {/* ✅ Video */}
+                      {videoUrl && (
+                        <div className="mt-2 bg-black">
+                          <video
+                            src={videoUrl}
+                            controls
+                            className="w-full max-h-[480px]"
+                            onError={e => { e.target.style.display = 'none'; }}
+                          />
+                        </div>
+                      )}
 
                       {/* Footer stats */}
-                      <div className="px-4 py-3 bg-gray-50 border-t flex gap-4 text-sm text-gray-500">
-                        <span>❤️ {post.stats?.likes?.length || post.stats?.likesCount || 0}</span>
-                        <span>💬 {post.stats?.commentsCount || 0}</span>
+                      <div className="px-4 py-3 bg-gray-50 border-t flex gap-4 text-sm text-gray-500 mt-2">
+                        <span>❤️ {post.stats?.likes?.length || 0} me gusta</span>
+                        <span>💬 {post.stats?.commentsCount || 0} comentarios</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
+
             )}
           </main>
         </div>
