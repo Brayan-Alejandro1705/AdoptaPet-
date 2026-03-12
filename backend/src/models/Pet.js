@@ -167,7 +167,10 @@ const petSchema = new mongoose.Schema({
             message: 'No puede haber más de 3 videos'
         }
     },
-    
+    video: {
+        type: String,
+        default: null
+    },
     // =============================================
     // INFORMACIÓN DE SALUD
     // =============================================
