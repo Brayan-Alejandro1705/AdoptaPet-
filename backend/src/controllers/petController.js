@@ -1,8 +1,70 @@
 const Pet = require('../models/Pet');
 const AdoptionRequest = require('../models/AdoptionRequest');
 const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 const path = require('path');
-const fs = require('fs');
+
+// ============================================
+// CLOUDINARY CONFIG
+// ============================================
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// ============================================
+// MULTER + CLOUDINARY (imágenes)
+// ============================================
+const imageStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => ({
+    folder:         'adoptapet/pets',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }],
+    public_id: `pet-img-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+  }),
+});
+
+// ============================================
+// MULTER + CLOUDINARY (videos)
+// ============================================
+const videoStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req, file) => ({
+    folder:        'adoptapet/pets/videos',
+    resource_type: 'video',
+    public_id: `pet-vid-${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+  }),
+});
+
+// ============================================
+// UPLOAD MIXTO: imágenes + video
+// ============================================
+const uploadMixed = multer({
+  storage: multer.memoryStorage(), // acumulamos en memoria, subimos manualmente
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
+      return cb(null, true);
+    }
+    cb(new Error('Tipo de archivo no permitido'));
+  },
+}).fields([
+  { name: 'imagenes', maxCount: 5 },
+  { name: 'video',    maxCount: 1 },
+]);
+
+// Subir buffer a Cloudinary
+const uploadToCloudinary = (buffer, options) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    });
+    stream.end(buffer);
+  });
 
 // ============================================
 // FUNCIONES BÁSICAS DEL CONTROLADOR
@@ -13,18 +75,14 @@ exports.getAllPets = async (req, res) => {
     const { species, gender, size, status, page = 1, limit = 10 } = req.query;
     const filter = {};
     if (species) filter.species = species.toLowerCase();
-    if (gender) filter.gender = gender.toLowerCase();
-    if (size) filter.size = size.toLowerCase();
-    if (status) filter.status = status;
-    const pets = await Pet.find(filter)
-      .populate('owner', 'nombre name email avatar')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    if (gender)  filter.gender  = gender.toLowerCase();
+    if (size)    filter.size    = size.toLowerCase();
+    if (status)  filter.status  = status;
+    const pets  = await Pet.find(filter).populate('owner', 'nombre name email avatar').sort({ createdAt: -1 }).limit(limit * 1).skip((page - 1) * limit);
     const count = await Pet.countDocuments(filter);
     res.json({ success: true, data: pets, totalPages: Math.ceil(count / limit), currentPage: page });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -33,14 +91,14 @@ exports.searchPets = async (req, res) => {
     const { q } = req.query;
     const pets = await Pet.find({
       $or: [
-        { name: { $regex: q, $options: 'i' } },
-        { breed: { $regex: q, $options: 'i' } },
-        { description: { $regex: q, $options: 'i' } }
-      ]
+        { name:        { $regex: q, $options: 'i' } },
+        { breed:       { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+      ],
     }).populate('owner', 'nombre name email avatar').sort({ createdAt: -1 });
     res.json({ success: true, data: pets });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Error al buscar mascotas' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -50,31 +108,28 @@ exports.getPetById = async (req, res) => {
     if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
     res.json({ success: true, data: pet });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Error al obtener mascota' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.getPetsByShelterId = async (req, res) => {
   try {
-    const pets = await Pet.find({ owner: req.params.shelterId })
-      .populate('owner', 'nombre name email avatar').sort({ createdAt: -1 });
+    const pets = await Pet.find({ owner: req.params.shelterId }).populate('owner', 'nombre name email avatar').sort({ createdAt: -1 });
     res.json({ success: true, data: pets });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.createPet = async (req, res) => {
   try {
-    const petData = { ...req.body, owner: req.user.id, status: 'disponible' };
-    const pet = await Pet.create(petData);
+    const pet = await Pet.create({ ...req.body, owner: req.user.id, status: 'disponible' });
     res.status(201).json({ success: true, data: pet, message: 'Mascota creada exitosamente' });
   } catch (error) {
     if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(e => e.message);
-      return res.status(400).json({ success: false, message: 'Error de validación', errors });
+      return res.status(400).json({ success: false, message: 'Error de validación', errors: Object.values(error.errors).map(e => e.message) });
     }
-    res.status(500).json({ success: false, message: error.message || 'Error al crear mascota' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -82,9 +137,9 @@ exports.updatePet = async (req, res) => {
   try {
     const pet = await Pet.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
-    res.json({ success: true, data: pet, message: 'Mascota actualizada exitosamente' });
+    res.json({ success: true, data: pet });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Error al actualizar mascota' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -94,85 +149,34 @@ exports.deletePet = async (req, res) => {
     if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
     res.json({ success: true, message: 'Mascota eliminada exitosamente' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Error al eliminar mascota' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // ============================================
-// MULTER CON SOPORTE IMAGEN + VIDEO ✅
+// HELPERS ENUM MAPPING
 // ============================================
-
-const uploadsDir = path.join(__dirname, '../../uploads/pets');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/pets/'),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'pet-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const uploadMixed = multer({
-  storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB cubre videos
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      const allowed = /jpeg|jpg|png|gif|webp/;
-      if (allowed.test(path.extname(file.originalname).toLowerCase())) return cb(null, true);
-      return cb(new Error('Formato de imagen no permitido. Usa JPG, PNG, GIF o WEBP'));
-    }
-    if (file.mimetype.startsWith('video/')) {
-      return cb(null, true); // acepta cualquier video
-    }
-    cb(new Error('Tipo de archivo no permitido'));
-  }
-}).fields([
-  { name: 'imagenes', maxCount: 5 },
-  { name: 'video',    maxCount: 1 }
-]);
+const mapSpecies = t => ({ perro:'perro', gato:'gato', conejo:'conejo', ave:'ave', roedor:'roedor', reptil:'reptil' })[(t||'').toLowerCase()] || 'otro';
+const mapGender  = s => ({ macho:'macho', hembra:'hembra' })[(s||'').toLowerCase()] || 'desconocido';
+const mapSize    = t => ({ 'pequeño':'pequeño', pequeno:'pequeño', mediano:'mediano', grande:'grande', gigante:'gigante' })[(t||'').toLowerCase()] || 'mediano';
 
 // ============================================
-// HELPERS DE MAPEO PARA ENUMS DEL SCHEMA ✅
+// ADOPCIÓN - OBTENER
 // ============================================
-
-// species: perro|gato|conejo|ave|roedor|reptil|otro
-const mapSpecies = (tipo) => {
-  const map = { perro:'perro', gato:'gato', conejo:'conejo', ave:'ave', roedor:'roedor', reptil:'reptil' };
-  return map[(tipo || '').toLowerCase()] || 'otro';
-};
-
-// gender: macho|hembra|desconocido
-const mapGender = (sexo) => {
-  const map = { macho:'macho', hembra:'hembra' };
-  return map[(sexo || '').toLowerCase()] || 'desconocido';
-};
-
-// size: pequeño|mediano|grande|gigante
-const mapSize = (tamano) => {
-  const map = { 'pequeño':'pequeño', 'pequeno':'pequeño', 'mediano':'mediano', 'grande':'grande', 'gigante':'gigante' };
-  return map[(tamano || '').toLowerCase()] || 'mediano';
-};
-
-// ============================================
-// ADOPCIÓN - OBTENER Y PUBLICAR
-// ============================================
-
 exports.getMascotasEnAdopcion = async (req, res) => {
   try {
-    const pets = await Pet.find({ status: 'disponible' })
-      .sort({ createdAt: -1 })
-      .populate('owner', 'nombre name email avatar');
-    console.log('✅ Mascotas en adopción encontradas:', pets.length);
+    const pets = await Pet.find({ status: 'disponible' }).sort({ createdAt: -1 }).populate('owner', 'nombre name email avatar');
     return res.json({ success: true, data: pets });
   } catch (error) {
-    console.error('❌ Error al obtener mascotas:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Error al obtener mascotas en adopción' });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// ============================================
+// ADOPCIÓN - PUBLICAR (CLOUDINARY) ✅
+// ============================================
 exports.publicarMascotaAdopcion = async (req, res) => {
-  uploadMixed(req, res, async function (err) {
+  uploadMixed(req, res, async (err) => {
     if (err) {
       console.error('❌ Error Multer:', err.message);
       return res.status(400).json({ success: false, message: err.message });
@@ -184,9 +188,6 @@ exports.publicarMascotaAdopcion = async (req, res) => {
       const imageFiles = req.files?.imagenes || [];
       const videoFile  = req.files?.video?.[0] || null;
 
-      console.log('📝 Datos recibidos:', { nombre, tipo, edad, imagenes: imageFiles.length, video: videoFile?.filename || 'ninguno' });
-
-      // Validaciones básicas
       if (!nombre || !tipo || !edad) {
         return res.status(400).json({ success: false, message: 'Nombre, tipo y edad son obligatorios' });
       }
@@ -194,16 +195,31 @@ exports.publicarMascotaAdopcion = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Debes subir al menos una foto de la mascota' });
       }
 
-      // Validar tamaño individual de imágenes (máx 5MB c/u)
-      for (const file of imageFiles) {
-        if (file.size > 5 * 1024 * 1024) {
-          return res.status(400).json({ success: false, message: `La imagen "${file.originalname}" supera 5MB` });
-        }
-      }
-
-      const photos    = imageFiles.map(f => `/uploads/pets/${f.filename}`);
+      // ✅ Subir imágenes a Cloudinary
+      console.log(`📤 Subiendo ${imageFiles.length} imagen(es) a Cloudinary...`);
+      const imageResults = await Promise.all(
+        imageFiles.map(f =>
+          uploadToCloudinary(f.buffer, {
+            folder:          'adoptapet/pets',
+            resource_type:   'image',
+            transformation:  [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }],
+          })
+        )
+      );
+      const photos    = imageResults.map(r => r.secure_url);
       const mainPhoto = photos[0];
-      const videoUrl  = videoFile ? `/uploads/pets/${videoFile.filename}` : null;
+
+      // ✅ Subir video a Cloudinary (si existe)
+      let videoUrl = null;
+      if (videoFile) {
+        console.log('📤 Subiendo video a Cloudinary...');
+        const videoResult = await uploadToCloudinary(videoFile.buffer, {
+          folder:        'adoptapet/pets/videos',
+          resource_type: 'video',
+        });
+        videoUrl = videoResult.secure_url;
+        console.log('✅ Video subido:', videoUrl);
+      }
 
       // Parsear edad
       let ageValue = 0, ageUnit = 'años';
@@ -215,18 +231,17 @@ exports.publicarMascotaAdopcion = async (req, res) => {
         ageValue = edad;
       }
 
-      // Descripción mínima 20 chars (requerido por el schema)
       const finalDescription = descripcion && descripcion.trim().length >= 20
         ? descripcion.trim()
         : `${nombre} busca un hogar amoroso. ${descripcion || 'Es una mascota maravillosa que merece una segunda oportunidad.'} Contáctanos para conocerle.`.trim();
 
       const nuevaMascota = await Pet.create({
         name:        nombre,
-        species:     mapSpecies(tipo),    // ✅ enum correcto
+        species:     mapSpecies(tipo),
         breed:       raza || 'Mestizo',
         age:         { value: ageValue, unit: ageUnit },
-        gender:      mapGender(sexo),     // ✅ enum correcto
-        size:        mapSize(tamano),     // ✅ enum correcto
+        gender:      mapGender(sexo),
+        size:        mapSize(tamano),
         description: finalDescription,
         healthInfo: {
           vaccinated: vacunado === 'true' || vacunado === true,
@@ -239,13 +254,13 @@ exports.publicarMascotaAdopcion = async (req, res) => {
         contactInfo: { phone: telefono || '' },
         photos,
         mainPhoto,
-        video:  videoUrl, // ✅ campo video guardado
+        video:  videoUrl, // ✅ URL permanente de Cloudinary
         owner:  req.user.id,
         status: 'disponible',
       });
 
       console.log('✅ Mascota creada:', nuevaMascota._id, videoUrl ? '(con video)' : '(sin video)');
-      res.status(201).json({ success: true, data: nuevaMascota, message: 'Mascota publicada exitosamente en adopción' });
+      res.status(201).json({ success: true, data: nuevaMascota, message: 'Mascota publicada exitosamente' });
 
     } catch (error) {
       console.error('❌ Error al crear mascota:', error);
@@ -254,7 +269,7 @@ exports.publicarMascotaAdopcion = async (req, res) => {
         console.error('Errores de validación:', errors);
         return res.status(400).json({ success: false, message: 'Error de validación', errors });
       }
-      res.status(500).json({ success: false, message: error.message || 'Error al publicar mascota' });
+      res.status(500).json({ success: false, message: error.message });
     }
   });
 };
@@ -277,20 +292,20 @@ exports.solicitarAdopcion = async (req, res) => {
     if (existing) return res.status(400).json({ success: false, message: 'Ya enviaste una solicitud para esta mascota', data: existing });
     const solicitud = await AdoptionRequest.create({ pet: petId, applicant: applicantId, owner: ownerId, message: message || `Estoy interesado en adoptar a ${pet.name}.` });
     await solicitud.populate([
-      { path: 'pet', select: 'name species mainPhoto photos' },
-      { path: 'applicant', select: 'nombre name email avatar' }
+      { path: 'pet',       select: 'name species mainPhoto photos' },
+      { path: 'applicant', select: 'nombre name email avatar' },
     ]);
     res.status(201).json({ success: true, message: `Solicitud enviada para adoptar a ${pet.name}`, data: solicitud });
   } catch (error) {
     if (error.code === 11000) return res.status(400).json({ success: false, message: 'Ya enviaste una solicitud para esta mascota' });
-    res.status(500).json({ success: false, message: error.message || 'Error al enviar solicitud' });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
 exports.getMisSolicitudes = async (req, res) => {
   try {
     const solicitudes = await AdoptionRequest.find({ applicant: req.user.id })
-      .populate('pet', 'name species mainPhoto photos status location')
+      .populate('pet',   'name species mainPhoto photos status location')
       .populate('owner', 'nombre name email avatar')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: solicitudes });
@@ -302,7 +317,7 @@ exports.getMisSolicitudes = async (req, res) => {
 exports.getSolicitudesRecibidas = async (req, res) => {
   try {
     const solicitudes = await AdoptionRequest.find({ owner: req.user.id })
-      .populate('pet', 'name species mainPhoto photos status')
+      .populate('pet',       'name species mainPhoto photos status')
       .populate('applicant', 'nombre name email avatar')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: solicitudes });
