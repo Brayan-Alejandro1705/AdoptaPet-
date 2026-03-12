@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
-
 import PetCard from '../components/common/PetCard';
 import PetModal from '../components/common/PetModal';
 import FilterSection from '../components/adoptar/FilterSection';
@@ -37,19 +36,38 @@ export default function Adoptar() {
       if (!Array.isArray(data)) throw new Error('El servidor no devolvió un array de mascotas');
 
       const formattedPets = data.map(pet => {
-        // ✅ FIX: el modelo Pet hace delete _id en toJSON, solo queda pet.id
         const petId = pet.id || pet._id;
 
+        // ── Fotos ────────────────────────────────────────────────
         let photos = [];
-        if (pet.photos?.length > 0) photos = pet.photos.map(p =>
-          p.startsWith('http') ? p : `${API_BASE}${p}`
-        );
-        else if (pet.mainPhoto) photos = [
-          pet.mainPhoto.startsWith('http') ? pet.mainPhoto : `${API_BASE}${pet.mainPhoto}`
-        ];
+        if (pet.photos?.length > 0) {
+          photos = pet.photos.map(p => p.startsWith('http') ? p : `${API_BASE}${p}`);
+        } else if (pet.mainPhoto) {
+          photos = [pet.mainPhoto.startsWith('http') ? pet.mainPhoto : `${API_BASE}${pet.mainPhoto}`];
+        }
+
+        // ── Video ─────────────────────────────────────────────────
+        // Soporta: pet.video (string), pet.videos (array), pet.media.video, pet.media.videos
+        let videoUrl = null;
+        if (pet.video && typeof pet.video === 'string') {
+          videoUrl = pet.video.startsWith('http') ? pet.video : `${API_BASE}${pet.video}`;
+        } else if (pet.videos?.length > 0) {
+          const v = pet.videos[0];
+          videoUrl = typeof v === 'string'
+            ? (v.startsWith('http') ? v : `${API_BASE}${v}`)
+            : (v?.url || null);
+        } else if (pet.media?.video) {
+          const v = pet.media.video;
+          videoUrl = v.startsWith('http') ? v : `${API_BASE}${v}`;
+        } else if (pet.media?.videos?.length > 0) {
+          const v = pet.media.videos[0];
+          videoUrl = typeof v === 'string'
+            ? (v.startsWith('http') ? v : `${API_BASE}${v}`)
+            : (v?.url || null);
+        }
 
         return {
-          _id: petId,   // ✅ ambos apuntan al mismo ID válido
+          _id: petId,
           id: petId,
           name: pet.name || 'Sin nombre',
           species: pet.species || 'desconocido',
@@ -64,9 +82,8 @@ export default function Adoptar() {
           location: pet.location || { city: 'No especificada' },
           description: pet.description || 'Sin descripción',
           photos,
-          mainPhoto: pet.mainPhoto
-            ? (pet.mainPhoto.startsWith('http') ? pet.mainPhoto : `${API_BASE}${pet.mainPhoto}`)
-            : null,
+          mainPhoto: photos[0] || null,
+          video: videoUrl, // ✅ video mapeado
           vaccinated: pet.healthInfo?.vaccinated || false,
           sterilized: pet.healthInfo?.sterilized || false,
           featured: pet.featured || false,
@@ -178,7 +195,7 @@ export default function Adoptar() {
                     <div className="text-5xl mb-3">🐾</div>
                     <h3 className="text-xl font-bold text-gray-800 mb-1">Aún no hay mascotas</h3>
                     <p className="text-gray-500 text-sm mb-5">Sé el primero en publicar una mascota en adopción</p>
-                    <a href="/crear-adopcion"
+                    <a href="/adoptar/crear"
                       className="inline-block bg-gradient-to-r from-purple-500 to-pink-500 text-white px-5 py-2.5 rounded-xl font-semibold hover:shadow-lg transition-all text-sm">
                       Publicar mascota
                     </a>

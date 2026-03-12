@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Heart, Trash2, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Heart, Trash2, MapPin, Play } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -7,7 +7,9 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoadingFav, setIsLoadingFav] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [imgError, setImgError] = useState(false); // ✅ FIX: estado para error de imagen
+  const [imgError, setImgError] = useState(false);
+  const [showVideo, setShowVideo] = useState(false); // ✅ alterna foto ↔ video
+  const videoRef = useRef(null);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -25,6 +27,11 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
     };
     checkFavorite();
   }, [pet._id]);
+
+  // Pausa el video al volver a la foto
+  useEffect(() => {
+    if (!showVideo && videoRef.current) videoRef.current.pause();
+  }, [showVideo]);
 
   const handleFavoriteClick = async (e) => {
     e.stopPropagation();
@@ -78,30 +85,47 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
     }
   };
 
+  const handleToggleVideo = (e) => {
+    e.stopPropagation();
+    setShowVideo(v => !v);
+  };
+
   const isOwner = currentUser && pet.owner &&
     (String(currentUser._id || currentUser.id) === String(pet.owner._id || pet.owner.id));
 
-  // ✅ FIX: determina si hay una foto válida para mostrar
   const photoUrl = pet.mainPhoto || pet.photos?.[0] || null;
   const showImage = photoUrl && !imgError;
+  const hasVideo = !!pet.video;
 
   return (
     <div
       onClick={onClick}
       className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group relative"
     >
-      {/* Imagen de la mascota */}
+      {/* Imagen / Video de la mascota */}
       <div className="relative h-56 bg-gray-200 overflow-hidden">
 
-        {/* ✅ FIX: siempre muestra el placeholder si no hay foto o hubo error */}
-        {showImage ? (
+        {/* VIDEO */}
+        {hasVideo && showVideo ? (
+          <video
+            ref={videoRef}
+            src={pet.video}
+            controls
+            autoPlay
+            className="w-full h-full object-cover"
+            onClick={e => e.stopPropagation()}
+            onError={() => setShowVideo(false)}
+          />
+        ) : showImage ? (
+          /* FOTO */
           <img
             src={photoUrl}
             alt={pet.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={() => setImgError(true)} // ✅ FIX: activa el placeholder en vez de ocultar
+            onError={() => setImgError(true)}
           />
         ) : (
+          /* PLACEHOLDER */
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100 gap-2">
             <span className="text-5xl">🐾</span>
             <span className="text-xs text-gray-400 font-medium">Sin foto</span>
@@ -133,6 +157,25 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
             style={{ opacity: isLoadingFav ? 0.6 : 1 }}
           />
         </button>
+
+        {/* ✅ Botón alternar foto ↔ video (solo si hay video) */}
+        {hasVideo && (
+          <button
+            onClick={handleToggleVideo}
+            className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white shadow-lg transition-all active:scale-95"
+            style={{
+              background: showVideo
+                ? 'rgba(0,0,0,0.55)'
+                : 'linear-gradient(135deg,#7c3aed,#ec4899)'
+            }}
+            title={showVideo ? 'Ver foto' : 'Ver video'}
+          >
+            {showVideo
+              ? <><span>🖼️</span><span>Ver foto</span></>
+              : <><Play className="w-3 h-3 fill-white" /><span>Ver video</span></>
+            }
+          </button>
+        )}
 
         {/* Botón eliminar — solo propietario */}
         {isOwner && (
