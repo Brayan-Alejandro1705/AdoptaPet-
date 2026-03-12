@@ -5,6 +5,8 @@ import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
 import BottomNav from '../components/layout/BottomNav';
 import { MapPin, Heart } from 'lucide-react';
+import PostCard from '../components/PostCard';
+import PetModal from '../components/common/PetModal';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -15,8 +17,17 @@ export default function Favoritos() {
   const [posts, setPosts]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [removingId, setRemovingId] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [selectedPet, setSelectedPet] = useState(null);
 
   useEffect(() => { cargarTodo(); }, []);
+
+  useEffect(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || 'null');
+      setCurrentUser(u);
+    } catch { setCurrentUser(null); }
+  }, []);
 
   const cargarTodo = async () => {
     setLoading(true);
@@ -207,7 +218,7 @@ export default function Favoritos() {
                           </p>
                         )}
                         <button
-                          onClick={() => navigate('/adoptar')}
+                          onClick={(e) => { e.stopPropagation(); setSelectedPet(pet); }}
                           className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold rounded-xl hover:shadow-md transition"
                         >
                           Ver detalles
@@ -220,91 +231,16 @@ export default function Favoritos() {
 
             ) : (
 
-              /* ── LISTA DE POSTS ── */
-              <div className="space-y-4">
-                {posts.map(post => {
-                  const removing = removingId === post._id;
-
-                  // ✅ Imagen: soporta Cloudinary (URL absoluta) y rutas relativas
-                  const rawImage = post.media?.images?.[0] || post.images?.[0]?.url || post.images?.[0] || null;
-                  const imageUrl = rawImage
-                    ? rawImage.startsWith('http') ? rawImage : `${API}${rawImage}`
-                    : null;
-
-                  // ✅ Video: post.media.videos[0]
-                  const rawVideo = post.media?.videos?.[0] || null;
-                  const videoUrl = rawVideo
-                    ? rawVideo.startsWith('http') ? rawVideo : `${API}${rawVideo}`
-                    : null;
-
-                  const authorName = post.author?.nombre || post.author?.name || 'Usuario';
-
-                  return (
-                    <div
-                      key={post._id}
-                      className={`bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all ${removing ? 'opacity-0 scale-95' : ''}`}
-                      style={{ transition: 'opacity 0.4s, transform 0.4s' }}
-                    >
-                      {/* Header */}
-                      <div className="p-4 flex items-center justify-between border-b">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={post.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=random`}
-                            alt={authorName}
-                            className="w-10 h-10 rounded-full object-cover"
-                            onError={e => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=U&background=random`; }}
-                          />
-                          <div>
-                            <p className="font-semibold text-gray-800">{authorName}</p>
-                            <p className="text-xs text-gray-400">{timeAgo(post.createdAt)}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => removePost(post._id)}
-                          className="p-2 rounded-full hover:bg-red-50 transition"
-                          title="Quitar de favoritos"
-                        >
-                          <Heart className="w-5 h-5 fill-red-500 text-red-500" />
-                        </button>
-                      </div>
-
-                      {/* Texto */}
-                      {post.content && (
-                        <div className="px-4 pt-4 pb-2">
-                          <p className="text-gray-800 whitespace-pre-wrap">{post.content}</p>
-                        </div>
-                      )}
-
-                      {/* ✅ Imagen */}
-                      {imageUrl && !videoUrl && (
-                        <img
-                          src={imageUrl}
-                          alt="Publicación"
-                          className="w-full max-h-[480px] object-cover mt-2"
-                          onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
-                        />
-                      )}
-
-                      {/* ✅ Video */}
-                      {videoUrl && (
-                        <div className="mt-2 bg-black">
-                          <video
-                            src={videoUrl}
-                            controls
-                            className="w-full max-h-[480px]"
-                            onError={e => { e.target.style.display = 'none'; }}
-                          />
-                        </div>
-                      )}
-
-                      {/* Footer stats */}
-                      <div className="px-4 py-3 bg-gray-50 border-t flex gap-4 text-sm text-gray-500 mt-2">
-                        <span>❤️ {post.stats?.likes?.length || 0} me gusta</span>
-                        <span>💬 {post.stats?.commentsCount || 0} comentarios</span>
-                      </div>
-                    </div>
-                  );
-                })}
+              /* ── LISTA DE POSTS — usa PostCard igual que el feed ── */
+              <div className="space-y-3">
+                {currentUser && posts.map(post => (
+                  <PostCard
+                    key={post._id}
+                    post={post}
+                    currentUser={currentUser}
+                    onDelete={(id) => setPosts(prev => prev.filter(p => p._id !== id))}
+                  />
+                ))}
               </div>
 
             )}
@@ -313,6 +249,10 @@ export default function Favoritos() {
       </div>
 
       <BottomNav />
+
+      {selectedPet && (
+        <PetModal pet={selectedPet} onClose={() => setSelectedPet(null)} />
+      )}
     </div>
   );
 }
