@@ -16,7 +16,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
       try {
         const token = localStorage.getItem('token');
         if (!token || !pet._id) return;
-        const res = await fetch(`${API_BASE}/api/favoritos/check/${pet._id}`, {
+        const res = await fetch(`${API_BASE}/api/favoritos/check-pet/${pet._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -40,7 +40,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
       if (!token) { alert('Debes iniciar sesión para guardar favoritos'); return; }
       setIsLoadingFav(true);
       const method = isFavorite ? 'DELETE' : 'POST';
-      const res = await fetch(`${API_BASE}/api/favoritos/${pet._id}`, {
+      const res = await fetch(`${API_BASE}/api/favoritos/pet/${pet._id}`, {
         method,
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
       });

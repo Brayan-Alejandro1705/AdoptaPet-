@@ -255,12 +255,12 @@ const userSchema = new mongoose.Schema({
     
     favoritesPets: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Post'
+        ref: 'Pet'
     }],
     
     favoritesPosts: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Post'
+        ref: 'Pet'
     }],
     
     // =============================================
