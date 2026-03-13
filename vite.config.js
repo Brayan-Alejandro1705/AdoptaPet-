@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [react()],
   root: 'frontend',
   build: {
-    outDir: '../dist'
+    outDir: '../dist',
+    rollupOptions: {
+      external: []
+    }
+  },
+  resolve: {
+    dedupe: ['socket.io-client']
   }
 })
