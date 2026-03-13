@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm install --include=dev && ./node_modules/.bin/vite build",
+    "build": "cd frontend && npm install && cd .. && ./node_modules/.bin/vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
