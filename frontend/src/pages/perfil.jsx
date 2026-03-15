@@ -383,12 +383,6 @@ function Perfil() {
             <button onClick={() => setActiveTab('publicaciones')} className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'publicaciones' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>
               📱 Publicaciones
             </button>
-            {isOwnProfile && (
-              <button onClick={() => setActiveTab('solicitudes')} className={`flex-1 px-6 py-4 text-sm font-semibold border-b-2 transition-colors duration-300 whitespace-nowrap ${activeTab === 'solicitudes' ? 'border-purple-600 bg-purple-50 text-gray-700' : 'border-transparent text-gray-500 hover:bg-gray-50'}`}>
-                📋 Solicitudes
-                {friendRequests.length > 0 && <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{friendRequests.length}</span>}
-              </button>
-            )}
           </div>
 
           <div className="p-6">
@@ -448,40 +442,6 @@ function Perfil() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
-
-            {activeTab === 'solicitudes' && isOwnProfile && (
-              <div className="space-y-8">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <span className="bg-purple-500 text-white px-3 py-1 rounded-full text-sm">{friendRequests.length}</span>
-                    👥 Solicitudes de Amistad
-                  </h3>
-                  {requestsLoading ? (
-                    <div className="text-center py-8"><div className="text-4xl mb-4">🔄</div><p className="text-gray-600">Cargando...</p></div>
-                  ) : friendRequests.length === 0 ? (
-                    <div className="text-center py-8 bg-gray-50 rounded-2xl"><div className="text-4xl mb-2">📭</div><p className="text-gray-600">No tienes solicitudes de amistad pendientes</p></div>
-                  ) : (
-                    <div className="space-y-3">
-                      {friendRequests.map(request => (
-                        <div key={request._id} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-4">
-                          <img src={request.from?.avatar || getAvatarFallback(request.from?.nombre || request.from?.name)} alt={request.from?.nombre || request.from?.name} className="w-16 h-16 rounded-full object-cover border-2 border-purple-200" onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(request.from?.nombre || request.from?.name); }} />
-                          <div className="flex-1">
-                            <h4 className="font-bold text-gray-800">{request.from?.nombre || request.from?.name}</h4>
-                            <p className="text-sm text-gray-500">{request.from?.email}</p>
-                            {request.message && <p className="text-sm text-gray-600 mt-1 italic">"{request.message}"</p>}
-                            <p className="text-xs text-gray-400 mt-1">{formatTimeAgo(request.createdAt)}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button onClick={() => handleAcceptRequest(request._id)} className="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-600 transition">✓ Aceptar</button>
-                            <button onClick={() => handleRejectRequest(request._id)} className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-400 transition">✕ Rechazar</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
