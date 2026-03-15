@@ -66,7 +66,7 @@ export default function Amigos() {
 
       // Traer todos los usuarios y los amigos actuales en paralelo
       const [usersRes, friendsRes] = await Promise.allSettled([
-        fetch(`${API_BASE}/api/users/search?q=`, {
+        fetch(`${API_BASE}/api/users/suggestions`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         friendRequestService.getFriends(),

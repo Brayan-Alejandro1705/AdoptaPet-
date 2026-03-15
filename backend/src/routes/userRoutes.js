@@ -601,6 +601,50 @@ router.delete('/avatar', protect, async (req, res) => {
   }
 });
 
+// =====================================================
+// GET - Sugerencias de usuarios (personas que quizás conozcas)
+// =====================================================
+router.get('/suggestions', protect, async (req, res) => {
+  try {
+    console.log('💡 Obteniendo sugerencias para:', req.user.id);
+
+    // Obtener el usuario actual con su lista de amigos
+    const currentUser = await User.findById(req.user.id).select('friends');
+    if (!currentUser) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
+    // IDs a excluir: el propio usuario + sus amigos actuales
+    const excludeIds = [
+      req.user.id,
+      ...(currentUser.friends || []).map(id => id.toString())
+    ];
+
+    const suggestions = await User.find({
+      _id: { $nin: excludeIds },
+      status: 'active',
+      'verified.email': true
+    })
+      .select('name nombre email avatar bio location role verified createdAt')
+      .sort({ createdAt: -1 })
+      .limit(12);
+
+    console.log(`✅ Sugerencias encontradas: ${suggestions.length}`);
+
+    res.json({
+      success: true,
+      data: suggestions
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener sugerencias:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener sugerencias',
+      error: error.message
+    });
+  }
+});
+
 // =============================================
 // GET - Obtener usuario por ID (DEBE IR AL FINAL)
 // =============================================
