@@ -1,7 +1,9 @@
 require('dotenv').config();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY, {
+  apiVersion: 'v1'
+});
 
 // =====================================================
 // HELPER: Convertir URL a Base64 (usando fetch nativo de Node 18+)
