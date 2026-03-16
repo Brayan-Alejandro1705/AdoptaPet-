@@ -30,6 +30,7 @@ const renderMessageText = (text) => {
 export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -39,13 +40,22 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
     scrollToBottom();
   }, [messages]);
 
+  // ✅ FIX: enfocar el input cuando se selecciona un chat
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [chat]);
+
   const handleSend = () => {
-    if (newMessage.trim()) {
-      onSendMessage(newMessage.trim());
-      setNewMessage('');
-    }
+    const text = newMessage.trim();
+    if (!text) return;
+
+    onSendMessage(text);
+    setNewMessage('');
+    // ✅ Mantener foco en el input después de enviar
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
+  // ✅ FIX: usar onKeyDown en lugar del deprecated onKeyPress
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -79,14 +89,13 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
         </div>
       </header>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#efeae2]"
-        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M0 0h100v100H0z\' fill=\'%23efeae2\'/%3E%3C/svg%3E")' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-[#efeae2]">
         <div className="py-2 px-4">
           {messages.map((message) => {
             const isMe = message.sender === 'me';
             const read = isMe ? isMessageRead(message) : false;
             return (
-              <div key={message.id} className={`flex mb-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+              <div key={message.id || message._id} className={`flex mb-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className={`rounded-lg shadow-sm ${isMe ? 'bg-purple-200' : 'bg-white'}`}
                   style={{ maxWidth: 'calc(100% - 32px)', width: 'fit-content', padding: '6px 8px', wordBreak: 'break-word', overflowWrap: 'break-word', boxSizing: 'border-box' }}>
                   <div className="flex items-end gap-2">
@@ -112,12 +121,26 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
 
       <footer className="bg-[#f0f2f5] px-3 py-2 flex items-end gap-2 flex-shrink-0">
         <div className="flex-1 bg-white rounded-full px-4 py-2 flex items-center min-w-0">
-          <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyDown} placeholder="Escribe un mensaje"
-            className="flex-1 outline-none text-[15px] bg-transparent placeholder-gray-500 min-w-0" />
+          {/* ✅ FIX: onKeyDown en lugar del deprecated onKeyPress */}
+          <input
+            ref={inputRef}
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Escribe un mensaje"
+            className="flex-1 outline-none text-[15px] bg-transparent placeholder-gray-500 min-w-0"
+          />
         </div>
-        <button onClick={handleSend} disabled={!newMessage.trim()}
-          className={`p-3 rounded-full transition-all duration-200 flex-shrink-0 ${newMessage.trim() ? 'bg-blue-400 hover:bg-blue-500 text-white shadow-md' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+        <button
+          onClick={handleSend}
+          disabled={!newMessage.trim()}
+          className={`p-3 rounded-full transition-all duration-200 flex-shrink-0 ${
+            newMessage.trim()
+              ? 'bg-blue-400 hover:bg-blue-500 text-white shadow-md'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
+        >
           <Send className="w-5 h-5" />
         </button>
       </footer>

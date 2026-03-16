@@ -16,15 +16,22 @@ export default function Chat() {
   const [showChatList, setShowChatList] = useState(false);
 
   const socket = useSocket();
+  const socketRef = useRef(null); // ref para siempre tener el socket más reciente
   const [searchParams] = useSearchParams();
 
-  // ✅ Parámetros de URL: ?chat=ID&autoMsg=texto
   const targetChatId = searchParams.get('chat');
   const autoMsg = searchParams.get('autoMsg');
-  const autoMsgSentRef = useRef(false); // evitar doble envío
+  const autoMsgSentRef = useRef(false);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const currentUserId = String(user?.id || user?._id || '');
+
+  // ✅ FIX: mantener socketRef siempre actualizado
+  useEffect(() => {
+    if (socket) {
+      socketRef.current = socket;
+    }
+  }, [socket]);
 
   const getId = (x) => {
     if (!x) return null;
@@ -62,10 +69,11 @@ export default function Chat() {
 
   const markChatAsRead = useCallback(
     (chatId) => {
-      if (!socket || !chatId || !currentUserId) return;
-      socket.emit('mark_read', { chatId: String(chatId), readerId: String(currentUserId) });
+      const s = socketRef.current;
+      if (!s || !chatId || !currentUserId) return;
+      s.emit('mark_read', { chatId: String(chatId), readerId: String(currentUserId) });
     },
-    [socket, currentUserId]
+    [currentUserId]
   );
 
   const markIncomingAsReadLocally = useCallback(() => {
@@ -83,23 +91,23 @@ export default function Chat() {
     loadChats();
   }, []);
 
-  // ✅ Enviar autoMsg cuando el socket y el chat estén listos
+  // ✅ FIX: enviar autoMsg cuando el socket esté disponible
   useEffect(() => {
-    if (!autoMsg || !selectedChat || !socket || autoMsgSentRef.current) return;
+    const s = socketRef.current;
+    if (!autoMsg || !selectedChat || !s || !s.connected || autoMsgSentRef.current) return;
 
     const chatId = getChatId(selectedChat);
     if (targetChatId && chatId !== targetChatId) return;
 
-    // Pequeño delay para asegurar que el socket esté en la sala
     const timer = setTimeout(() => {
       const text = decodeURIComponent(autoMsg);
-      socket.emit('send_message', {
+      s.emit('send_message', {
         chatId,
         senderId: currentUserId,
         text
       });
       autoMsgSentRef.current = true;
-    }, 600);
+    }, 800);
 
     return () => clearTimeout(timer);
   }, [autoMsg, selectedChat, socket, targetChatId, currentUserId]);
@@ -126,10 +134,11 @@ export default function Chat() {
   }, [selectedChat]);
 
   useEffect(() => {
-    if (!socket || !selectedChat) return;
+    const s = socketRef.current;
+    if (!s || !selectedChat) return;
 
     const chatId = getChatId(selectedChat);
-    socket.emit('join_chat', chatId);
+    s.emit('join_chat', chatId);
     markChatAsRead(chatId);
     markIncomingAsReadLocally();
 
@@ -169,12 +178,13 @@ export default function Chat() {
       }
     };
 
-    socket.on('receive_message', handleNewMessage);
-    return () => socket.off('receive_message', handleNewMessage);
+    s.on('receive_message', handleNewMessage);
+    return () => s.off('receive_message', handleNewMessage);
   }, [socket, selectedChat, currentUserId, markChatAsRead, markIncomingAsReadLocally]);
 
   useEffect(() => {
-    if (!socket) return;
+    const s = socketRef.current;
+    if (!s) return;
 
     const handleOnlineUsers = ({ userIds }) => {
       const onlineSet = new Set((userIds || []).map((u) => String(u)));
@@ -194,15 +204,15 @@ export default function Chat() {
       setSelectedChat((prev) => (prev && getOtherUserId(prev) === uid ? { ...prev, online: false } : prev));
     };
 
-    socket.on('online_users', handleOnlineUsers);
-    socket.on('user_online', handleUserOnline);
-    socket.on('user_offline', handleUserOffline);
-    socket.emit('get_online_users');
+    s.on('online_users', handleOnlineUsers);
+    s.on('user_online', handleUserOnline);
+    s.on('user_offline', handleUserOffline);
+    s.emit('get_online_users');
 
     return () => {
-      socket.off('online_users', handleOnlineUsers);
-      socket.off('user_online', handleUserOnline);
-      socket.off('user_offline', handleUserOffline);
+      s.off('online_users', handleOnlineUsers);
+      s.off('user_online', handleUserOnline);
+      s.off('user_offline', handleUserOffline);
     };
   }, [socket, currentUserId]);
 
@@ -212,14 +222,12 @@ export default function Chat() {
       const normalized = (data || []).map((c) => ({ ...c, online: !!c.online }));
       setChats(normalized);
 
-      // ✅ Si hay ?chat= en la URL, seleccionar ese chat específico
       let chatToSelect = null;
 
       if (targetChatId) {
         chatToSelect = normalized.find((c) => getChatId(c) === targetChatId);
       }
 
-      // Si no encontramos el chat (puede ser nuevo), recargamos una vez más
       if (targetChatId && !chatToSelect) {
         try {
           const fresh = await chatService.getChats();
@@ -241,7 +249,8 @@ export default function Chat() {
         markIncomingAsReadLocally();
       }
 
-      socket?.emit('get_online_users');
+      const s = socketRef.current;
+      if (s) s.emit('get_online_users');
     } catch (error) {
       console.error('❌ Error al cargar chats:', error);
     } finally {
@@ -272,21 +281,54 @@ export default function Chat() {
           if (!base || getChatId(base) !== chatId) return prev;
           return { ...base, __otherUserId: otherFromMessages };
         });
-        socket?.emit('get_online_users');
+        const s = socketRef.current;
+        if (s) s.emit('get_online_users');
       }
     } catch (error) {
       console.error('❌ Error al cargar mensajes:', error);
     }
   };
 
-  const handleSendMessage = (text) => {
-    if (!socket || !selectedChat || !text.trim()) return;
-    socket.emit('send_message', {
-      chatId: getChatId(selectedChat),
+  // ✅ FIX PRINCIPAL: usar socketRef.current para garantizar acceso al socket
+  const handleSendMessage = useCallback((text) => {
+    if (!text || !text.trim()) return;
+
+    if (!selectedChat) {
+      console.error('❌ No hay chat seleccionado');
+      return;
+    }
+
+    const s = socketRef.current;
+    if (!s) {
+      console.error('❌ Socket no disponible');
+      return;
+    }
+
+    if (!s.connected) {
+      console.error('❌ Socket no conectado, intentando reconectar...');
+      s.connect();
+      // Reintentar después de un breve delay
+      setTimeout(() => {
+        if (s.connected) {
+          s.emit('send_message', {
+            chatId: getChatId(selectedChat),
+            senderId: currentUserId,
+            text: text.trim()
+          });
+        }
+      }, 1000);
+      return;
+    }
+
+    const chatId = getChatId(selectedChat);
+    console.log('📤 Enviando mensaje:', { chatId, senderId: currentUserId, text: text.trim() });
+
+    s.emit('send_message', {
+      chatId,
       senderId: currentUserId,
       text: text.trim()
     });
-  };
+  }, [selectedChat, currentUserId]);
 
   const handleSelectChat = async (chat) => {
     setSelectedChat(chat);
@@ -295,7 +337,8 @@ export default function Chat() {
     await loadMessages(chatId, chat);
     markChatAsRead(chatId);
     markIncomingAsReadLocally();
-    socket?.emit('get_online_users');
+    const s = socketRef.current;
+    if (s) s.emit('get_online_users');
   };
 
   if (loading) {

@@ -1,18 +1,20 @@
 // frontend/src/hooks/useSocket.js
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 
 const SOCKET_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}`;
 
-let globalSocket = null; // ✅ instancia compartida para evitar doble conexión en StrictMode
+let globalSocket = null;
 
 export const useSocket = () => {
   const socketRef = useRef(null);
+  const [, forceUpdate] = useState(0); // para forzar re-render cuando el socket esté listo
 
   useEffect(() => {
     // Si ya hay un socket conectado, reutilizarlo
     if (globalSocket && globalSocket.connected) {
       socketRef.current = globalSocket;
+      forceUpdate(n => n + 1);
       return;
     }
 
@@ -42,6 +44,8 @@ export const useSocket = () => {
     s.on('connect', () => {
       console.log('✅ Conectado a Socket.io:', s.id);
       registerPresence();
+      socketRef.current = s;
+      forceUpdate(n => n + 1); // notificar que el socket ya está listo
     });
 
     s.io.on('reconnect', () => {
@@ -69,7 +73,6 @@ export const useSocket = () => {
       window.dispatchEvent(new CustomEvent('chat_messages_read', { detail: payload }));
     });
 
-    // Solo limpiar listeners, NO desconectar (evita problema de StrictMode)
     return () => {
       s.off('unread_count');
       s.off('messages_read');
