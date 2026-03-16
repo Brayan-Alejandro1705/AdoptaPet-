@@ -5,6 +5,7 @@ const router = express.Router();
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const Notification = require('../models/Notification'); // ✅ FIX: agregado
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 
@@ -280,7 +281,7 @@ router.get('/:chatId/messages', authenticate, async (req, res) => {
 
 
 // ================================
-// POST enviar mensaje
+// POST enviar mensaje ✅ CON notificationSettings
 // ================================
 router.post('/:chatId/messages', authenticate, async (req, res) => {
 
@@ -322,12 +323,9 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
     }
 
 
-    const otherUserId = getOtherUserIdFromChat(
-      chat,
-      userId
-    );
+    const otherUserId = getOtherUserIdFromChat(chat, userId);
 
-
+    // ✅ El mensaje SIEMPRE se guarda y entrega — independiente del setting
     const message = new Message({
 
       chat: chatId,
@@ -357,6 +355,50 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
       select: 'name avatar'
     });
 
+    // ✅ FIX: solo crear notificación si el receptor tiene messages activado
+    if (otherUserId) {
+      try {
+        const [sender, receiver] = await Promise.all([
+          User.findById(userId).select('name nombre avatar'),
+          User.findById(otherUserId).select('notificationSettings')
+        ]);
+
+        const messagesEnabled = receiver?.notificationSettings?.messages !== false;
+
+        if (messagesEnabled) {
+          const notification = await Notification.create({
+            recipient: otherUserId,
+            sender: userId,
+            type: 'message',
+            title: 'Nuevo mensaje',
+            message: `${sender.name || sender.nombre} te envió un mensaje`,
+            icon: '📩',
+            color: 'blue',
+            relatedId: chat._id,
+            relatedModel: 'Chat',
+            actionUrl: `/mensajes/${chatId}`
+          });
+
+          const io = req.app.get('io');
+          if (io) {
+            io.to(otherUserId.toString()).emit('nueva-notificacion', {
+              ...notification.toObject(),
+              sender: {
+                _id: sender._id,
+                name: sender.name || sender.nombre,
+                avatar: sender.avatar
+              }
+            });
+          }
+
+          console.log('🔔 Notificación de mensaje creada:', notification._id);
+        } else {
+          console.log('🔕 Usuario desactivó notificaciones de mensajes — omitida');
+        }
+      } catch (notifError) {
+        console.error('⚠️ Error creando notificación de mensaje:', notifError);
+      }
+    }
 
     res.status(201).json({
 
