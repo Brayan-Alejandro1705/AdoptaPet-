@@ -36,7 +36,6 @@ const auth = async (req, res, next) => {
       });
     }
 
-    // Buscar usuario en BD
     const user = await UserModel.findById(decoded.id);
     if (!user) {
       console.log('❌ Usuario no encontrado en BD');
@@ -46,11 +45,7 @@ const auth = async (req, res, next) => {
       });
     }
 
-    console.log('✅ Usuario autenticado:', {
-      id: user._id,
-      nombre: user.name,
-      email: user.email
-    });
+    console.log('✅ Usuario autenticado:', { id: user._id, nombre: user.name, email: user.email });
 
     req.userId = decoded.id;
     req.user = user;
@@ -202,7 +197,6 @@ router.get('/', auth, async (req, res) => {
 });
 
 // ✅ CREAR PUBLICACIÓN — SIN multer, acepta JSON con URLs de Cloudinary
-// ✅ Soporta: contenido, imagenes (array) y videos (string URL o null)
 router.post('/', auth, async (req, res) => {
   try {
     console.log('📝 ===== CREANDO NUEVA PUBLICACIÓN =====');
@@ -211,14 +205,12 @@ router.post('/', auth, async (req, res) => {
 
     const { contenido, tipo, petInfo, disponibleAdopcion } = req.body;
 
-    // ✅ Leer URLs de Cloudinary desde req.body.imagenes y req.body.videos
     const imageUrls = Array.isArray(req.body.imagenes) ? req.body.imagenes : [];
     const videoUrl = req.body.videos || null;
     
     console.log('🖼️ URLs de imágenes recibidas:', imageUrls);
     console.log('🎥 URL de video recibida:', videoUrl);
 
-    // ✅ VALIDACIÓN: Debe tener contenido O al menos una imagen O un video
     if (!contenido?.trim() && imageUrls.length === 0 && !videoUrl) {
       console.log('❌ Validación fallida: Sin contenido ni media');
       return res.status(400).json({
@@ -251,17 +243,9 @@ router.post('/', auth, async (req, res) => {
       content: contenido?.trim() || '',
       type: tipo || 'update',
       status: 'active',
-      media: {
-        images: [],
-        videos: []
-      },
+      media: { images: [], videos: [] },
       comments: [],
-      stats: {
-        likes: [],
-        commentsCount: 0,
-        shares: 0,
-        views: 0
-      },
+      stats: { likes: [], commentsCount: 0, shares: 0, views: 0 },
       settings: {
         visibility: finalVisibility,
         allowComments: allowCommentsDefault,
@@ -269,19 +253,15 @@ router.post('/', auth, async (req, res) => {
       }
     };
 
-    // ✅ Guardar URLs permanentes de Cloudinary para imágenes
     if (imageUrls.length > 0) {
       postData.media.images = imageUrls;
       console.log('✅ Imágenes Cloudinary agregadas:', postData.media.images);
     }
 
-    // ✅ Guardar URL de video si existe
     if (videoUrl) {
       postData.media.videos = [videoUrl];
       console.log('✅ Video Cloudinary agregado:', videoUrl);
     }
-
-    console.log('💾 Datos del post a guardar:', JSON.stringify(postData, null, 2));
 
     const newPost = new Post(postData);
     await newPost.save();
@@ -332,20 +312,12 @@ router.get('/feed', auth, async (req, res) => {
       success: true,
       data: {
         posts,
-        pagination: {
-          page,
-          limit,
-          total: totalPosts,
-          pages: Math.ceil(totalPosts / limit)
-        }
+        pagination: { page, limit, total: totalPosts, pages: Math.ceil(totalPosts / limit) }
       }
     });
   } catch (error) {
     console.error('❌ Error obteniendo feed:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener publicaciones'
-    });
+    res.status(500).json({ success: false, message: 'Error al obtener publicaciones' });
   }
 });
 
@@ -358,20 +330,14 @@ router.get('/user/:userId', auth, async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find({ 
-      author: req.params.userId,
-      status: 'active'
-    })
+    const posts = await Post.find({ author: req.params.userId, status: 'active' })
       .populate('author', 'name nombre email avatar role verified')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const totalPosts = await Post.countDocuments({ 
-      author: req.params.userId,
-      status: 'active'
-    });
+    const totalPosts = await Post.countDocuments({ author: req.params.userId, status: 'active' });
 
     console.log(`✅ Posts encontrados: ${posts.length}`);
 
@@ -379,12 +345,7 @@ router.get('/user/:userId', auth, async (req, res) => {
       success: true,
       data: {
         posts,
-        pagination: {
-          page,
-          limit,
-          total: totalPosts,
-          pages: Math.ceil(totalPosts / limit)
-        }
+        pagination: { page, limit, total: totalPosts, pages: Math.ceil(totalPosts / limit) }
       }
     });
   } catch (error) {
@@ -397,29 +358,24 @@ router.get('/user/:userId', auth, async (req, res) => {
   }
 });
 
-// 5. DAR/QUITAR LIKE (✅ CON NOTIFICACIONES)
+// 5. DAR/QUITAR LIKE ✅ (CON notificationSettings)
 router.post('/:postId/like', auth, async (req, res) => {
   try {
     console.log('❤️ ===== PROCESANDO LIKE =====');
     console.log('📝 Post ID:', req.params.postId);
     console.log('👤 Usuario:', req.userId);
-    
-    const post = await Post.findById(req.params.postId);
 
+    const post = await Post.findById(req.params.postId);
     if (!post) {
-      console.log('❌ Post no encontrado');
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     const likeIndex = post.stats.likes.findIndex(
       like => like.toString() === req.userId.toString()
     );
-    
+
     let liked = false;
-    
+
     if (likeIndex > -1) {
       post.stats.likes.splice(likeIndex, 1);
       liked = false;
@@ -431,37 +387,41 @@ router.post('/:postId/like', auth, async (req, res) => {
 
       if (post.author.toString() !== req.userId.toString()) {
         try {
-          const liker = await User.findById(req.userId);
-          
-          const notificationData = {
-            recipient: post.author,
-            sender: req.userId,
-            type: 'like',
-            title: 'Le gustó tu publicación',
-            message: `A ${liker.name || liker.nombre} le gustó tu publicación`,
-            icon: '❤️',
-            color: 'pink',
-            relatedId: post._id,
-            relatedModel: 'Post',
-            actionUrl: `/post/${post._id}`
-          };
-          
-          const notification = await Notification.create(notificationData);
-          console.log('🔔 ✅ Notificación creada con ID:', notification._id);
+          const [liker, postAuthor] = await Promise.all([
+            User.findById(req.userId),
+            User.findById(post.author).select('notificationSettings')
+          ]);
 
-          const io = req.app.get('io');
-          if (io) {
-            io.to(post.author.toString()).emit('nueva-notificacion', {
-              ...notification.toObject(),
-              sender: {
-                _id: liker._id,
-                name: liker.name || liker.nombre,
-                avatar: liker.avatar
-              }
+          // ✅ VERIFICAR si el autor tiene likes activados
+          const likesEnabled = postAuthor?.notificationSettings?.likes !== false;
+
+          if (likesEnabled) {
+            const notification = await Notification.create({
+              recipient: post.author,
+              sender: req.userId,
+              type: 'like',
+              title: 'Le gustó tu publicación',
+              message: `A ${liker.name || liker.nombre} le gustó tu publicación`,
+              icon: '❤️',
+              color: 'pink',
+              relatedId: post._id,
+              relatedModel: 'Post',
+              actionUrl: `/post/${post._id}`
             });
+
+            const io = req.app.get('io');
+            if (io) {
+              io.to(post.author.toString()).emit('nueva-notificacion', {
+                ...notification.toObject(),
+                sender: { _id: liker._id, name: liker.name || liker.nombre, avatar: liker.avatar }
+              });
+            }
+            console.log('🔔 Notificación de like creada:', notification._id);
+          } else {
+            console.log('🔕 Usuario desactivó notificaciones de likes — omitida');
           }
         } catch (notifError) {
-          console.error('⚠️ Error creando notificación:', notifError);
+          console.error('⚠️ Error creando notificación de like:', notifError);
         }
       }
     }
@@ -471,17 +431,11 @@ router.post('/:postId/like', auth, async (req, res) => {
     res.json({
       success: true,
       message: liked ? 'Like agregado' : 'Like removido',
-      data: { 
-        liked,
-        likesCount: post.stats.likes.length
-      }
+      data: { liked, likesCount: post.stats.likes.length }
     });
   } catch (error) {
     console.error('❌ Error con like:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al procesar like'
-    });
+    res.status(500).json({ success: false, message: 'Error al procesar like' });
   }
 });
 
@@ -489,12 +443,8 @@ router.post('/:postId/like', auth, async (req, res) => {
 router.delete('/:postId/like', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
-
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     post.stats.likes = post.stats.likes.filter(
@@ -506,98 +456,77 @@ router.delete('/:postId/like', auth, async (req, res) => {
     res.json({
       success: true,
       message: 'Like removido',
-      data: { 
-        unliked: true,
-        likesCount: post.stats.likes.length
-      }
+      data: { unliked: true, likesCount: post.stats.likes.length }
     });
   } catch (error) {
     console.error('❌ Error quitando like:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al quitar like'
-    });
+    res.status(500).json({ success: false, message: 'Error al quitar like' });
   }
 });
 
-// 6. AGREGAR COMENTARIO (✅ CON NOTIFICACIONES)
+// 6. AGREGAR COMENTARIO ✅ (CON notificationSettings)
 router.post('/:postId/comments', auth, async (req, res) => {
   try {
     console.log('💬 ===== AGREGANDO COMENTARIO =====');
 
     const { content } = req.body;
-
     if (!content || !content.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'El comentario no puede estar vacío'
-      });
+      return res.status(400).json({ success: false, message: 'El comentario no puede estar vacío' });
     }
 
     const post = await Post.findById(req.params.postId);
-
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     if (post.settings?.allowComments === false) {
-      return res.status(403).json({
-        success: false,
-        message: 'Los comentarios están deshabilitados en esta publicación'
-      });
+      return res.status(403).json({ success: false, message: 'Los comentarios están deshabilitados en esta publicación' });
     }
-
-    const newComment = {
-      user: req.userId,
-      content: content.trim(),
-      createdAt: new Date()
-    };
 
     if (!post.comments) post.comments = [];
-    post.comments.push(newComment);
-
-    if (post.stats) {
-      post.stats.commentsCount = post.comments.length;
-    }
+    post.comments.push({ user: req.userId, content: content.trim(), createdAt: new Date() });
+    if (post.stats) post.stats.commentsCount = post.comments.length;
 
     await post.save();
 
     if (post.author.toString() !== req.userId.toString()) {
       try {
-        const commenter = await User.findById(req.userId);
-        
-        const notificationData = {
-          recipient: post.author,
-          sender: req.userId,
-          type: 'comment',
-          title: 'Nuevo comentario',
-          message: `${commenter.name || commenter.nombre} comentó: "${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"`,
-          icon: '💬',
-          color: 'blue',
-          relatedId: post._id,
-          relatedModel: 'Post',
-          actionUrl: `/post/${post._id}`
-        };
+        const [commenter, postAuthor] = await Promise.all([
+          User.findById(req.userId),
+          User.findById(post.author).select('notificationSettings')
+        ]);
 
-        const notification = await Notification.create(notificationData);
-        console.log('🔔 ✅ Notificación creada con ID:', notification._id);
+        // ✅ VERIFICAR si el autor tiene comentarios activados
+        const commentsEnabled = postAuthor?.notificationSettings?.comments !== false;
 
-        const io = req.app.get('io');
-        if (io) {
-          io.to(post.author.toString()).emit('nueva-notificacion', {
-            ...notification.toObject(),
-            sender: {
-              _id: commenter._id,
-              name: commenter.name || commenter.nombre,
-              avatar: commenter.avatar
-            }
+        if (commentsEnabled) {
+          const preview = content.length > 50 ? content.substring(0, 50) + '...' : content;
+          const notification = await Notification.create({
+            recipient: post.author,
+            sender: req.userId,
+            type: 'comment',
+            title: 'Nuevo comentario',
+            message: `${commenter.name || commenter.nombre} comentó: "${preview}"`,
+            icon: '💬',
+            color: 'blue',
+            relatedId: post._id,
+            relatedModel: 'Post',
+            actionUrl: `/post/${post._id}`
           });
+
+          const io = req.app.get('io');
+          if (io) {
+            io.to(post.author.toString()).emit('nueva-notificacion', {
+              ...notification.toObject(),
+              sender: { _id: commenter._id, name: commenter.name || commenter.nombre, avatar: commenter.avatar }
+            });
+          }
+          console.log('🔔 Notificación de comentario creada:', notification._id);
+        } else {
+          console.log('🔕 Usuario desactivó notificaciones de comentarios — omitida');
         }
       } catch (notifError) {
-        console.error('⚠️ Error creando notificación:', notifError);
+        console.error('⚠️ Error creando notificación de comentario:', notifError);
       }
     }
 
@@ -609,18 +538,11 @@ router.post('/:postId/comments', auth, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Comentario agregado exitosamente',
-      data: {
-        comment: savedComment,
-        commentsCount: savedPost.comments.length
-      }
+      data: { comment: savedComment, commentsCount: savedPost.comments.length }
     });
   } catch (error) {
     console.error('❌ Error agregando comentario:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al agregar comentario',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error al agregar comentario', error: error.message });
   }
 });
 
@@ -632,25 +554,16 @@ router.get('/:postId/comments', auth, async (req, res) => {
       .lean();
 
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     res.json({
       success: true,
-      data: {
-        comments: post.comments || [],
-        commentsCount: post.comments?.length || 0
-      }
+      data: { comments: post.comments || [], commentsCount: post.comments?.length || 0 }
     });
   } catch (error) {
     console.error('❌ Error obteniendo comentarios:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener comentarios'
-    });
+    res.status(500).json({ success: false, message: 'Error al obtener comentarios' });
   }
 });
 
@@ -658,12 +571,8 @@ router.get('/:postId/comments', auth, async (req, res) => {
 router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
-
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     const commentIndex = post.comments.findIndex(
@@ -671,43 +580,29 @@ router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
     );
 
     if (commentIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Comentario no encontrado'
-      });
+      return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
     }
 
     const isCommentAuthor = post.comments[commentIndex].user.toString() === req.userId.toString();
     const isPostAuthor = post.author.toString() === req.userId.toString();
 
     if (!isCommentAuthor && !isPostAuthor) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permiso para eliminar este comentario'
-      });
+      return res.status(403).json({ success: false, message: 'No tienes permiso para eliminar este comentario' });
     }
 
     post.comments.splice(commentIndex, 1);
-
-    if (post.stats) {
-      post.stats.commentsCount = post.comments.length;
-    }
+    if (post.stats) post.stats.commentsCount = post.comments.length;
 
     await post.save();
 
     res.json({
       success: true,
       message: 'Comentario eliminado exitosamente',
-      data: {
-        commentsCount: post.comments.length
-      }
+      data: { commentsCount: post.comments.length }
     });
   } catch (error) {
     console.error('❌ Error eliminando comentario:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al eliminar comentario'
-    });
+    res.status(500).json({ success: false, message: 'Error al eliminar comentario' });
   }
 });
 
@@ -717,34 +612,21 @@ router.delete('/:postId', auth, async (req, res) => {
     console.log('🗑️ Eliminando post:', req.params.postId);
     
     const post = await Post.findById(req.params.postId);
-
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     if (post.author.toString() !== req.userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permiso para eliminar esta publicación'
-      });
+      return res.status(403).json({ success: false, message: 'No tienes permiso para eliminar esta publicación' });
     }
 
     post.status = 'deleted';
     await post.save();
 
-    res.json({
-      success: true,
-      message: 'Publicación eliminada exitosamente'
-    });
+    res.json({ success: true, message: 'Publicación eliminada exitosamente' });
   } catch (error) {
     console.error('❌ Error eliminando post:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al eliminar la publicación'
-    });
+    res.status(500).json({ success: false, message: 'Error al eliminar la publicación' });
   }
 });
 
@@ -757,26 +639,16 @@ router.put('/:postId', auth, async (req, res) => {
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     if (post.author.toString() !== req.userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permiso para editar esta publicación'
-      });
+      return res.status(403).json({ success: false, message: 'No tienes permiso para editar esta publicación' });
     }
 
     const newContent = contenido || content;
-
     if (!newContent || !newContent.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'El contenido no puede estar vacío'
-      });
+      return res.status(400).json({ success: false, message: 'El contenido no puede estar vacío' });
     }
 
     post.content = newContent;
@@ -792,10 +664,7 @@ router.put('/:postId', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error editando post:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al editar la publicación'
-    });
+    res.status(500).json({ success: false, message: 'Error al editar la publicación' });
   }
 });
 
@@ -833,34 +702,19 @@ router.get('/admin/all', auth, isAdmin, async (req, res) => {
     const totalPosts = await Post.countDocuments(query);
     const activeCount = await Post.countDocuments({ status: 'active' });
     const deletedCount = await Post.countDocuments({ status: 'deleted' });
-    const moderatedCount = await Post.countDocuments({ 
-      moderatedBy: { $exists: true, $ne: null } 
-    });
+    const moderatedCount = await Post.countDocuments({ moderatedBy: { $exists: true, $ne: null } });
 
     res.json({
       success: true,
       data: {
         posts,
-        stats: {
-          total: totalPosts,
-          active: activeCount,
-          deleted: deletedCount,
-          moderated: moderatedCount
-        },
-        pagination: {
-          page,
-          limit,
-          total: totalPosts,
-          pages: Math.ceil(totalPosts / limit)
-        }
+        stats: { total: totalPosts, active: activeCount, deleted: deletedCount, moderated: moderatedCount },
+        pagination: { page, limit, total: totalPosts, pages: Math.ceil(totalPosts / limit) }
       }
     });
   } catch (error) {
     console.error('❌ Error obteniendo publicaciones (admin):', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener publicaciones'
-    });
+    res.status(500).json({ success: false, message: 'Error al obtener publicaciones' });
   }
 });
 
@@ -871,10 +725,7 @@ router.post('/admin/:postId/moderate', auth, isAdmin, async (req, res) => {
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     post.status = 'deleted';
@@ -883,16 +734,10 @@ router.post('/admin/:postId/moderate', auth, isAdmin, async (req, res) => {
     post.moderationReason = reason || 'Eliminado por moderación';
     await post.save();
 
-    res.json({
-      success: true,
-      message: 'Publicación moderada exitosamente'
-    });
+    res.json({ success: true, message: 'Publicación moderada exitosamente' });
   } catch (error) {
     console.error('❌ Error moderando:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al moderar publicación'
-    });
+    res.status(500).json({ success: false, message: 'Error al moderar publicación' });
   }
 });
 
@@ -902,10 +747,7 @@ router.post('/admin/:postId/restore', auth, isAdmin, async (req, res) => {
     const post = await Post.findById(req.params.postId);
 
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
     post.status = 'active';
@@ -913,16 +755,10 @@ router.post('/admin/:postId/restore', auth, isAdmin, async (req, res) => {
     post.restoredAt = new Date();
     await post.save();
 
-    res.json({
-      success: true,
-      message: 'Publicación restaurada exitosamente'
-    });
+    res.json({ success: true, message: 'Publicación restaurada exitosamente' });
   } catch (error) {
     console.error('❌ Error restaurando:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al restaurar publicación'
-    });
+    res.status(500).json({ success: false, message: 'Error al restaurar publicación' });
   }
 });
 
@@ -930,16 +766,10 @@ router.post('/admin/:postId/restore', auth, isAdmin, async (req, res) => {
 router.delete('/admin/:postId/permanent', auth, isSuperAdmin, async (req, res) => {
   try {
     await Post.findByIdAndDelete(req.params.postId);
-    res.json({
-      success: true,
-      message: 'Publicación eliminada permanentemente'
-    });
+    res.json({ success: true, message: 'Publicación eliminada permanentemente' });
   } catch (error) {
     console.error('❌ Error eliminando permanentemente:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al eliminar publicación'
-    });
+    res.status(500).json({ success: false, message: 'Error al eliminar publicación' });
   }
 });
 
@@ -954,22 +784,13 @@ router.get('/:postId', auth, async (req, res) => {
       .lean();
 
     if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Publicación no encontrada'
-      });
+      return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
-    res.json({
-      success: true,
-      data: { post }
-    });
+    res.json({ success: true, data: { post } });
   } catch (error) {
     console.error('❌ Error obteniendo post:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener la publicación'
-    });
+    res.status(500).json({ success: false, message: 'Error al obtener la publicación' });
   }
 });
 
@@ -980,9 +801,9 @@ console.log('   📰 GET    /api/posts/feed - Feed de publicaciones (con privaci
 console.log('   👤 GET    /api/posts/user/my-posts - Mis publicaciones');
 console.log('   👥 GET    /api/posts/user/:userId - Posts de usuario');
 console.log('   📄 GET    /api/posts/:postId - Ver publicación');
-console.log('   ❤️  POST   /api/posts/:postId/like - Dar like (type: "like")');
+console.log('   ❤️  POST   /api/posts/:postId/like - Dar like (con notificationSettings)');
 console.log('   💔 DELETE /api/posts/:postId/like - Quitar like');
-console.log('   💬 POST   /api/posts/:postId/comments - Agregar comentario (type: "comment")');
+console.log('   💬 POST   /api/posts/:postId/comments - Agregar comentario (con notificationSettings)');
 console.log('   💬 GET    /api/posts/:postId/comments - Ver comentarios');
 console.log('   💬 DELETE /api/posts/:postId/comments/:commentId - Borrar comentario');
 console.log('   🗑️  DELETE /api/posts/:postId - Eliminar');
