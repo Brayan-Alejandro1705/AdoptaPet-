@@ -13,3 +13,5 @@ const AjustesSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 export default mongoose.model("Ajustes", AjustesSchema);
+gi
+

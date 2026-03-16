@@ -8,7 +8,7 @@ import NotificacionesModal from '../components/common/NotificacionesModal';
 import PublicacionesModal from '../components/common/PublicacionesModal';
 import EtiquetadoModal from '../components/common/EtiquetadoModal';
 
-const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}`; // ✅ backticks
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}`;
 
 const Ajustes = () => {
   const [modalCuenta, setModalCuenta] = useState(false);
@@ -35,14 +35,15 @@ const Ajustes = () => {
 
   const token = localStorage.getItem('token');
 
-  // ✅ Cargar ajustes de publicaciones desde la ruta correcta
+  // ✅ Cargar ajustes de publicaciones
   useEffect(() => {
     fetch(`${API_URL}/api/users/me/post-settings`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.json())
       .then(data => {
-        if (data && !data.success === false) {
+        // ✅ FIX: condición corregida
+        if (data && data.success !== false) {
           setSettings(prev => ({ ...prev, ...data }));
         }
       })
@@ -63,7 +64,7 @@ const Ajustes = () => {
       .catch(err => console.error("Error obteniendo notificaciones:", err));
   }, []);
 
-  // ✅ Guardar ajustes de publicaciones en la ruta correcta
+  // ✅ Guardar ajustes de publicaciones
   const handleGuardar = async () => {
     try {
       const res = await fetch(`${API_URL}/api/users/me/post-settings`, {
@@ -89,7 +90,7 @@ const Ajustes = () => {
     }
   };
 
-  // Guardar ajustes de notificaciones
+  // ✅ FIX: manejo de error mejorado
   const handleGuardarNotificaciones = async () => {
     const res = await fetch(`${API_URL}/api/users/notification-settings`, {
       method: "PUT",
@@ -100,7 +101,7 @@ const Ajustes = () => {
       body: JSON.stringify(notificationSettings),
     });
     const data = await res.json();
-    if (!data.success) throw new Error("Error al guardar notificaciones");
+    if (!data.success) throw new Error(data.message || "Error al guardar notificaciones");
   };
 
   return (
@@ -173,3 +174,10 @@ const Ajustes = () => {
 };
 
 export default Ajustes;
+
+
+
+
+
+
+
