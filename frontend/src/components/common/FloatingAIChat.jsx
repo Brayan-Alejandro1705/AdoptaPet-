@@ -130,15 +130,14 @@ export default function FloatingAIChat() {
         reader.readAsDataURL(imageFile);
 
       } else {
-        const response = await fetch(`${API_BASE}/api/ai/chat`, {
+        const response = await fetch(`${API_BASE}/api/ai/chatbot`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            message: inputMessage,
-            conversationHistory: messages
+            message: inputMessage
           })
         });
 

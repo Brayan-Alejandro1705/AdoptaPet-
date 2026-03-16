@@ -5,31 +5,29 @@ import { Send, Camera, AlertCircle, Sparkles, X, Minus } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+const INITIAL_MESSAGE = {
+  id: 1,
+  sender: 'ai',
+  text: 'Hola, soy Simon BOT, tu asistente veterinario de AdoptaPet. Estoy aquí para ayudarte con el cuidado de tus mascotas.\n\nPuedo asesorarte sobre nutrición, comportamiento, salud y bienestar de perros y gatos. También puedo analizar fotos de mascotas si las subes.\n\n¿Cómo te llamas y en qué puedo ayudarte hoy?',
+  timestamp: new Date()
+};
+
 export default function AIAssistant() {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: 'ai',
-      text: 'Hola, soy Simon BOT, tu asistente veterinario de AdoptaPet. Estoy aquí para ayudarte con el cuidado de tus mascotas.\n\nPuedo asesorarte sobre nutrición, comportamiento, salud y bienestar de perros y gatos. También puedo analizar fotos de mascotas si las subes.\n\n¿Cómo te llamas y en qué puedo ayudarte hoy?',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState([INITIAL_MESSAGE]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [isOpen, setIsOpen] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
-
-  // Draggable state
   const [position, setPosition] = useState({ x: null, y: null });
   const [isDragging, setIsDragging] = useState(false);
+
   const dragOffset = useRef({ x: 0, y: 0 });
   const chatRef = useRef(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Set initial position once mounted
   useEffect(() => {
     setPosition({
       x: window.innerWidth - 400 - 24,
@@ -41,7 +39,6 @@ export default function AIAssistant() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Mouse drag
   const onMouseDown = (e) => {
     if (e.target.closest('button') || e.target.closest('textarea')) return;
     setIsDragging(true);
@@ -68,7 +65,6 @@ export default function AIAssistant() {
     };
   }, [isDragging]);
 
-  // Touch drag
   const onTouchStart = (e) => {
     if (e.target.closest('button') || e.target.closest('textarea')) return;
     const touch = e.touches[0];
@@ -100,7 +96,10 @@ export default function AIAssistant() {
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('La imagen es muy grande. Máximo 5MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen es muy grande. Máximo 5MB.');
+      return;
+    }
     setImageFile(file);
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
@@ -113,77 +112,133 @@ export default function AIAssistant() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // ✅ CORREGIDO: Cloudinary → Gemini analyze-pet
+  const analyzeImageWithAI = async (file, token) => {
+    // PASO 1: Subir a Cloudinary
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'adopta_pet_unsigned');
+    formData.append('folder', 'adopta-pet/ai-analysis');
+
+    const cloudRes = await fetch(
+      'https://api.cloudinary.com/v1_1/dn9x4ccqk/image/upload',
+      { method: 'POST', body: formData }
+    );
+    const cloudData = await cloudRes.json();
+
+    if (!cloudData.secure_url) throw new Error('Error al subir imagen a Cloudinary');
+
+    // PASO 2: Analizar con Gemini
+    const response = await fetch(`${API_BASE}/api/ai/analyze-pet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ imageUrl: cloudData.secure_url })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      return '❌ No pude analizar la imagen. Asegúrate de que sea una foto clara de un animal.';
+    }
+
+    return data.analysis;
+  };
+
+  // ✅ CORREGIDO: /api/ai/chatbot en lugar de /api/ai/chat
+  const sendTextMessage = async (message, token) => {
+    const response = await fetch(`${API_BASE}/api/ai/chatbot`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ message })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      return '❌ Hubo un error al procesar tu mensaje. Intenta de nuevo.';
+    }
+
+    return data.reply;
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() && !imageFile) return;
+
     const token = localStorage.getItem('token');
-    if (!token) { alert('Debes iniciar sesión para usar el asistente'); return; }
+    if (!token) {
+      alert('Debes iniciar sesión para usar el asistente');
+      return;
+    }
 
     const userMessage = {
-      id: Date.now(), sender: 'user',
-      text: inputMessage, image: imagePreview, timestamp: new Date()
+      id: Date.now(),
+      sender: 'user',
+      text: inputMessage,
+      image: imagePreview,
+      timestamp: new Date()
     };
+
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setLoading(true);
 
     try {
+      let aiResponse;
+
       if (imageFile) {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const response = await fetch(`${API_BASE}/api/ai/identify-breed`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ imageBase64: reader.result })
-          });
-          const data = await response.json();
-          let aiResponse;
-          if (data.success) {
-            const a = data.data;
-            aiResponse = `🔍 **Análisis de la imagen:**\n\n🐾 **Animal:** ${a.animal}\n🏷️ **Raza:** ${a.raza}\n📊 **Confianza:** ${a.confianza}%\n📅 **Edad:** ${a.edad}\n📏 **Tamaño:** ${a.tamaño}\n\n**Razas probables:**\n${a.razasProbables.map((r, i) => `${i + 1}. ${r}`).join('\n')}\n\n**Características:**\n${a.caracteristicas.map(c => `• ${c}`).join('\n')}`;
-          } else {
-            aiResponse = '❌ No pude analizar la imagen. Asegúrate de que sea una foto clara de un perro o gato.';
-          }
-          setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: aiResponse, timestamp: new Date() }]);
-          setLoading(false);
-          removeImage();
-        };
-        reader.readAsDataURL(imageFile);
+        aiResponse = await analyzeImageWithAI(imageFile, token);
       } else {
-        const response = await fetch(`${API_BASE}/api/ai/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ message: inputMessage, conversationHistory: messages })
-        });
-        const data = await response.json();
-        const aiResponse = data.success ? data.data.message : '❌ Hubo un error. Intenta de nuevo.';
-        setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: aiResponse, timestamp: new Date() }]);
-        setLoading(false);
+        aiResponse = await sendTextMessage(inputMessage, token);
       }
+
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        sender: 'ai',
+        text: aiResponse,
+        timestamp: new Date()
+      }]);
+
     } catch (error) {
-      setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: '❌ Hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.', timestamp: new Date() }]);
+      console.error('❌ Error:', error);
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        sender: 'ai',
+        text: '❌ Hubo un error al procesar tu solicitud. Por favor, intenta de nuevo.',
+        timestamp: new Date()
+      }]);
+    } finally {
       setLoading(false);
       removeImage();
     }
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
-  };
-
-  // Don't render until position is calculated
-  if (position.x === null) return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <Header />
-      <Sidebar />
-    </div>
-  );
+  if (position.x === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+        <Header />
+        <Sidebar />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       <Header />
       <Sidebar />
 
-      {/* Floating chat window */}
       {isOpen && (
         <div
           ref={chatRef}
@@ -213,7 +268,7 @@ export default function AIAssistant() {
               maxHeight: isMinimized ? 'auto' : 560,
             }}
           >
-            {/* Drag handle / header */}
+            {/* Header / Drag handle */}
             <div
               onMouseDown={onMouseDown}
               onTouchStart={onTouchStart}
@@ -227,9 +282,8 @@ export default function AIAssistant() {
                 flexShrink: 0,
               }}
             >
-              {/* Drag dots indicator */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3, opacity: 0.6, marginRight: 2 }}>
-                {[0,1,2].map(i => (
+                {[0, 1, 2].map(i => (
                   <div key={i} style={{ display: 'flex', gap: 3 }}>
                     <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#fff' }} />
                     <div style={{ width: 3, height: 3, borderRadius: '50%', background: '#fff' }} />
@@ -239,7 +293,8 @@ export default function AIAssistant() {
 
               <div style={{
                 width: 36, height: 36, background: 'rgba(255,255,255,0.2)',
-                borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                borderRadius: '50%', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', flexShrink: 0
               }}>
                 <Sparkles style={{ width: 18, height: 18, color: '#fff' }} />
               </div>
@@ -256,12 +311,12 @@ export default function AIAssistant() {
                   background: 'rgba(255,255,255,0.2)', border: 'none',
                   color: '#fff', cursor: 'pointer', display: 'flex',
                   alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.15s'
                 }}
                 title={isMinimized ? 'Expandir' : 'Minimizar'}
               >
                 <Minus style={{ width: 14, height: 14 }} />
               </button>
+
               <button
                 onClick={() => setIsOpen(false)}
                 style={{
@@ -269,7 +324,6 @@ export default function AIAssistant() {
                   background: 'rgba(255,255,255,0.2)', border: 'none',
                   color: '#fff', cursor: 'pointer', display: 'flex',
                   alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.15s'
                 }}
                 title="Cerrar"
               >
@@ -277,17 +331,20 @@ export default function AIAssistant() {
               </button>
             </div>
 
-            {/* Chat body (hidden when minimized) */}
+            {/* Chat body */}
             {!isMinimized && (
               <>
-                {/* Messages */}
+                {/* Mensajes */}
                 <div style={{
                   flex: 1, overflowY: 'auto', padding: '12px',
                   background: '#efeae2', display: 'flex', flexDirection: 'column', gap: 8,
                   maxHeight: 360, minHeight: 200
                 }}>
                   {messages.map((message) => (
-                    <div key={message.id} style={{ display: 'flex', justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div key={message.id} style={{
+                      display: 'flex',
+                      justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start'
+                    }}>
                       <div style={{
                         maxWidth: '82%',
                         background: message.sender === 'user' ? '#d9fdd3' : '#fff',
@@ -296,9 +353,18 @@ export default function AIAssistant() {
                         boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
                       }}>
                         {message.image && (
-                          <img src={message.image} alt="Uploaded" style={{ width: '100%', borderRadius: 8, marginBottom: 6, maxHeight: 140, objectFit: 'cover' }} />
+                          <img
+                            src={message.image}
+                            alt="Uploaded"
+                            style={{ width: '100%', borderRadius: 8, marginBottom: 6, maxHeight: 140, objectFit: 'cover' }}
+                          />
                         )}
-                        <p style={{ fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, color: '#1f2937' }}>{message.text}</p>
+                        <p style={{
+                          fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word', margin: 0, color: '#1f2937'
+                        }}>
+                          {message.text}
+                        </p>
                         <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0', textAlign: 'right' }}>
                           {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                         </p>
@@ -308,7 +374,12 @@ export default function AIAssistant() {
 
                   {loading && (
                     <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                      <div style={{ background: '#fff', borderRadius: '4px 16px 16px 16px', padding: '10px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                      <div style={{
+                        background: '#fff',
+                        borderRadius: '4px 16px 16px 16px',
+                        padding: '10px 14px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                      }}>
                         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
                           {[0, 0.15, 0.3].map((delay, i) => (
                             <div key={i} style={{
@@ -320,43 +391,67 @@ export default function AIAssistant() {
                       </div>
                     </div>
                   )}
+
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Image preview */}
+                {/* Preview imagen */}
                 {imagePreview && (
-                  <div style={{ padding: '8px 12px', background: '#f9fafb', borderTop: '1px solid #f3f4f6', flexShrink: 0 }}>
+                  <div style={{
+                    padding: '8px 12px', background: '#f9fafb',
+                    borderTop: '1px solid #f3f4f6', flexShrink: 0
+                  }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{ position: 'relative' }}>
-                        <img src={imagePreview} alt="Preview" style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} />
-                        <button onClick={removeImage} style={{
-                          position: 'absolute', top: -6, right: -6,
-                          width: 18, height: 18, borderRadius: '50%',
-                          background: '#ef4444', border: 'none', color: '#fff',
-                          fontSize: 11, cursor: 'pointer', display: 'flex',
-                          alignItems: 'center', justifyContent: 'center'
-                        }}>×</button>
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }}
+                        />
+                        <button
+                          onClick={removeImage}
+                          style={{
+                            position: 'absolute', top: -6, right: -6,
+                            width: 18, height: 18, borderRadius: '50%',
+                            background: '#ef4444', border: 'none', color: '#fff',
+                            fontSize: 11, cursor: 'pointer', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >×</button>
                       </div>
-                      <p style={{ fontSize: 11, color: '#6b7280', margin: 0 }}>Imagen lista para analizar</p>
+                      <p style={{ fontSize: 11, color: '#6b7280', margin: 0 }}>
+                        Imagen lista para analizar con Gemini ✨
+                      </p>
                     </div>
                   </div>
                 )}
 
                 {/* Input */}
-                <div style={{ padding: '10px 12px', background: '#fff', borderTop: '1px solid #f3f4f6', flexShrink: 0 }}>
+                <div style={{
+                  padding: '10px 12px', background: '#fff',
+                  borderTop: '1px solid #f3f4f6', flexShrink: 0
+                }}>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      style={{ display: 'none' }}
+                    />
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={loading}
                       style={{
                         width: 36, height: 36, borderRadius: '50%',
-                        background: '#f3f4f6', border: 'none', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        transition: 'background 0.15s'
+                        background: imageFile ? '#ede9fe' : '#f3f4f6',
+                        border: imageFile ? '2px solid #7c3aed' : 'none',
+                        cursor: 'pointer', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                       }}
+                      title="Subir imagen"
                     >
-                      <Camera style={{ width: 17, height: 17, color: '#6b7280' }} />
+                      <Camera style={{ width: 17, height: 17, color: imageFile ? '#7c3aed' : '#6b7280' }} />
                     </button>
 
                     <textarea
@@ -371,7 +466,6 @@ export default function AIAssistant() {
                         border: '2px solid #e5e7eb', borderRadius: 18,
                         outline: 'none', resize: 'none', fontSize: 13,
                         fontFamily: 'inherit', background: '#fff', color: '#1f2937',
-                        transition: 'border-color 0.15s',
                         lineHeight: 1.4
                       }}
                       onFocus={e => e.target.style.borderColor = '#7c3aed'}
@@ -389,7 +483,6 @@ export default function AIAssistant() {
                         color: (!inputMessage.trim() && !imageFile) || loading ? '#9ca3af' : '#fff',
                         cursor: (!inputMessage.trim() && !imageFile) || loading ? 'not-allowed' : 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        transition: 'all 0.2s'
                       }}
                     >
                       <Send style={{ width: 16, height: 16 }} />
@@ -398,7 +491,9 @@ export default function AIAssistant() {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
                     <AlertCircle style={{ width: 11, height: 11, color: '#9ca3af', flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: '#9ca3af' }}>Sube una foto para identificar razas</span>
+                    <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                      Sube una foto para que Gemini analice tu mascota
+                    </span>
                   </div>
                 </div>
               </>
@@ -407,7 +502,7 @@ export default function AIAssistant() {
         </div>
       )}
 
-      {/* Re-open bubble */}
+      {/* Burbuja para reabrir */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
@@ -418,8 +513,7 @@ export default function AIAssistant() {
             border: 'none', color: '#fff', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 6px 24px rgba(124,58,237,0.45)',
-            zIndex: 9999, transition: 'transform 0.2s, box-shadow 0.2s',
-            fontSize: 26
+            zIndex: 9999, fontSize: 26
           }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
