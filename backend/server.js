@@ -679,23 +679,12 @@ try {
   app.use('/api/ai', geminiRoutes);
   services.geminiLoaded = true;
   console.log('✅ Rutas de IA cargadas correctamente');
-} catch (error) {
-  console.error('❌ Error cargando rutas de IA:', error.message);
-}
-  
-  // Solo marcar como cargado si es el archivo real (no placeholder)
-  if (geminiRoutes.stack && geminiRoutes.stack.length > 1) {
-    services.geminiLoaded = true;
-    console.log('✅ Rutas de IA (Google Gemini) cargadas correctamente');
-    console.log('   💬 POST /api/ai/chatbot');
-    console.log('   🔍 POST /api/ai/analyze-pet');
-    console.log('   🛡️  POST /api/ai/moderate');
-    console.log('   ✅ POST /api/ai/validate-posting');
-    console.log('   📝 POST /api/ai/generate-description');
-    console.log('   🔄 POST /api/ai/check-duplicate');
-  } else {
-    console.log('⏸️  Google Gemini usando placeholder (archivos no configurados)');
-  }
+  console.log('   💬 POST /api/ai/chatbot');
+  console.log('   🔍 POST /api/ai/analyze-pet');
+  console.log('   🛡️  POST /api/ai/moderate');
+  console.log('   ✅ POST /api/ai/validate-posting');
+  console.log('   📝 POST /api/ai/generate-description');
+  console.log('   🔄 POST /api/ai/check-duplicate');
 } catch (error) {
   console.error('⚠️  Error cargando rutas de IA:', error.message);
   console.log('   💡 Verifica que los archivos existan:');
