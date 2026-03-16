@@ -671,35 +671,17 @@ try {
 }
 
 // ============================================
-// RUTAS DE IA - GOOGLE GEMINI ✅ NUEVA
+// RUTAS DE IA - GOOGLE GEMINI
 // ============================================
 try {
-  console.log('\n🤖 Cargando módulo de IA (Google Gemini)...');
-  let geminiRoutes;
-  try {
-    geminiRoutes = require('./src/routes/geminiRoutes');
-  } catch (loadError) {
-    if (loadError.code === 'MODULE_NOT_FOUND') {
-      console.log('   ⏸️  Archivo geminiRoutes.js no encontrado');
-      console.log('   💡 Para habilitar Gemini, copia:');
-      console.log('      - geminiService.js en ./src/services/');
-      console.log('      - geminiRoutes.js en ./src/routes/');
-      // Crear una ruta placeholder
-      const express = require('express');
-      const placeholderRouter = express.Router();
-      placeholderRouter.all('/', (req, res) => {
-        res.status(503).json({ 
-          success: false, 
-          message: 'Google Gemini no está configurado. Por favor, configura los archivos necesarios.' 
-        });
-      });
-      geminiRoutes = placeholderRouter;
-    } else {
-      throw loadError;
-    }
-  }
-  
+  console.log('\n🤖 Cargando rutas de IA (Google Gemini)...');
+  const geminiRoutes = require('./src/routes/geminiRoutes');
   app.use('/api/ai', geminiRoutes);
+  services.geminiLoaded = true;
+  console.log('✅ Rutas de IA cargadas correctamente');
+} catch (error) {
+  console.error('❌ Error cargando rutas de IA:', error.message);
+}
   
   // Solo marcar como cargado si es el archivo real (no placeholder)
   if (geminiRoutes.stack && geminiRoutes.stack.length > 1) {

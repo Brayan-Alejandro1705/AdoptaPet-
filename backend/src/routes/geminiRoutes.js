@@ -1,8 +1,3 @@
-// =====================================================
-// 🚀 RUTAS BACKEND PARA GOOGLE GEMINI
-// Adaptadas para tu estructura (CommonJS)
-// =====================================================
-
 const express = require('express');
 const router = express.Router();
 const {
@@ -14,107 +9,66 @@ const {
   checkImageSimilarity,
 } = require('../services/geminiService');
 
-// Middleware de autenticación (asume que ya tienes)
-const { verifyToken } = require('../middleware/auth');
+// ✅ CORREGIDO: usar 'protect' en lugar de 'verifyToken'
+const { protect } = require('../middleware/auth');
 
-// =====================================================
-// 1️⃣ CHATBOT DE ASESORAMIENTO ANIMAL
-// =====================================================
-
-router.post('/chatbot', verifyToken, async (req, res) => {
+// 1. CHATBOT
+router.post('/chatbot', protect, async (req, res) => {
   try {
     const { message, petType } = req.body;
 
-    if (!message || message.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'El mensaje es requerido',
-      });
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'El mensaje es requerido' });
     }
 
     const result = await chatbotAnimalAdvisor(message, petType);
 
     if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error,
-      });
+      return res.status(500).json({ success: false, error: result.error });
     }
 
-    return res.json({
-      success: true,
-      reply: result.reply,
-      tokens: result.tokensUsed,
-    });
+    return res.json({ success: true, reply: result.reply });
   } catch (error) {
     console.error('Error en /api/ai/chatbot:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Error del servidor',
-    });
+    return res.status(500).json({ success: false, error: 'Error del servidor' });
   }
 });
 
-// =====================================================
-// 2️⃣ ANALIZAR IMAGEN DE MASCOTA
-// =====================================================
-
-router.post('/analyze-pet', verifyToken, async (req, res) => {
+// 2. ANALIZAR IMAGEN DE MASCOTA
+router.post('/analyze-pet', protect, async (req, res) => {
   try {
     const { imageUrl } = req.body;
 
     if (!imageUrl) {
-      return res.status(400).json({
-        success: false,
-        error: 'La URL de la imagen es requerida',
-      });
+      return res.status(400).json({ success: false, error: 'La URL de la imagen es requerida' });
     }
 
     const result = await analyzeAnimalImage(imageUrl);
 
     if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error,
-      });
+      return res.status(500).json({ success: false, error: result.error });
     }
 
-    return res.json({
-      success: true,
-      analysis: result.analysis,
-      tokens: result.tokensUsed,
-    });
+    return res.json({ success: true, analysis: result.analysis });
   } catch (error) {
     console.error('Error en /api/ai/analyze-pet:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Error al analizar imagen',
-    });
+    return res.status(500).json({ success: false, error: 'Error al analizar imagen' });
   }
 });
 
-// =====================================================
-// 3️⃣ MODERAR IMAGEN
-// =====================================================
-
+// 3. MODERAR IMAGEN (sin auth, se usa internamente)
 router.post('/moderate', async (req, res) => {
   try {
     const { imageUrl } = req.body;
 
     if (!imageUrl) {
-      return res.status(400).json({
-        success: false,
-        error: 'La URL de la imagen es requerida',
-      });
+      return res.status(400).json({ success: false, error: 'La URL de la imagen es requerida' });
     }
 
     const result = await moderateImage(imageUrl);
 
     if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error,
-      });
+      return res.status(500).json({ success: false, error: result.error });
     }
 
     if (!result.moderation.isAppropriate) {
@@ -125,149 +79,89 @@ router.post('/moderate', async (req, res) => {
       });
     }
 
-    return res.json({
-      success: true,
-      moderation: result.moderation,
-      tokens: result.tokensUsed,
-    });
+    return res.json({ success: true, moderation: result.moderation });
   } catch (error) {
     console.error('Error en /api/ai/moderate:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Error al moderar imagen',
-    });
+    return res.status(500).json({ success: false, error: 'Error al moderar imagen' });
   }
 });
 
-// =====================================================
-// 4️⃣ VALIDAR PUBLICACIÓN
-// =====================================================
-
-router.post('/validate-posting', verifyToken, async (req, res) => {
+// 4. VALIDAR PUBLICACIÓN
+router.post('/validate-posting', protect, async (req, res) => {
   try {
     const { imageUrl, description } = req.body;
 
     if (!imageUrl || !description) {
-      return res.status(400).json({
-        success: false,
-        error: 'Imagen y descripción son requeridas',
-      });
+      return res.status(400).json({ success: false, error: 'Imagen y descripción son requeridas' });
     }
 
     const result = await validatePetPosting(imageUrl, description);
 
     if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error,
-      });
+      return res.status(500).json({ success: false, error: result.error });
     }
 
     if (!result.validation.isValid) {
-      return res.json({
-        success: false,
-        error: result.validation.feedback,
-        validation: result.validation,
-      });
+      return res.json({ success: false, error: result.validation.feedback, validation: result.validation });
     }
 
-    return res.json({
-      success: true,
-      validation: result.validation,
-      tokens: result.tokensUsed,
-    });
+    return res.json({ success: true, validation: result.validation });
   } catch (error) {
     console.error('Error en /api/ai/validate-posting:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Error al validar publicación',
-    });
+    return res.status(500).json({ success: false, error: 'Error al validar publicación' });
   }
 });
 
-// =====================================================
-// 5️⃣ GENERAR DESCRIPCIÓN AUTOMÁTICA
-// =====================================================
-
-router.post('/generate-description', verifyToken, async (req, res) => {
+// 5. GENERAR DESCRIPCIÓN
+router.post('/generate-description', protect, async (req, res) => {
   try {
     const { imageUrl, petName, petType } = req.body;
 
     if (!imageUrl || !petName || !petType) {
-      return res.status(400).json({
-        success: false,
-        error: 'Imagen, nombre y tipo de mascota son requeridos',
-      });
+      return res.status(400).json({ success: false, error: 'Imagen, nombre y tipo son requeridos' });
     }
 
     const result = await generatePetDescription(imageUrl, petName, petType);
 
     if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error,
-      });
+      return res.status(500).json({ success: false, error: result.error });
     }
 
-    return res.json({
-      success: true,
-      description: result.description,
-      tokens: result.tokensUsed,
-    });
+    return res.json({ success: true, description: result.description });
   } catch (error) {
     console.error('Error en /api/ai/generate-description:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Error al generar descripción',
-    });
+    return res.status(500).json({ success: false, error: 'Error al generar descripción' });
   }
 });
 
-// =====================================================
-// 6️⃣ DETECTAR FOTOS DUPLICADAS (Anti-scam)
-// =====================================================
-
-router.post('/check-duplicate', verifyToken, async (req, res) => {
+// 6. DETECTAR DUPLICADOS
+router.post('/check-duplicate', protect, async (req, res) => {
   try {
     const { imageUrl1, imageUrl2 } = req.body;
 
     if (!imageUrl1 || !imageUrl2) {
-      return res.status(400).json({
-        success: false,
-        error: 'Ambas URLs de imagen son requeridas',
-      });
+      return res.status(400).json({ success: false, error: 'Ambas URLs son requeridas' });
     }
 
     const result = await checkImageSimilarity(imageUrl1, imageUrl2);
 
     if (!result.success) {
-      return res.status(500).json({
-        success: false,
-        error: result.error,
-      });
+      return res.status(500).json({ success: false, error: result.error });
     }
 
-    if (result.comparison.riskLevel === 'alto') {
-      return res.json({
-        success: false,
-        warning: 'Posible contenido duplicado o fraudulento',
-        comparison: result.comparison,
-        tokens: result.tokensUsed,
-      });
-    }
-
-    return res.json({
-      success: true,
-      comparison: result.comparison,
-      tokens: result.tokensUsed,
-    });
+    return res.json({ success: true, comparison: result.comparison });
   } catch (error) {
     console.error('Error en /api/ai/check-duplicate:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Error al comparar imágenes',
-    });
+    return res.status(500).json({ success: false, error: 'Error al comparar imágenes' });
   }
 });
+
+console.log('✅ Rutas Gemini cargadas correctamente');
+console.log('   💬 POST /api/ai/chatbot');
+console.log('   🔍 POST /api/ai/analyze-pet');
+console.log('   🛡️  POST /api/ai/moderate');
+console.log('   ✅ POST /api/ai/validate-posting');
+console.log('   📝 POST /api/ai/generate-description');
+console.log('   🔄 POST /api/ai/check-duplicate');
 
 module.exports = router;
