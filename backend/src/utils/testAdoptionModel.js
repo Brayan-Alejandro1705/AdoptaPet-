@@ -54,21 +54,7 @@ async function testAdoptionModel() {
         await shelter.save();
         console.log(`✅ Refugio creado: ${shelter.shelterInfo.organizationName}`);
         
-        // Crear mascota
-        const pet = new Pet({
-            name: 'Luna Test',
-            species: 'perro',
-            breed: 'Labrador',
-            age: { value: 2, unit: 'años' },
-            gender: 'hembra',
-            size: 'mediano',
-            description: 'Perrita hermosa buscando hogar',
-            photos: ['https://test.com/luna.jpg'],
-            mainPhoto: 'https://test.com/luna.jpg',
-            location: { country: 'Colombia', city: 'Bogotá' },
-            owner: shelter._id,
-            status: 'disponible'
-        });
+        
         await pet.save();
         console.log(`✅ Mascota creada: ${pet.name}\n`);
         

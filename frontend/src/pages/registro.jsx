@@ -17,6 +17,12 @@ const testConnection = async () => {
   }
 };
 
+// ✅ Validación: letras + números + carácter especial + mínimo 8 caracteres
+const validarPassword = (password) => {
+  const regex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&._#\-])[A-Za-z\d@$!%*?&._#\-]{8,}$/;
+  return regex.test(password);
+};
+
 export default function Registro() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -63,8 +69,8 @@ export default function Registro() {
     }
 
     if (name === 'password') {
-      if (value && value.length < 6) {
-        newErrors.password = 'Minimo 8 caracteres';
+      if (value && !validarPassword(value)) {
+        newErrors.password = 'Debe tener letras, números y un carácter especial (@$!%*?&._#-)';
       } else {
         delete newErrors.password;
       }
@@ -115,8 +121,9 @@ export default function Registro() {
       return;
     }
 
-    if (password.length < 6) {
-      setMessage({ text: 'La contrasena debe tener al menos 6 caracteres', type: 'error' });
+    // ✅ Validación fuerte de contraseña en el submit
+    if (!validarPassword(password)) {
+      setMessage({ text: 'La contraseña debe tener letras, números y al menos un carácter especial (@$!%*?&._#-)', type: 'error' });
       return;
     }
 
@@ -276,7 +283,7 @@ export default function Registro() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Minimo 8 caracteres"
+                placeholder="Letras, números y carácter especial"
                 className={`w-full px-4 py-3 pr-12 border-2 rounded-lg text-sm focus:outline-none transition-colors ${
                   errors.password ? 'border-red-500' : 'border-gray-200 focus:border-purple-500'
                 }`}
@@ -290,6 +297,8 @@ export default function Registro() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
+            {/* ✅ Indicaciones visibles debajo del campo */}
+            <p className="text-gray-400 text-xs mt-1">Mínimo 8 caracteres, letras, números y un carácter especial (@$!%*?&._#-)</p>
             {errors.password && (
               <p className="text-red-500 text-xs mt-1">{errors.password}</p>
             )}
