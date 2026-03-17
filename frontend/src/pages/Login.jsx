@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import petsBg from '../assets/65555.jpg'; // ✅ Imagen local
 
 function Login() {
   const navigate = useNavigate();
@@ -90,10 +89,10 @@ function Login() {
   return (
     <div className="flex items-center justify-center h-screen relative overflow-hidden">
 
-      {/* ✅ Fondo con imagen local */}
+      {/* Fondo con blur — Unsplash (estable, sin CORS, perros y gatos) */}
       <div
         className="absolute inset-0 bg-cover bg-center filter blur-sm"
-        style={{ backgroundImage: `url(${petsBg})` }}
+        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=1920&q=80')" }}
       />
 
       {/* Overlay oscuro */}
