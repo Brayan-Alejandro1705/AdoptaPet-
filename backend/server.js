@@ -43,6 +43,8 @@ const corsOptions = {
       'https://adoptapet.up.railway.app',
       'https://adoptapet-production-9df1.up.railway.app',
       'https://adopta-pet-omega.vercel.app',
+      'https://adoptapet.fun',
+      'https://www.adoptapet.fun',
       process.env.FRONTEND_URL
     ].filter(Boolean);
 
