@@ -207,7 +207,7 @@ export default function Registro() {
       {/* ✅ Fondo con blur — misma imagen que Login */}
       <div
         className="absolute inset-0 bg-cover bg-center filter blur-sm"
-        style={{ backgroundImage: "url('https://images.unsplash.com/photo-1450778869180-41d0601e046e?w=1920&q=80')" }}
+        style={{ backgroundImage: "url('https://us.123rf.com/450wm/isselee/isselee2210/isselee221000042/192975949-gran-grupo-de-gatos-y-perros-mirando-a-la-c%C3%A1mara-sobre-fondo-azul.jpg?ver=6')" }}
       />
 
       {/* Overlay oscuro */}
