@@ -5,18 +5,6 @@ import { Eye, EyeOff, Check } from 'lucide-react';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
 
-const testConnection = async () => {
-  try {
-    const response = await fetch(`${API_BASE}/health`);
-    const data = await response.json();
-    console.log('Backend conectado:', data);
-    return true;
-  } catch (error) {
-    console.error('Backend NO conectado:', error);
-    return false;
-  }
-};
-
 // ✅ Validación: letras + números + carácter especial + mínimo 8 caracteres
 const validarPassword = (password) => {
   const regex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[@$!%*?&._#\-])[A-Za-z\d@$!%*?&._#\-]{8,}$/;
@@ -39,12 +27,6 @@ export default function Registro() {
   });
 
   const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    testConnection().then(connected => {
-      console.log(connected ? 'Conectado' : 'Desconectado');
-    });
-  }, []);
 
   const validateField = (name, value) => {
     const newErrors = { ...errors };
@@ -121,7 +103,6 @@ export default function Registro() {
       return;
     }
 
-    // ✅ Validación fuerte de contraseña en el submit
     if (!validarPassword(password)) {
       setMessage({ text: 'La contraseña debe tener letras, números y al menos un carácter especial (@$!%*?&._#-)', type: 'error' });
       return;
@@ -177,41 +158,15 @@ export default function Registro() {
     }
   };
 
-  const handleGoogleLogin = async (e) => {
+  const handleGoogleLogin = (e) => {
     e.preventDefault();
-
-    console.log('🔍 Iniciando Google Login...');
-
-    try {
-      const response = await fetch(`${API_BASE}/health`);
-      const data = await response.json();
-
-      console.log('✅ Backend activo:', data);
-
-      if (data.services?.googleAuth === 'disabled') {
-        setMessage({
-          text: 'Google OAuth no está disponible. Verifica la configuración del servidor.',
-          type: 'error'
-        });
-        return;
-      }
-
-      console.log('🔄 Redirigiendo a Google OAuth...');
-      window.location.href = `${API_BASE}/api/auth/google`;
-
-    } catch (err) {
-      console.error('❌ Error al verificar backend:', err);
-      setMessage({
-        text: 'No se puede conectar con el servidor. Verifica que esté corriendo en el puerto 5000.',
-        type: 'error'
-      });
-    }
+    window.location.href = `${API_BASE}/api/auth/google`;
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden">
 
-      {/* ✅ Fondo con blur — misma imagen que Login */}
+      {/* Fondo con blur */}
       <div
         className="absolute inset-0 bg-cover bg-center filter blur-sm"
         style={{ backgroundImage: "url('https://us.123rf.com/450wm/isselee/isselee2210/isselee221000042/192975949-gran-grupo-de-gatos-y-perros-mirando-a-la-c%C3%A1mara-sobre-fondo-azul.jpg?ver=6')" }}
@@ -297,7 +252,6 @@ export default function Registro() {
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            {/* ✅ Indicaciones visibles debajo del campo */}
             <p className="text-gray-400 text-xs mt-1">Mínimo 8 caracteres, letras, números y un carácter especial (@$!%*?&._#-)</p>
             {errors.password && (
               <p className="text-red-500 text-xs mt-1">{errors.password}</p>
