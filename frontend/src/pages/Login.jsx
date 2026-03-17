@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import petsBg from '../assets/image.png'; // ✅ Imagen local
 
 function Login() {
   const navigate = useNavigate();
@@ -89,10 +90,10 @@ function Login() {
   return (
     <div className="flex items-center justify-center h-screen relative overflow-hidden">
 
-      {/* Fondo con blur */}
+      {/* ✅ Fondo con imagen local */}
       <div
         className="absolute inset-0 bg-cover bg-center filter blur-sm"
-        style={{ backgroundImage: "url('https://www.petdarling.com/wp-content/uploads/2021/04/animales-domesticos-1.jpg')" }}
+        style={{ backgroundImage: `url(${petsBg})` }}
       />
 
       {/* Overlay oscuro */}
@@ -152,7 +153,6 @@ function Login() {
             {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
 
-          {/* ✅ NUEVO: Enlace olvidaste tu contraseña */}
           <p className="text-center text-sm text-gray-500">
             ¿Olvidaste tu contraseña?{' '}
             <Link to="/forgot-password" className="text-blue-500 font-semibold hover:underline">
