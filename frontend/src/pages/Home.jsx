@@ -5,7 +5,7 @@ import Sidebar from '../components/common/Sidebar';
 import RightSidebar from '../components/common/RightSidebar';
 
 import PostCard from '../components/common/PostCard';
-import FeaturedPetsMobile from '../components/common/FeaturedPetsMobile';
+
 
 export default function Home() {
   const [searchParams] = useSearchParams();
@@ -239,8 +239,6 @@ export default function Home() {
                   onComment={handleComment}
                 />
               ))}
-
-              <FeaturedPetsMobile />
             </main>
 
             {/* RightSidebar — solo desktop */}
