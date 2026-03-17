@@ -64,7 +64,7 @@ export default function Registro() {
 
     if (name === 'password') {
       if (value && value.length < 6) {
-        newErrors.password = 'Minimo 6 caracteres';
+        newErrors.password = 'Minimo 8 caracteres';
       } else {
         delete newErrors.password;
       }
@@ -271,7 +271,7 @@ export default function Registro() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Minimo 6 caracteres"
+                placeholder="Minimo 8 caracteres"
                 className={`w-full px-4 py-3 pr-12 border-2 rounded-lg text-sm focus:outline-none transition-colors ${
                   errors.password ? 'border-red-500' : 'border-gray-200 focus:border-purple-500'
                 }`}
