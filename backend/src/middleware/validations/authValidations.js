@@ -34,7 +34,7 @@ exports.registroValidation = [
   
   body('password')
     .notEmpty().withMessage('La contraseña es obligatoria')
-    .isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
+    .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres'),
   
   body('passwordConfirm')
     .notEmpty().withMessage('Debes confirmar la contraseña')
@@ -107,7 +107,7 @@ exports.changePasswordValidation = [
   
   body('newPassword')
     .notEmpty().withMessage('La nueva contraseña es obligatoria')
-    .isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres')
+    .isLength({ min: 8 }).withMessage('La nueva contraseña debe tener al menos 8 caracteres')
     .custom((value, { req }) => value !== req.body.currentPassword)
     .withMessage('La nueva contraseña debe ser diferente a la actual'),
   

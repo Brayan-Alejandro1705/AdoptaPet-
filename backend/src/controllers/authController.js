@@ -4,6 +4,7 @@
 
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // =============================================
 // FUNCIÓN DE ENVÍO DE EMAIL (CON LOGS DETALLADOS)
@@ -230,12 +231,19 @@ exports.registro = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Las contraseñas no coinciden' });
     }
 
+    // ✅ FIX: Validar longitud mínima de contraseña
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
     const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Ya existe una cuenta con este email' });
     }
 
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // ✅ FIX: Usar crypto.randomInt en lugar de Math.random()
+    const verificationCode = crypto.randomInt(100000, 999999).toString();
+    // ✅ FIX: Definir verificationExpires correctamente
     const verificationExpires = new Date(Date.now() + 15 * 60 * 1000);
 
     const user = await User.create({
@@ -422,7 +430,8 @@ exports.resendVerification = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Este email ya fue verificado.' });
     }
 
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // ✅ FIX: Usar crypto.randomInt en lugar de Math.random()
+    const newCode = crypto.randomInt(100000, 999999).toString();
     user.verificationToken = newCode;
     user.verificationTokenExpires = new Date(Date.now() + 15 * 60 * 1000);
     await user.save({ validateBeforeSave: false });

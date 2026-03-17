@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema({
         required: function() {
             return !this.googleId;
         },
-        minlength: [6, 'La contraseña debe tener al menos 6 caracteres'],
+        minlength: [8, 'La contraseña debe tener al menos 8 caracteres'],
         select: false
     },
     

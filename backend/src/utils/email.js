@@ -1,57 +1,44 @@
 // backend/src/utils/email.js
-const sendEmail = async (subject, message, send_to, sent_from, reply_to) => {
-  try {
-    const payload = {
-      from: {
-        email: process.env.EMAIL_USER || sent_from || "noreply@adoptapet.com",
-        name: "AdoptaPet Team",
-      },
-      to: [
-        {
-          email: send_to,
-        },
-      ],
-      subject: subject,
-      html: message,
-    };
+const { Resend } = require('resend');
 
-    if (reply_to) {
-      payload.reply_to = {
-        email: reply_to,
-        name: "Reply",
-      };
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+const EMAIL_FROM = `AdoptaPet <noreply@adoptapet.fun>`;
+
+// ─── Envío genérico ───────────────────────────────────────────────────────────
+const sendEmail = async (subject, html, send_to) => {
+  try {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY no está configurado');
     }
 
-    const response = await fetch("https://api.mailersend.com/v1/email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-        Authorization: `Bearer ${process.env.API_TOKEN_MAILERSEND}`,
-      },
-      body: JSON.stringify(payload),
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to:   [send_to],
+      subject,
+      html,
     });
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("❌ MailerSend API Error Details:", errorData);
-      throw new Error(`MailerSend HTTP Error: ${response.status} ${response.statusText}`);
+    if (error) {
+      console.error('❌ Resend error:', error);
+      throw new Error(`Resend error: ${error.message}`);
     }
 
-    console.log("✅ Email enviado exitosamente a:", send_to);
-    return { success: true };
+    console.log('✅ Email enviado a:', send_to, '| ID:', data.id);
+    return { success: true, id: data.id };
+
   } catch (err) {
-    console.error("❌ Error enviando email:", err.message);
-    throw new Error("Error al enviar email");
+    console.error('❌ Error enviando email:', err.message);
+    throw new Error('Error al enviar email');
   }
 };
 
-// Generar código de verificación de 6 dígitos
+// ─── Código de verificación ───────────────────────────────────────────────────
 const generateVerificationCode = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Plantilla HTML para email de verificación
+// ─── Template: verificación ───────────────────────────────────────────────────
 const getVerificationEmailTemplate = (userName, code) => {
   return `
 <!DOCTYPE html>
@@ -61,171 +48,60 @@ const getVerificationEmailTemplate = (userName, code) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Verifica tu email - AdoptaPet</title>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: 'Arial', sans-serif;
-      background-color: #f4f4f7;
-    }
-    .email-container {
-      max-width: 600px;
-      margin: 40px auto;
-      background-color: #ffffff;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    }
-    .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 40px 20px;
-      text-align: center;
-    }
-    .logo {
-      font-size: 48px;
-      margin-bottom: 10px;
-    }
-    .header-title {
-      color: #ffffff;
-      font-size: 28px;
-      font-weight: bold;
-      margin: 0;
-    }
-    .content {
-      padding: 40px 30px;
-    }
-    .greeting {
-      font-size: 20px;
-      color: #333333;
-      margin-bottom: 20px;
-    }
-    .message {
-      font-size: 16px;
-      color: #666666;
-      line-height: 1.6;
-      margin-bottom: 30px;
-    }
-    .code-container {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 12px;
-      padding: 30px;
-      text-align: center;
-      margin: 30px 0;
-    }
-    .code-label {
-      color: #ffffff;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 10px;
-    }
-    .code {
-      color: #ffffff;
-      font-size: 48px;
-      font-weight: bold;
-      letter-spacing: 8px;
-      font-family: 'Courier New', monospace;
-    }
-    .warning {
-      background-color: #fff3cd;
-      border-left: 4px solid #ffc107;
-      padding: 15px;
-      margin: 20px 0;
-      border-radius: 4px;
-    }
-    .warning-text {
-      color: #856404;
-      font-size: 14px;
-      margin: 0;
-    }
-    .footer {
-      background-color: #f8f9fa;
-      padding: 30px;
-      text-align: center;
-      border-top: 1px solid #e9ecef;
-    }
-    .footer-text {
-      color: #6c757d;
-      font-size: 14px;
-      margin: 5px 0;
-    }
-    .social-icons {
-      margin: 20px 0;
-    }
-    .social-icon {
-      display: inline-block;
-      margin: 0 10px;
-      font-size: 24px;
-      text-decoration: none;
-    }
+    body { margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f7; }
+    .email-container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center; }
+    .logo { font-size: 48px; margin-bottom: 10px; }
+    .header-title { color: #ffffff; font-size: 28px; font-weight: bold; margin: 0; }
+    .content { padding: 40px 30px; }
+    .greeting { font-size: 20px; color: #333333; margin-bottom: 20px; }
+    .message { font-size: 16px; color: #666666; line-height: 1.6; margin-bottom: 20px; }
+    .code-container { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 30px; text-align: center; margin: 30px 0; }
+    .code-label { color: #ffffff; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .code { color: #ffffff; font-size: 48px; font-weight: bold; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+    .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px; }
+    .warning-text { color: #856404; font-size: 14px; margin: 0; }
+    .footer { background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e9ecef; }
+    .footer-text { color: #6c757d; font-size: 14px; margin: 5px 0; }
   </style>
 </head>
 <body>
   <div class="email-container">
-    <!-- Header -->
     <div class="header">
       <div class="logo">🐾</div>
       <h1 class="header-title">AdoptaPet</h1>
     </div>
-
-    <!-- Content -->
     <div class="content">
       <p class="greeting">¡Hola ${userName}! 👋</p>
-      
       <p class="message">
         ¡Bienvenido/a a AdoptaPet! Estamos emocionados de tenerte en nuestra comunidad de amantes de los animales. 🎉
       </p>
-
       <p class="message">
-        Para completar tu registro y comenzar a ayudar a mascotas a encontrar un hogar, por favor verifica tu dirección de correo electrónico usando el siguiente código:
+        Para completar tu registro, verifica tu email usando el siguiente código:
       </p>
-
-      <!-- Código de verificación -->
       <div class="code-container">
         <div class="code-label">Tu código de verificación</div>
         <div class="code">${code}</div>
       </div>
-
-      <p class="message">
-        Ingresa este código en la aplicación para activar tu cuenta.
-      </p>
-
-      <!-- Advertencia -->
+      <p class="message">Ingresa este código en la aplicación para activar tu cuenta.</p>
       <div class="warning">
         <p class="warning-text">
-          ⚠️ <strong>Importante:</strong> Este código expira en 15 minutos. Si no solicitaste este código, puedes ignorar este email de forma segura.
+          ⚠️ <strong>Importante:</strong> Este código expira en 15 minutos. Si no solicitaste este código, ignora este email.
         </p>
       </div>
-
-      <p class="message">
-        Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.
-      </p>
-
-      <p class="message" style="margin-top: 30px;">
-        ¡Gracias por unirte a nuestra misión de encontrar hogares amorosos para mascotas! ❤️
-      </p>
-
-      <p class="message">
-        <strong>El equipo de AdoptaPet</strong>
-      </p>
+      <p class="message">¡Gracias por unirte a nuestra misión! ❤️</p>
+      <p class="message"><strong>El equipo de AdoptaPet</strong></p>
     </div>
-
-    <!-- Footer -->
     <div class="footer">
-      <div class="social-icons">
-        <a href="#" class="social-icon">📧</a>
-        <a href="#" class="social-icon">📱</a>
-        <a href="#" class="social-icon">🌐</a>
-      </div>
       <p class="footer-text">© 2025 AdoptaPet. Todos los derechos reservados.</p>
       <p class="footer-text">Ayudando a mascotas a encontrar hogares felices 🏡</p>
     </div>
   </div>
 </body>
-</html>
-  `;
+</html>`;
 };
 
-// Plantilla HTML para email de bienvenida
+// ─── Template: bienvenida ─────────────────────────────────────────────────────
 const getWelcomeEmailTemplate = (userName) => {
   return `
 <!DOCTYPE html>
@@ -252,12 +128,8 @@ const getWelcomeEmailTemplate = (userName) => {
     </div>
     <div class="content">
       <p class="message">¡Hola ${userName}!</p>
-      <p class="message">
-        ¡Tu email ha sido verificado exitosamente! 🎊 Ahora eres parte oficial de nuestra comunidad de amantes de los animales.
-      </p>
-      <p class="message">
-        Con tu cuenta verificada, ahora puedes:
-      </p>
+      <p class="message">¡Tu email ha sido verificado exitosamente! 🎊 Ahora eres parte oficial de nuestra comunidad.</p>
+      <p class="message">Con tu cuenta verificada, ahora puedes:</p>
       <ul class="message">
         <li>🏠 Publicar mascotas en adopción</li>
         <li>❤️ Guardar tus favoritos</li>
@@ -265,18 +137,11 @@ const getWelcomeEmailTemplate = (userName) => {
         <li>📱 Compartir historias y fotos</li>
         <li>🌟 Solicitar adopciones</li>
       </ul>
-      <p class="message">
-        ¡Estamos emocionados de tenerte con nosotros en esta misión de ayudar a las mascotas a encontrar hogares amorosos!
-      </p>
       <div style="text-align: center;">
-        <a href="https://adopta-pet-omega.vercel.app" class="button">Ir a AdoptaPet</a>
+        <a href="https://adoptapet.fun" class="button">Ir a AdoptaPet</a>
       </div>
-      <p class="message" style="margin-top: 30px;">
-        ¡Gracias por unirte! 🐾
-      </p>
-      <p class="message">
-        <strong>El equipo de AdoptaPet</strong>
-      </p>
+      <p class="message" style="margin-top: 30px;">¡Gracias por unirte! 🐾</p>
+      <p class="message"><strong>El equipo de AdoptaPet</strong></p>
     </div>
     <div class="footer">
       <p>© 2025 AdoptaPet. Todos los derechos reservados.</p>
@@ -284,53 +149,31 @@ const getWelcomeEmailTemplate = (userName) => {
     </div>
   </div>
 </body>
-</html>
-  `;
+</html>`;
 };
 
-// Enviar email de verificación
+// ─── Enviar verificación ──────────────────────────────────────────────────────
 const sendVerificationEmail = async (email, userName, code) => {
   try {
-    const htmlTemplate = getVerificationEmailTemplate(userName, code);
-    
-    await sendEmail(
-      "🐾 Verifica tu email - AdoptaPet",
-      htmlTemplate,
-      email,
-      process.env.EMAIL_USER || "noreply@adoptapet.com",
-      null
-    );
-
-    console.log('✅ Email de verificación enviado:', email);
-    console.log('   🔢 Código:', code);
-    
-    return {
-      success: true,
-      message: "Email de verificación enviado correctamente"
-    };
+    const html = getVerificationEmailTemplate(userName, code);
+    await sendEmail('🐾 Verifica tu email - AdoptaPet', html, email);
+    console.log('✅ Email de verificación enviado:', email, '| Código:', code);
+    return { success: true, message: 'Email de verificación enviado correctamente' };
   } catch (error) {
     console.error('❌ Error enviando email de verificación:', error.message);
     throw new Error('Error al enviar email de verificación');
   }
 };
 
-// Enviar email de bienvenida (después de verificación exitosa)
+// ─── Enviar bienvenida ────────────────────────────────────────────────────────
 const sendWelcomeEmail = async (email, userName) => {
   try {
-    const htmlTemplate = getWelcomeEmailTemplate(userName);
-    
-    await sendEmail(
-      "🎉 ¡Bienvenido/a a AdoptaPet!",
-      htmlTemplate,
-      email,
-      process.env.EMAIL_USER || "noreply@adoptapet.com",
-      null
-    );
-
+    const html = getWelcomeEmailTemplate(userName);
+    await sendEmail('🎉 ¡Bienvenido/a a AdoptaPet!', html, email);
     console.log('✅ Email de bienvenida enviado a:', email);
   } catch (error) {
     console.error('❌ Error enviando email de bienvenida:', error.message);
-    // No lanzar error para no interrumpir el flujo
+    // No interrumpir el flujo si falla
   }
 };
 

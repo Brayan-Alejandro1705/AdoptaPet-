@@ -6,7 +6,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 // ✅ IMPORTANTE: debe coincidir con el secreto usado al firmar tokens en server.js
-const JWT_SECRET = process.env.JWT_SECRET || 'adoptapet_secreto_super_seguro_2025';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET no está definido en .env');
 
 // =============================================
 // PROTEGER RUTAS - Verificar JWT Token (Header o Cookie)
