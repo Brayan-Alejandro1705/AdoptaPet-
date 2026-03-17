@@ -31,7 +31,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // ============================================
-// 1. CORS (CORREGIDO PARA VERCEL PREVIEW + EXPRESS 5)
+// 1. CORS
 // ============================================
 const corsOptions = {
   origin: function (origin, callback) {
@@ -62,10 +62,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// ✅ CORRECCIÓN CLAVE: regex en lugar de '*' (incompatible con Express 5)
 app.options(/(.*)/, cors(corsOptions));
-
 console.log('✅ CORS configurado con soporte para uploads');
 
 // ============================================
@@ -229,12 +226,11 @@ try {
 })();
 
 // ============================================
-// 9. SOCKET.IO (CHAT TIEMPO REAL)
+// 9. SOCKET.IO — CHAT EN TIEMPO REAL (CORREGIDO)
 // ============================================
 let io;
 
 try {
-
   const { Server } = require("socket.io");
 
   io = new Server(server, {
@@ -245,77 +241,149 @@ try {
   });
 
   services.socketLoaded = true;
-
   app.set('io', io);
-
   console.log('✅ Socket.io inicializado correctamente');
 
-
-  // ===============================
-  // USUARIOS CONECTADOS
-  // ===============================
+  // Mapa userId -> socketId para presencia online
   const onlineUsers = new Map();
 
-
   io.on("connection", (socket) => {
-
     console.log("🟢 Usuario conectado:", socket.id);
 
-
-    // registrar usuario
+    // ─── Registrar usuario y notificar presencia ───────────────────────────
     socket.on("register", (userId) => {
+      const uid = String(userId);
+      onlineUsers.set(uid, socket.id);
+      socket.userId = uid; // guardar en el socket para usarlo al desconectar
+      console.log("👤 Usuario registrado en socket:", uid);
 
-      onlineUsers.set(userId, socket.id);
+      // Notificar a todos que este usuario está online
+      socket.broadcast.emit("user_online", { userId: uid });
 
-      console.log("👤 Usuario registrado en socket:", userId);
-
+      // Enviar lista completa de online al usuario que se acaba de conectar
+      const onlineIds = Array.from(onlineUsers.keys());
+      socket.emit("online_users", { userIds: onlineIds });
     });
 
+    // ─── Unirse a la sala de un chat ───────────────────────────────────────
+    socket.on("join_chat", (chatId) => {
+      socket.join(String(chatId));
+      console.log(`🚪 Socket ${socket.id} unido al chat: ${chatId}`);
+    });
 
-    // ===============================
-    // MENSAJE EN TIEMPO REAL
-    // ===============================
-    socket.on("sendMessage", (data) => {
+    // ─── Obtener usuarios online ───────────────────────────────────────────
+    socket.on("get_online_users", () => {
+      const onlineIds = Array.from(onlineUsers.keys());
+      socket.emit("online_users", { userIds: onlineIds });
+    });
 
-      const { receiverId } = data;
+    // ─── ENVIAR MENSAJE ────────────────────────────────────────────────────
+    socket.on("send_message", async ({ chatId, senderId, text }) => {
+      try {
+        const Message = require('./src/models/Message');
+        const Chat    = require('./src/models/Chat');
 
-      const receiverSocket = onlineUsers.get(receiverId);
+        // ✅ Usar los campos correctos del modelo: "chat" y "sender"
+        const saved = await Message.create({
+          chat:   chatId,   // el modelo usa "chat", no "chatId"
+          sender: senderId, // el modelo usa "sender", no "senderId"
+          text,
+          status: 'sent'
+        });
 
-      if (receiverSocket) {
+        // ✅ Actualizar lastMessage del chat
+        await Chat.findByIdAndUpdate(chatId, {
+          lastMessage: text,
+          updatedAt: new Date()
+        });
 
-        io.to(receiverSocket).emit("newMessage", data);
+        const payload = {
+          ...saved.toObject(),
+          id:       saved._id.toString(),
+          _id:      saved._id.toString(),
+          chatId:   String(chatId),   // el frontend espera chatId
+          senderId: String(senderId), // el frontend espera senderId
+          time:     new Date(saved.createdAt).toLocaleTimeString('es-ES', {
+                      hour: '2-digit', minute: '2-digit'
+                    }),
+          status: 'sent'
+        };
 
+        // ✅ Emitir a todos en la sala del chat
+        io.to(String(chatId)).emit("receive_message", payload);
+
+        console.log(`💬 Mensaje guardado y emitido en chat ${chatId}`);
+
+      } catch (err) {
+        console.error('❌ Error guardando mensaje:', err.message);
+        socket.emit('message_error', { error: 'No se pudo guardar el mensaje' });
       }
-
     });
 
+    // ─── Marcar mensajes como leídos ──────────────────────────────────────
+    socket.on("mark_read", async ({ chatId, readerId }) => {
+      try {
+        const Message = require('./src/models/Message');
 
-    // ===============================
-    // USUARIO DESCONECTADO
-    // ===============================
+        // ✅ Usar los campos correctos del modelo: "chat" y "sender"
+        await Message.updateMany(
+          {
+            chat:   chatId,              // el modelo usa "chat"
+            sender: { $ne: readerId },   // el modelo usa "sender"
+            status: { $ne: 'read' }
+          },
+          {
+            status: 'read',
+            read:   true,                // el modelo tiene este campo también
+            readAt: new Date()
+          }
+        );
+
+        const readAt = new Date().toISOString();
+
+        // Notificar a todos en el chat que los mensajes fueron leídos
+        io.to(String(chatId)).emit("messages_read", { chatId, readAt });
+
+        // Actualizar contador de no leídos para el lector
+        const unreadCount = await Message.countDocuments({
+          sender: { $ne: readerId },
+          status: { $ne: 'read' }
+        });
+
+        socket.emit("unread_count", {
+          chatUnreadCount: unreadCount,
+          unreadByChat: {}
+        });
+
+      } catch (err) {
+        console.error('❌ Error marcando mensajes como leídos:', err.message);
+      }
+    });
+
+    // ─── Desconexión ──────────────────────────────────────────────────────
     socket.on("disconnect", () => {
-
-      for (let [userId, socketId] of onlineUsers.entries()) {
-
-        if (socketId === socket.id) {
-          onlineUsers.delete(userId);
-          break;
+      const uid = socket.userId;
+      if (uid) {
+        onlineUsers.delete(uid);
+        socket.broadcast.emit("user_offline", { userId: uid });
+        console.log(`🔴 Usuario desconectado: ${uid} (${socket.id})`);
+      } else {
+        // Búsqueda por socketId como fallback
+        for (const [userId, socketId] of onlineUsers.entries()) {
+          if (socketId === socket.id) {
+            onlineUsers.delete(userId);
+            socket.broadcast.emit("user_offline", { userId });
+            break;
+          }
         }
-
+        console.log("🔴 Socket desconectado:", socket.id);
       }
-
-      console.log("🔴 Usuario desconectado:", socket.id);
-
     });
-
   });
 
 } catch (error) {
-
   console.error('❌ Error al cargar Socket.io:', error.message);
-
   console.log('⚠️  El chat no estará disponible');
-
 }
 
 // ============================================
@@ -502,16 +570,14 @@ try {
 }
 
 // ============================================
-// RUTAS DE USUARIOS ✅ CORREGIDO
+// RUTAS DE USUARIOS
 // ============================================
 try {
   console.log('\n👤 Cargando rutas de usuarios...');
   const userRoutes = require('./src/routes/userRoutes');
-  
-  if (!userRoutes) {
-    throw new Error('userRoutes no está exportado correctamente');
-  }
-  
+
+  if (!userRoutes) throw new Error('userRoutes no está exportado correctamente');
+
   app.use('/api/users/avatar', uploadLimiter);
   app.use('/api/users', userRoutes);
   console.log('✅ Rutas de usuarios cargadas correctamente');
@@ -569,8 +635,6 @@ try {
   try {
     applicationRoutes = require('./src/routes/applicationRoutes');
   } catch (loadError) {
-    // Si el archivo no existe, crear una ruta placeholder
-    const express = require('express');
     const placeholderRouter = express.Router();
     placeholderRouter.get('/', (req, res) => {
       res.json({ success: true, message: 'Rutas de solicitudes de adopción no configuradas aún' });
@@ -578,7 +642,6 @@ try {
     applicationRoutes = placeholderRouter;
     console.log('   ⏸️  Usando placeholder para solicitudes de adopción');
   }
-  
   app.use('/api/applications', applicationRoutes);
   console.log('✅ Rutas de solicitudes de adopción cargadas');
 } catch (error) {
@@ -609,18 +672,19 @@ try {
   const chatRoutes = require('./src/routes/chatRoutes');
   app.use('/api/chat', chatRoutes);
   console.log('✅ Rutas de chat cargadas');
-  console.log('   📨 GET /api/chat');
+  console.log('   📨 GET  /api/chat');
+  console.log('   💬 GET  /api/chat/:id/messages');
   console.log('   💬 POST /api/chat/:id/messages');
 } catch (error) {
   console.error('⚠️  Error cargando rutas de chat:', error.message);
 }
 
 // ============================================
-// RUTAS DE FAVORITOS - ✅ VERSIÓN CORREGIDA
+// RUTAS DE FAVORITOS
 // ============================================
 try {
   console.log('\n⭐ Cargando rutas de favoritos...');
-  
+
   let favoritesRoutes;
   try {
     favoritesRoutes = require('./src/routes/favoritos');
@@ -629,15 +693,12 @@ try {
     console.error('   ❌ Error al cargar archivo:', loadError.message);
     throw loadError;
   }
-  
-  if (!favoritesRoutes) {
-    throw new Error('favoritesRoutes es null o undefined - verifica module.exports');
-  }
-  
+
+  if (!favoritesRoutes) throw new Error('favoritesRoutes es null o undefined');
   if (typeof favoritesRoutes !== 'object' && typeof favoritesRoutes !== 'function') {
-    throw new Error(`favoritesRoutes debe ser un objeto o función, pero es: ${typeof favoritesRoutes}`);
+    throw new Error(`favoritesRoutes debe ser objeto o función, es: ${typeof favoritesRoutes}`);
   }
-  
+
   app.use('/api/favoritos', favoritesRoutes);
   console.log('✅ Rutas de favoritos cargadas correctamente');
   console.log('   🔍 GET    /api/favoritos/check/:postId');
@@ -652,9 +713,7 @@ try {
   console.error('   Mensaje:', error.message);
   console.error('   Archivo esperado: ./src/routes/favoritos.js');
   console.error('   Verifica que el archivo exista y tenga: module.exports = router;');
-  if (process.env.NODE_ENV === 'development') {
-    console.error('   Stack:', error.stack);
-  }
+  if (process.env.NODE_ENV === 'development') console.error('   Stack:', error.stack);
   process.exit(1);
 }
 
@@ -666,12 +725,19 @@ try {
   const notificationRoutes = require('./src/routes/Notificationroutes');
   app.use('/api/notifications', notificationRoutes);
   console.log('✅ Rutas de notificaciones cargadas');
+  console.log('   📬 GET    /api/notifications');
+  console.log('   📊 GET    /api/notifications/unread-count');
+  console.log('   ✅ PUT    /api/notifications/:id/read');
+  console.log('   ✅ PUT    /api/notifications/mark-all-read');
+  console.log('   🗑️  DELETE /api/notifications/clear-read');
+  console.log('   🗑️  DELETE /api/notifications/:id');
+  console.log('   🗑️  DELETE /api/notifications');
 } catch (error) {
   console.error('⚠️  Error cargando rutas de notificaciones:', error.message);
 }
 
 // ============================================
-// RUTAS DE IA - GOOGLE GEMINI
+// RUTAS DE IA — GOOGLE GEMINI
 // ============================================
 try {
   console.log('\n🤖 Cargando rutas de IA (Google Gemini)...');
@@ -720,7 +786,7 @@ app.use((err, req, res, next) => {
   if (err.name === 'ValidationError') {
     return res.status(400).json({ success: false, message: 'Error de validación', errors: Object.values(err.errors).map(e => e.message) });
   }
-  if (err.name === 'CastError') return res.status(400).json({ success: false, message: 'ID inválido' });
+  if (err.name === 'CastError')  return res.status(400).json({ success: false, message: 'ID inválido' });
   if (err.code === 11000) {
     const field = Object.keys(err.keyPattern)[0];
     return res.status(400).json({ success: false, message: `El ${field} ya está registrado` });
@@ -778,9 +844,7 @@ const gracefulShutdown = (signal) => {
   server.close(async () => {
     console.log('✅ Servidor HTTP cerrado');
     if (services.socketLoaded && io) {
-      io.close(() => {
-        console.log('✅ Socket.io cerrado');
-      });
+      io.close(() => console.log('✅ Socket.io cerrado'));
     }
     if (services.mongoConnected) {
       try {
@@ -801,7 +865,7 @@ const gracefulShutdown = (signal) => {
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
 process.on('unhandledRejection', (reason) => {
   console.error('❌ Unhandled Rejection:', reason);
 });
