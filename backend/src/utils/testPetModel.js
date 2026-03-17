@@ -257,10 +257,7 @@ async function testPetModel() {
         // =============================================
         console.log('\n🔍 === PRUEBA 6: BUSCAR MASCOTAS ===');
         
-        // Buscar todas las mascotas de prueba
-        const allPets = await Pet.find({
-            name: { $regex: 'Max|Luna|Rocky', $options: 'i' }
-        });
+       
         
         console.log(`✅ Mascotas encontradas: ${allPets.length}`);
         
@@ -297,10 +294,7 @@ async function testPetModel() {
         const urgentPets = await Pet.find({ urgent: true });
         console.log(`🚨 Mascotas urgentes: ${urgentPets.length}`);
         
-        // Buscar mascotas destacadas
-        const featuredPets = await Pet.find({ featured: true });
-        console.log(`⭐ Mascotas destacadas: ${featuredPets.length}`);
-        
+       
         // =============================================
         // LIMPIEZA: ELIMINAR MASCOTAS DE PRUEBA
         // =============================================
