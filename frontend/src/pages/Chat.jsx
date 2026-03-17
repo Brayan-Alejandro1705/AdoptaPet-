@@ -16,7 +16,7 @@ export default function Chat() {
   const [showChatList, setShowChatList] = useState(false);
 
   const socket = useSocket();
-  const socketRef = useRef(null); // ref para siempre tener el socket más reciente
+  const socketRef = useRef(null);
   const [searchParams] = useSearchParams();
 
   const targetChatId = searchParams.get('chat');
@@ -26,7 +26,7 @@ export default function Chat() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const currentUserId = String(user?.id || user?._id || '');
 
-  // ✅ FIX: mantener socketRef siempre actualizado
+  // Mantener socketRef siempre actualizado
   useEffect(() => {
     if (socket) {
       socketRef.current = socket;
@@ -91,7 +91,7 @@ export default function Chat() {
     loadChats();
   }, []);
 
-  // ✅ FIX: enviar autoMsg cuando el socket esté disponible
+  // Enviar autoMsg cuando el socket esté disponible
   useEffect(() => {
     const s = socketRef.current;
     if (!autoMsg || !selectedChat || !s || !s.connected || autoMsgSentRef.current) return;
@@ -101,10 +101,23 @@ export default function Chat() {
 
     const timer = setTimeout(() => {
       const text = decodeURIComponent(autoMsg);
+
+      // Agregar el autoMsg localmente también
+      const tempMessage = {
+        id: `temp-auto-${Date.now()}`,
+        _id: `temp-auto-${Date.now()}`,
+        text,
+        senderId: currentUserId,
+        sender: 'me',
+        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        status: 'sent',
+      };
+      setMessages((prev) => [...prev, tempMessage]);
+
       s.emit('send_message', {
         chatId,
         senderId: currentUserId,
-        text
+        text,
       });
       autoMsgSentRef.current = true;
     }, 800);
@@ -145,15 +158,22 @@ export default function Chat() {
     const handleNewMessage = (message) => {
       const senderId = String(message.senderId || message.sender?._id || message.sender?.id || '');
 
+      // ✅ FIX PRINCIPAL: ignorar mensajes propios que llegan del servidor
+      // porque ya los agregamos localmente al momento de enviarlos
+      if (senderId === currentUserId) return;
+
       const formattedMessage = {
         ...message,
         senderId,
-        sender: senderId === currentUserId ? 'me' : 'other'
+        sender: 'other',
+        time:
+          message.time ||
+          new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, formattedMessage]);
 
-      if (senderId && senderId !== currentUserId) {
+      if (senderId) {
         setChats((prev) =>
           prev.map((c) => {
             if (getChatId(c) !== chatId) return c;
@@ -170,12 +190,9 @@ export default function Chat() {
         prev.map((c) => (getChatId(c) === chatId ? { ...c, lastMessage: message.text } : c))
       );
 
-      const esDelOtro = senderId && senderId !== currentUserId;
-      const chatAbierto = selectedChat && getChatId(selectedChat) === chatId;
-      if (chatAbierto && esDelOtro) {
-        markChatAsRead(chatId);
-        markIncomingAsReadLocally();
-      }
+      // Marcar como leídos los mensajes del otro
+      markChatAsRead(chatId);
+      markIncomingAsReadLocally();
     };
 
     s.on('receive_message', handleNewMessage);
@@ -195,13 +212,19 @@ export default function Chat() {
     const handleUserOnline = ({ userId }) => {
       const uid = String(userId);
       setChats((prev) => prev.map((c) => (getOtherUserId(c) === uid ? { ...c, online: true } : c)));
-      setSelectedChat((prev) => (prev && getOtherUserId(prev) === uid ? { ...prev, online: true } : prev));
+      setSelectedChat((prev) =>
+        prev && getOtherUserId(prev) === uid ? { ...prev, online: true } : prev
+      );
     };
 
     const handleUserOffline = ({ userId }) => {
       const uid = String(userId);
-      setChats((prev) => prev.map((c) => (getOtherUserId(c) === uid ? { ...c, online: false } : c)));
-      setSelectedChat((prev) => (prev && getOtherUserId(prev) === uid ? { ...prev, online: false } : prev));
+      setChats((prev) =>
+        prev.map((c) => (getOtherUserId(c) === uid ? { ...c, online: false } : c))
+      );
+      setSelectedChat((prev) =>
+        prev && getOtherUserId(prev) === uid ? { ...prev, online: false } : prev
+      );
     };
 
     s.on('online_users', handleOnlineUsers);
@@ -264,17 +287,33 @@ export default function Chat() {
 
       const formatted = (data || []).map((m) => {
         const senderId = String(m.senderId || m.sender?._id || m.sender?.id || '');
-        return { ...m, senderId, sender: senderId === currentUserId ? 'me' : 'other' };
+        return {
+          ...m,
+          senderId,
+          sender: senderId === currentUserId ? 'me' : 'other',
+          time:
+            m.time ||
+            (m.createdAt
+              ? new Date(m.createdAt).toLocaleTimeString('es-ES', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : ''),
+        };
       });
 
       setMessages(formatted);
       markChatAsRead(chatId);
       markIncomingAsReadLocally();
 
-      const otherFromMessages = formatted.find((m) => m.senderId && m.senderId !== currentUserId)?.senderId;
+      const otherFromMessages = formatted.find(
+        (m) => m.senderId && m.senderId !== currentUserId
+      )?.senderId;
       if (otherFromMessages) {
         setChats((prev) =>
-          prev.map((c) => (getChatId(c) === chatId ? { ...c, __otherUserId: otherFromMessages } : c))
+          prev.map((c) =>
+            getChatId(c) === chatId ? { ...c, __otherUserId: otherFromMessages } : c
+          )
         );
         setSelectedChat((prev) => {
           const base = prev || chatObj;
@@ -289,46 +328,68 @@ export default function Chat() {
     }
   };
 
-  // ✅ FIX PRINCIPAL: usar socketRef.current para garantizar acceso al socket
-  const handleSendMessage = useCallback((text) => {
-    if (!text || !text.trim()) return;
+  // ✅ FIX PRINCIPAL: agregar mensaje localmente al momento de enviarlo
+  const handleSendMessage = useCallback(
+    (text) => {
+      if (!text || !text.trim()) return;
 
-    if (!selectedChat) {
-      console.error('❌ No hay chat seleccionado');
-      return;
-    }
+      if (!selectedChat) {
+        console.error('❌ No hay chat seleccionado');
+        return;
+      }
 
-    const s = socketRef.current;
-    if (!s) {
-      console.error('❌ Socket no disponible');
-      return;
-    }
+      const s = socketRef.current;
+      if (!s) {
+        console.error('❌ Socket no disponible');
+        return;
+      }
 
-    if (!s.connected) {
-      console.error('❌ Socket no conectado, intentando reconectar...');
-      s.connect();
-      // Reintentar después de un breve delay
-      setTimeout(() => {
-        if (s.connected) {
-          s.emit('send_message', {
-            chatId: getChatId(selectedChat),
-            senderId: currentUserId,
-            text: text.trim()
-          });
-        }
-      }, 1000);
-      return;
-    }
+      if (!s.connected) {
+        console.error('❌ Socket no conectado, intentando reconectar...');
+        s.connect();
+        setTimeout(() => {
+          if (s.connected) {
+            s.emit('send_message', {
+              chatId: getChatId(selectedChat),
+              senderId: currentUserId,
+              text: text.trim(),
+            });
+          }
+        }, 1000);
+        return;
+      }
 
-    const chatId = getChatId(selectedChat);
-    console.log('📤 Enviando mensaje:', { chatId, senderId: currentUserId, text: text.trim() });
+      const chatId = getChatId(selectedChat);
+      console.log('📤 Enviando mensaje:', { chatId, senderId: currentUserId, text: text.trim() });
 
-    s.emit('send_message', {
-      chatId,
-      senderId: currentUserId,
-      text: text.trim()
-    });
-  }, [selectedChat, currentUserId]);
+      // ✅ Agregar el mensaje localmente de inmediato (optimistic update)
+      const tempMessage = {
+        id: `temp-${Date.now()}`,
+        _id: `temp-${Date.now()}`,
+        text: text.trim(),
+        senderId: currentUserId,
+        sender: 'me',
+        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        status: 'sent',
+      };
+      setMessages((prev) => [...prev, tempMessage]);
+
+      // Actualizar lastMessage en la lista de chats
+      setChats((prev) =>
+        prev.map((c) =>
+          getChatId(c) === chatId ? { ...c, lastMessage: text.trim() } : c
+        )
+      );
+
+      // Emitir al servidor
+      s.emit('send_message', {
+        chatId,
+        senderId: currentUserId,
+        text: text.trim(),
+      });
+    },
+    [selectedChat, currentUserId]
+  );
 
   const handleSelectChat = async (chat) => {
     setSelectedChat(chat);
@@ -359,18 +420,26 @@ export default function Chat() {
         <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="max-w-7xl mx-auto px-3 md:px-4 pt-4 md:pt-6">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
-              <div className="hidden md:block md:col-span-3"><Sidebar /></div>
+              <div className="hidden md:block md:col-span-3">
+                <Sidebar />
+              </div>
               <main className="col-span-1 md:col-span-9">
                 <div className="bg-white rounded-xl shadow-lg p-8 text-center">
                   <div className="text-6xl mb-4">💬</div>
-                  <h2 className="text-2xl font-bold text-gray-700 mb-2">No tienes conversaciones</h2>
-                  <p className="text-gray-500">Cuando contactes a alguien sobre una mascota, tus chats aparecerán aquí</p>
+                  <h2 className="text-2xl font-bold text-gray-700 mb-2">
+                    No tienes conversaciones
+                  </h2>
+                  <p className="text-gray-500">
+                    Cuando contactes a alguien sobre una mascota, tus chats aparecerán aquí
+                  </p>
                 </div>
               </main>
             </div>
           </div>
         </div>
-        <div className="shrink-0"><BottomNav /></div>
+        <div className="shrink-0">
+          <BottomNav />
+        </div>
       </div>
     );
   }
@@ -382,15 +451,29 @@ export default function Chat() {
       <div className="flex-1 min-h-0">
         <div className="max-w-7xl mx-auto px-3 md:px-4 pt-4 md:pt-6 h-full">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 h-full min-h-0">
-            <div className="hidden md:block md:col-span-3 h-full min-h-0"><Sidebar /></div>
+            <div className="hidden md:block md:col-span-3 h-full min-h-0">
+              <Sidebar />
+            </div>
 
             <main className="col-span-1 md:col-span-9 h-full min-h-0">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 h-full min-h-0">
-                <div className={`${showChatList ? 'block' : 'hidden'} md:block md:col-span-4 h-full min-h-0`}>
-                  <ChatList chats={chats} selectedChat={selectedChat} onSelectChat={handleSelectChat} />
+                <div
+                  className={`${
+                    showChatList ? 'block' : 'hidden'
+                  } md:block md:col-span-4 h-full min-h-0`}
+                >
+                  <ChatList
+                    chats={chats}
+                    selectedChat={selectedChat}
+                    onSelectChat={handleSelectChat}
+                  />
                 </div>
 
-                <div className={`${showChatList ? 'hidden' : 'block'} md:block col-span-1 md:col-span-8 h-full min-h-0`}>
+                <div
+                  className={`${
+                    showChatList ? 'hidden' : 'block'
+                  } md:block col-span-1 md:col-span-8 h-full min-h-0`}
+                >
                   {selectedChat ? (
                     <ChatWindow
                       chat={selectedChat}
@@ -410,7 +493,9 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="shrink-0"><BottomNav /></div>
+      <div className="shrink-0">
+        <BottomNav />
+      </div>
     </div>
   );
 }
