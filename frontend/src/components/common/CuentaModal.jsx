@@ -228,7 +228,7 @@ const CuentaModal = ({ isOpen, onClose }) => {
           >
 
             <span className="text-lg font-medium text-red-600">
-              Desactivar cuenta
+              Eliminar cuenta
             </span>
 
             <svg
@@ -396,7 +396,7 @@ const DeactivateModal = ({
             <span className="text-2xl">⚠️</span>
 
             <h3 className="text-xl font-bold">
-              Desactivar Cuenta
+              Eliminar Cuenta
             </h3>
 
             <button
