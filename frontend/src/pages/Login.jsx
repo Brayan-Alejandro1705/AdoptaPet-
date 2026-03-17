@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import petsBg from '../assets/image.png'; // ✅ Imagen local
+import petsBg from '../assets/65555.jpg'; // ✅ Imagen local
 
 function Login() {
   const navigate = useNavigate();
