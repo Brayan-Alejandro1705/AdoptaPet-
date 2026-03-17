@@ -418,7 +418,7 @@ const DeactivateModal = ({
             onChange={(e) => onReasonChange(e.target.value)}
             className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
             rows={4}
-            placeholder="Motivo de desactivación"
+            placeholder="Motivo de eliminación"
           />
 
           <div className="flex gap-3">
