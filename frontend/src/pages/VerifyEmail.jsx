@@ -146,8 +146,18 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+
+      {/* Fondo con imagen y blur — igual que Login y Registro */}
+      <div
+        className="absolute inset-0 bg-cover bg-center filter blur-sm"
+        style={{ backgroundImage: "url('https://us.123rf.com/450wm/isselee/isselee2210/isselee221000042/192975949-gran-grupo-de-gatos-y-perros-mirando-a-la-c%C3%A1mara-sobre-fondo-azul.jpg?ver=6')" }}
+      />
+      {/* Overlay oscuro para legibilidad */}
+      <div className="absolute inset-0 bg-black/40" />
+
+      {/* Contenido */}
+      <div className="relative z-10 max-w-md w-full">
         <div className="bg-white rounded-3xl shadow-2xl p-8">
 
           <div className="text-center mb-8">
@@ -224,7 +234,7 @@ export default function VerifyEmail() {
           </div>
         </div>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
+        <div className="mt-6 text-center text-sm text-white drop-shadow">
           <p>⏰ El código expira en 15 minutos</p>
           <p className="mt-2">🔒 Revisa también tu carpeta de spam</p>
         </div>

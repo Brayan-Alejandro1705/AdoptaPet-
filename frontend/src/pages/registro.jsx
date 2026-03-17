@@ -202,11 +202,16 @@ export default function Registro() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-5 bg-cover bg-center bg-fixed relative"
-      style={{ backgroundImage: "url('https://www.petdarling.com/wp-content/uploads/2021/04/animales-domesticos-1.jpg')" }}
-    >
-      <div className="absolute inset-0 bg-black bg-opacity-50"></div>
+    <div className="min-h-screen flex items-center justify-center p-5 relative overflow-hidden">
+
+      {/* ✅ Fondo con blur — misma imagen que Login */}
+      <div
+        className="absolute inset-0 bg-cover bg-center filter blur-sm"
+        style={{ backgroundImage: "url('https://us.123rf.com/450wm/isselee/isselee2210/isselee221000042/192975949-gran-grupo-de-gatos-y-perros-mirando-a-la-c%C3%A1mara-sobre-fondo-azul.jpg?ver=6')" }}
+      />
+
+      {/* Overlay oscuro */}
+      <div className="absolute inset-0 bg-black bg-opacity-50" />
 
       <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full">
 
