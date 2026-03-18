@@ -428,7 +428,7 @@ const DeactivateModal = ({
               disabled={loading}
               className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
             >
-              {loading ? 'Desactivando...' : 'Desactivar'}
+              {loading ? 'Desactivando...' : 'Eliminar'}
             </button>
 
           </div>
