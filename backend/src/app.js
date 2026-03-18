@@ -1,143 +1,405 @@
-// =============================================
-// APLICACIÓN PRINCIPAL - Adoptapet BACKEND
-// =============================================
+// backend/src/controllers/aiController.js
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-require('dotenv').config(); // Cargar variables de entorno PRIMERO
-const express = require('express');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
-const {connectDB} = require('./config/database');
-const { globalErrorHandler, AppError } = require('./middleware/errorHandler');
-
-console.log('🚀 Iniciando Adoptapet Backend...');
-
-// Crear aplicación Express
-const app = express();
-
-// =============================================
-// MIDDLEWARE DE LOGGING (solo en desarrollo)
-// =============================================
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    const method = req.method;
-    const url = req.originalUrl;
-    const ip = req.ip || req.connection.remoteAddress;
-    console.log(`📡 ${timestamp} - ${method} ${url} - IP: ${ip}`);
-    next();
-  });
+// Inicializar Gemini
+let genAI;
+let model;
+try {
+  genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+  model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  console.log('✅ Gemini SDK inicializado correctamente');
+} catch (error) {
+  console.error('❌ Error inicializando Gemini:', error.message);
+  genAI = null;
+  model = null;
 }
 
-// =============================================
-// CONFIGURACIÓN CORS
-// =============================================
-const allowedOrigins = process.env.NODE_ENV === 'production'
-    ? [process.env.FRONTEND_URL]
-    : ['http://localhost:3000'];
-
-app.use(cors({
-    origin: function(origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
+// Helper para llamar a Gemini
+const callGemini = async (prompt, temperature = 0.7) => {
+  const result = await model.generateContent({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature,
+      maxOutputTokens: 2000,
     },
-    credentials: true
-}));
-// =============================================
-// MIDDLEWARE DE PARSEO
-// =============================================
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
+  });
+  return result.response.text();
+};
 
-// =============================================
-// CONECTAR A MONGODB ATLAS
-// =============================================
-connectDB();
+// 1. IDENTIFICAR RAZA DE MASCOTA POR IMAGEN
+const identifyPetBreed = async (req, res) => {
+  try {
+    console.log('🔍 Identificando raza de mascota...');
 
-// =============================================
-// RUTAS DE LA API
-// =============================================
+    const { imageUrl, imageBase64 } = req.body;
 
-// Ruta raíz - Información general
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: '🐾 Adoptapet API funcionando correctamente',
-    version: process.env.APP_VERSION || '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/v1/auth',
-      pets: '/api/v1/pets',
-      shelters: '/api/v1/shelters'
+    if (!imageUrl && !imageBase64) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere imageUrl o imageBase64'
+      });
     }
-  });
-});
 
-// Ruta de salud básica
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Adoptapet Backend está funcionando correctamente',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
-});
+    if (!model) {
+      return res.status(500).json({
+        success: false,
+        message: 'El servicio de IA no está disponible.'
+      });
+    }
 
-// Ruta de health detallado
-app.get('/api/health', (req, res) => {
-  const mongoose = require('mongoose');
-  const dbStates = {
-    0: 'Disconnected',
-    1: 'Connected',
-    2: 'Connecting',
-    3: 'Disconnecting'
-  };
+    // Gemini sí soporta imágenes con base64
+    if (imageBase64) {
+      const imagePart = {
+        inlineData: {
+          data: imageBase64.replace(/^data:image\/\w+;base64,/, ''),
+          mimeType: 'image/jpeg'
+        }
+      };
 
-  res.json({
-    success: true,
-    timestamp: new Date().toISOString(),
-    service: 'Adoptapet API',
-    version: process.env.APP_VERSION || '1.0.0',
-    database: {
-      status: dbStates[mongoose.connection.readyState],
-      name: mongoose.connection.nombre || 'No conectado'
-    },
-    uptime: `${Math.floor(process.uptime())} segundos`
-  });
-});
+      const prompt = `Analiza esta imagen de una mascota y responde SOLO en formato JSON válido:
+{
+  "animal": "perro/gato/otro",
+  "raza": "nombre de la raza",
+  "razasProbables": ["raza1", "raza2"],
+  "confianza": 85,
+  "edad": "estimado",
+  "tamaño": "pequeño/mediano/grande",
+  "caracteristicas": ["característica1", "característica2"]
+}`;
 
-// Rutas principales
-const authRoutes = require('../src/routes/authRoutes');
-const userRoutes = require('../src/routes/userRoutes');  
-const petRoutes = require('../src/routes/petRoutes');
-const shelterRoutes = require('../src/routes/shelterRoutes');
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [imagePart, { text: prompt }] }]
+      });
 
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/pets', petRoutes);
-app.use('/api/v1/shelters', shelterRoutes);
+      const text = result.response.text();
+      const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
-// TODO: Agregar más rutas aquí
-// app.use('/api/v1/adoptions', adoptionRoutes);
-// app.use('/api/v1/posts', postRoutes);
-// app.use('/api/v1/comments', commentRoutes);
+      let breedData;
+      try {
+        breedData = JSON.parse(cleanText);
+      } catch {
+        breedData = { animal: 'desconocido', raza: 'No identificado', razasProbables: [], confianza: 0 };
+      }
 
-// =============================================
-// MANEJO DE RUTAS NO ENCONTRADAS
-// =============================================
-app.use((req, res, next) => {
-  next(new AppError(`No se puede encontrar ${req.originalUrl} en este servidor`, 404));
-});
+      return res.json({ success: true, data: breedData });
+    }
 
-// =============================================
-// MIDDLEWARE GLOBAL DE MANEJO DE ERRORES
-// =============================================
-app.use(globalErrorHandler);
+    // Si solo hay URL, respuesta básica
+    return res.json({
+      success: true,
+      data: {
+        animal: 'desconocido',
+        raza: 'Envía la imagen en base64 para identificarla',
+        razasProbables: [],
+        confianza: 0,
+        edad: 'desconocida',
+        tamaño: 'desconocido',
+        caracteristicas: ['Por favor describe la mascota en el chat']
+      }
+    });
 
-module.exports = app;
+  } catch (error) {
+    console.error('❌ Error identificando mascota:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al identificar la mascota',
+      error: error.message
+    });
+  }
+};
 
+// 2. OBTENER CONSEJOS SOBRE UNA MASCOTA
+const getPetAdvice = async (req, res) => {
+  try {
+    console.log('💡 Generando consejos para mascota...');
+
+    if (!model) {
+      return res.status(500).json({
+        success: false,
+        message: 'El servicio de IA no está disponible. Intenta de nuevo más tarde.'
+      });
+    }
+
+    const { species, breed, age, size, healthIssues, temperament } = req.body;
+
+    if (!species) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere el tipo de animal'
+      });
+    }
+
+    const prompt = `Eres un veterinario experto. Dame consejos detallados sobre esta mascota:
+
+Animal: ${species}
+Raza: ${breed || 'Mestizo'}
+Edad: ${age || 'Desconocida'}
+Tamaño: ${size || 'Desconocido'}
+${healthIssues ? 'Problemas de salud: ' + healthIssues : ''}
+${temperament ? 'Temperamento: ' + temperament : ''}
+
+Responde SOLO en formato JSON válido:
+{
+  "cuidadoGeneral": {
+    "alimentacion": "consejos",
+    "ejercicio": "necesidades",
+    "aseo": "cuidados"
+  },
+  "salud": {
+    "vacunas": "recomendadas",
+    "chequeos": "frecuencia",
+    "prevencion": "prevención"
+  },
+  "comportamiento": {
+    "socializacion": "consejos",
+    "entrenamiento": "tips",
+    "enriquecimiento": "actividades"
+  },
+  "advertencias": ["advertencia1", "advertencia2"],
+  "consejosEspecificos": ["consejo1", "consejo2", "consejo3"]
+}`;
+
+    const text = await callGemini(prompt, 0.7);
+    const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    let advice;
+    try {
+      advice = JSON.parse(cleanText);
+    } catch (parseError) {
+      console.error('❌ Error parseando JSON:', parseError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error al procesar la respuesta de la IA',
+        rawResponse: text
+      });
+    }
+
+    console.log('✅ Consejos generados');
+    res.json({ success: true, data: advice });
+
+  } catch (error) {
+    console.error('❌ Error generando consejos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar consejos',
+      error: error.message
+    });
+  }
+};
+
+// 3. CHAT CON IA SOBRE MASCOTAS - CON MEMORIA
+const chatWithAI = async (req, res) => {
+  try {
+    console.log('💬 Chat con IA...');
+
+    if (!model) {
+      return res.status(500).json({
+        success: false,
+        message: 'El servicio de IA no está disponible. Intenta de nuevo más tarde.'
+      });
+    }
+
+    const { message, petContext, conversationHistory } = req.body;
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere un mensaje'
+      });
+    }
+
+    const contextInfo = petContext ? '\n\nContexto: ' + JSON.stringify(petContext) : '';
+
+    const systemPrompt = `Eres Simon Bot, un asistente veterinario profesional y amigable de AdoptaPet. 
+
+PERSONALIDAD:
+- Presentate solo la PRIMERA vez como "Simon Bot"
+- Pregunta el nombre del usuario SOLO si aún no lo sabes
+- Una vez sepas el nombre, úsalo naturalmente en la conversación
+- Tono profesional pero cercano, como un veterinario amable
+- Respuestas claras y directas de máximo 3 párrafos cortos
+
+FORMATO:
+- SIN asteriscos, SIN negritas, SIN formato Markdown
+- Solo texto plano con saltos de línea
+- Consejos prácticos y bien fundamentados
+- Si algo requiere veterinario presencial, recomendarlo${contextInfo}`;
+
+    // Construir historial para Gemini (formato diferente al de Groq)
+    const history = [];
+
+    if (conversationHistory && Array.isArray(conversationHistory)) {
+      const recentHistory = conversationHistory.slice(-10);
+      recentHistory.forEach(msg => {
+        history.push({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }]
+        });
+      });
+    }
+
+    // Gemini maneja el system prompt como parte del primer mensaje
+    const chat = model.startChat({
+      history,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 350,
+      },
+      systemInstruction: systemPrompt,
+    });
+
+    const result = await chat.sendMessage(message);
+    let responseText = result.response.text() || 'Lo siento, no pude generar una respuesta.';
+
+    // Limpiar formato Markdown por si acaso
+    responseText = responseText
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/`{1,3}/g, '')
+      .trim();
+
+    console.log('✅ Respuesta generada con memoria');
+
+    res.json({
+      success: true,
+      data: {
+        message: responseText,
+        timestamp: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error en chat:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al procesar el mensaje',
+      error: error.message
+    });
+  }
+};
+
+// 4. ANALIZAR COMPATIBILIDAD MASCOTA-ADOPTANTE
+const analyzeCompatibility = async (req, res) => {
+  try {
+    console.log('🔄 Analizando compatibilidad...');
+
+    if (!model) {
+      return res.status(500).json({
+        success: false,
+        message: 'El servicio de IA no está disponible. Intenta de nuevo más tarde.'
+      });
+    }
+
+    const { pet, adopter } = req.body;
+
+    if (!pet || !adopter) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere información de la mascota y el adoptante'
+      });
+    }
+
+    const prompt = `Analiza la compatibilidad entre esta mascota y este posible adoptante:
+
+MASCOTA: ${JSON.stringify(pet, null, 2)}
+ADOPTANTE: ${JSON.stringify(adopter, null, 2)}
+
+Responde SOLO en formato JSON:
+{
+  "puntuacion": 0-100,
+  "nivel": "excelente/buena/regular/baja",
+  "factoresPositivos": ["factor1", "factor2"],
+  "factoresNegativos": ["factor1", "factor2"],
+  "recomendaciones": ["recomendación1", "recomendación2"],
+  "advertencias": ["advertencia1", "advertencia2"],
+  "resumen": "resumen en 2-3 frases"
+}`;
+
+    const text = await callGemini(prompt, 0.7);
+    const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    let compatibility;
+    try {
+      compatibility = JSON.parse(cleanText);
+    } catch (parseError) {
+      console.error('❌ Error parseando JSON:', parseError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error al procesar la respuesta',
+        rawResponse: text
+      });
+    }
+
+    console.log('✅ Compatibilidad analizada:', compatibility.puntuacion);
+    res.json({ success: true, data: compatibility });
+
+  } catch (error) {
+    console.error('❌ Error analizando compatibilidad:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al analizar compatibilidad',
+      error: error.message
+    });
+  }
+};
+
+// 5. GENERAR DESCRIPCIÓN AUTOMÁTICA DE MASCOTA
+const generatePetDescription = async (req, res) => {
+  try {
+    console.log('📝 Generando descripción de mascota...');
+
+    if (!model) {
+      return res.status(500).json({
+        success: false,
+        message: 'El servicio de IA no está disponible. Intenta de nuevo más tarde.'
+      });
+    }
+
+    const { species, breed, age, size, temperament } = req.body;
+
+    if (!species) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere el tipo de animal'
+      });
+    }
+
+    const prompt = `Genera una descripción atractiva y emotiva para una mascota en adopción (100-150 palabras):
+
+Animal: ${species}
+Raza: ${breed || 'Mestizo'}
+Edad: ${age || 'Desconocida'}
+Tamaño: ${size || 'Desconocido'}
+Temperamento: ${temperament || 'Amigable'}
+
+La descripción debe:
+- Ser emotiva pero realista
+- Destacar cualidades positivas
+- Mencionar el hogar ideal
+- Ser persuasiva para adopción
+
+Responde SOLO con la descripción, sin formato JSON ni Markdown.`;
+
+    const description = await callGemini(prompt, 0.9);
+
+    console.log('✅ Descripción generada');
+    res.json({ success: true, data: { description: description.trim() } });
+
+  } catch (error) {
+    console.error('❌ Error generando descripción:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar descripción',
+      error: error.message
+    });
+  }
+};
+
+module.exports = {
+  identifyPetBreed,
+  getPetAdvice,
+  chatWithAI,
+  analyzeCompatibility,
+  generatePetDescription
+};
