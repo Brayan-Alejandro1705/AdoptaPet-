@@ -456,40 +456,40 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
         } catch { alert('Error al procesar favorito'); }
     };
 
-    const handleLike = async () => {
+   const handleLike = async () => {
     const token = localStorage.getItem('token');
     if (!token) { alert('Debes iniciar sesión para dar like'); return; }
 
-    // ✅ Optimistic update — actualiza inmediatamente sin esperar al servidor
-    const nuevoLiked = !isLiked;
-    const nuevoCount = nuevoLiked ? likesCount + 1 : likesCount - 1;
-    setIsLiked(nuevoLiked);
-    setLikesCount(nuevoCount);
-    if (onLike) onLike(post._id, nuevoLiked);
+    // ✅ Guardar valor original ANTES de actualizar
+    const likedAntes = isLiked;
+    const countAntes = likesCount;
+
+    // Optimistic update — actualiza inmediatamente
+    setIsLiked(!likedAntes);
+    setLikesCount(likedAntes ? countAntes - 1 : countAntes + 1);
+    if (onLike) onLike(post._id, !likedAntes);
 
     try {
-        const res  = await fetch(`${API_BASE}/api/posts/${post._id}/like`, {
-            method: isLiked ? 'DELETE' : 'POST',
+        const res = await fetch(`${API_BASE}/api/posts/${post._id}/like`, {
+            method: likedAntes ? 'DELETE' : 'POST', // ✅ usa likedAntes, no isLiked
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
         const data = await res.json();
 
-        // Si el servidor falla, revertir el cambio
         if (!data.success) {
-            setIsLiked(isLiked);
-            setLikesCount(likesCount);
-            if (onLike) onLike(post._id, isLiked);
+            // Revertir si el servidor falla
+            setIsLiked(likedAntes);
+            setLikesCount(countAntes);
+            if (onLike) onLike(post._id, likedAntes);
         } else {
-            // Sincronizar con el conteo real del servidor
             setLikesCount(data.data.likesCount);
         }
     } catch {
         // Revertir si hay error de red
-        setIsLiked(isLiked);
-        setLikesCount(likesCount);
+        setIsLiked(likedAntes);
+        setLikesCount(countAntes);
     }
 };
-
     const handleComment = async (e) => {
         e.preventDefault();
         if (!commentText.trim()) return;
