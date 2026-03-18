@@ -4,8 +4,8 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 // ✅ Modelo compatible con free tier
-// Cuando quieras pagar, cambia esta línea a "gemini-2.0-flash"
-const MODEL = "gemini-1.5-flash-latest";
+// Modelos disponibles: "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"
+const MODEL = "gemini-1.5-flash";
 
 // =====================================================
 // HELPER: Convertir URL a Base64
