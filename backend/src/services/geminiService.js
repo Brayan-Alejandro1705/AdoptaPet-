@@ -5,7 +5,7 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 // ✅ Modelo compatible con free tier
 // Modelos disponibles: "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"
-const MODEL = "gemini-2.0-flash";
+const MODEL = "gemini-1.5-flash-8b";
 
 // =====================================================
 // HELPER: Convertir URL a Base64
