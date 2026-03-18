@@ -4,7 +4,7 @@ export default function BottomNav({ onOpenModal }) {
   const location = useLocation();
 
   // ✅ Ocultar en páginas específicas
-  const rutasOcultas = ['/mensajes'];
+  const rutasOcultas = ['/mensajes' , '/favoritos'];
   if (rutasOcultas.includes(location.pathname)) return null;
 
   return (
