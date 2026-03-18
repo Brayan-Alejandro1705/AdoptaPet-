@@ -301,7 +301,6 @@ const Publicar = () => {
                     <p className="p-heading">Comparte un momento</p>
                     <textarea
                       className="p-textarea"
-                      placeholder="¿Qué está haciendo tu peludo hoy?"
                       value={momentText}
                       onChange={e => setMomentText(e.target.value)}
                       disabled={loading}
