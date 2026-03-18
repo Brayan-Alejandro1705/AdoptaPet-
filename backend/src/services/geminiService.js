@@ -1,13 +1,11 @@
 require('dotenv').config();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY, {
-  apiVersion: 'v1'
-});
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 // ✅ Modelo compatible con free tier
 // Cuando quieras pagar, cambia esta línea a "gemini-2.0-flash"
-const MODEL = "gemini-1.5-flash";
+const MODEL = "gemini-1.5-flash-latest";
 
 // =====================================================
 // HELPER: Convertir URL a Base64
