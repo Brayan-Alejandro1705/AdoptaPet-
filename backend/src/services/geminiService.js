@@ -5,12 +5,16 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY, {
   apiVersion: 'v1'
 });
 
+// ✅ Modelo compatible con free tier
+// Cuando quieras pagar, cambia esta línea a "gemini-2.0-flash"
+const MODEL = "gemini-1.5-flash";
+
 // =====================================================
-// HELPER: Convertir URL a Base64 (usando fetch nativo de Node 18+)
+// HELPER: Convertir URL a Base64
 // =====================================================
 async function fetchImageAsBase64(imageUrl) {
   try {
-    const response = await fetch(imageUrl); // ✅ fetch nativo, sin require
+    const response = await fetch(imageUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer).toString('base64');
@@ -25,7 +29,7 @@ async function fetchImageAsBase64(imageUrl) {
 // =====================================================
 async function chatbotAnimalAdvisor(message, petType = null) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: MODEL });
 
     const contextPet = petType ? `\nTipo de mascota: ${petType}` : '';
     const prompt = `Eres un experto veterinario amable y servicial de AdoptaPet.
@@ -51,7 +55,7 @@ Usuario: ${message}`;
 // =====================================================
 async function analyzeAnimalImage(imageUrl) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: MODEL });
 
     const imageData = await fetchImageAsBase64(imageUrl);
 
@@ -82,7 +86,7 @@ Responde de forma clara y amigable, sin formato Markdown.`
 // =====================================================
 async function moderateImage(imageUrl) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: MODEL });
 
     const imageData = await fetchImageAsBase64(imageUrl);
 
@@ -120,7 +124,7 @@ Analiza la imagen y responde ÚNICAMENTE en JSON válido, sin texto adicional ni
 // =====================================================
 async function validatePetPosting(imageUrl, petDescription) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: MODEL });
 
     const imageData = await fetchImageAsBase64(imageUrl);
 
@@ -159,7 +163,7 @@ Responde ÚNICAMENTE en JSON válido, sin texto adicional ni backticks:
 // =====================================================
 async function generatePetDescription(imageUrl, petName, petType) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: MODEL });
 
     const imageData = await fetchImageAsBase64(imageUrl);
 
@@ -187,7 +191,7 @@ mencionar el hogar ideal y animar a la adopción. En español, sin formato Markd
 // =====================================================
 async function checkImageSimilarity(imageUrl1, imageUrl2) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: MODEL });
 
     const [img1, img2] = await Promise.all([
       fetchImageAsBase64(imageUrl1),
