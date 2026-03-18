@@ -186,7 +186,6 @@ router.put('/profile', protect, async (req, res) => {
     const telefono = req.body.telefono || req.body.phone;
     const ubicacion = req.body.ubicacion || req.body.location;
 
-    // ✅ IMPORTANTE: El schema usa "name" no "nombre"
     if (nombre) {
       user.name = nombre.trim();
       console.log(`📝 Nombre actualizado: ${user.name}`);
@@ -197,19 +196,16 @@ router.put('/profile', protect, async (req, res) => {
       console.log(`📄 Bio actualizada: ${user.bio.substring(0, 30)}...`);
     }
 
-    // ✅ IMPORTANTE: El schema usa "phone" no "telefono"
     if (telefono) {
       user.phone = telefono.trim();
       console.log(`📞 Teléfono actualizado: ${user.phone}`);
     }
 
-    // ✅ IMPORTANTE: El schema usa "location" no "ubicacion"
     if (ubicacion) {
       if (typeof ubicacion === 'object') {
         user.location = { ...user.location, ...ubicacion };
         console.log(`📍 Ubicación actualizada: ${JSON.stringify(user.location)}`);
       } else {
-        // Si viene como string, asumimos que es la ciudad
         user.location = user.location || {};
         user.location.city = ubicacion.trim();
         console.log(`📍 Ciudad actualizada: ${user.location.city}`);
@@ -219,7 +215,6 @@ router.put('/profile', protect, async (req, res) => {
     await user.save();
     console.log(`✅ Perfil actualizado para: ${user.email}`);
 
-    // ✅ RETORNAR EN AMBOS FORMATOS para que el frontend entienda
     res.json({
       success: true,
       message: 'Perfil actualizado correctamente',
@@ -474,17 +469,13 @@ router.patch('/me/password', protect, async (req, res) => {
 });
 
 // =====================================================
-// PATCH - Desactivar cuenta
+// ✅ DELETE - Eliminar cuenta permanentemente
 // =====================================================
-router.patch('/me/deactivate', protect, async (req, res) => {
+router.delete('/me/deactivate', protect, async (req, res) => {
   try {
-    console.log('❌ Desactivando cuenta...');
+    console.log('🗑️ Eliminando cuenta permanentemente...');
 
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { status: 'inactive' },
-      { new: true }
-    );
+    const user = await User.findByIdAndDelete(req.user.id);
 
     if (!user) {
       return res.status(404).json({
@@ -493,17 +484,17 @@ router.patch('/me/deactivate', protect, async (req, res) => {
       });
     }
 
-    console.log('✅ Cuenta desactivada');
+    console.log('✅ Cuenta eliminada:', user.email);
 
     return res.json({
       success: true,
-      message: 'Cuenta desactivada correctamente'
+      message: 'Cuenta eliminada correctamente'
     });
   } catch (error) {
-    console.error('❌ Error al desactivar cuenta:', error);
+    console.error('❌ Error al eliminar cuenta:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error al desactivar cuenta',
+      message: 'Error al eliminar cuenta',
       error: error.message
     });
   }
@@ -608,13 +599,11 @@ router.get('/suggestions', protect, async (req, res) => {
   try {
     console.log('💡 Obteniendo sugerencias para:', req.user.id);
 
-    // Obtener el usuario actual con su lista de amigos
     const currentUser = await User.findById(req.user.id).select('friends');
     if (!currentUser) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
-    // IDs a excluir: el propio usuario + sus amigos actuales
     const excludeIds = [
       req.user.id,
       ...(currentUser.friends || []).map(id => id.toString())

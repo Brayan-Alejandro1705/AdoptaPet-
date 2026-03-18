@@ -101,65 +101,39 @@ const CuentaModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const validateDeactivateAccount = () => {
-
-    if (!deactivateReason.trim()) {
-      alert('Indica el motivo');
-      return false;
-    }
-
+  // ✅ ELIMINAR CUENTA PERMANENTEMENTE
+  const handleEliminarCuenta = async () => {
     const confirmed = window.confirm(
-      '⚠️ ¿Seguro que quieres desactivar tu cuenta?'
+      '⚠️ ¿Seguro que quieres ELIMINAR tu cuenta? Esta acción es irreversible.'
     );
-
-    if (!confirmed) return false;
+    if (!confirmed) return;
 
     const token = getToken();
-
-    if (!token) {
-      alert('No hay sesión activa');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleDeactivateAccount = async () => {
-
-    if (!validateDeactivateAccount()) return;
+    if (!token) { alert('No hay sesión activa'); return; }
 
     setLoading(true);
-
     try {
-
-      const token = getToken();
-
       const res = await fetch(`${API_URL}/users/me/deactivate`, {
-        method: 'PATCH',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          reason: deactivateReason,
-        }),
       });
 
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        alert('❌ ' + (data.message || 'Error'));
+        alert('❌ ' + (data.message || 'Error al eliminar'));
         return;
       }
 
-      alert('Cuenta desactivada');
+      alert('✅ Cuenta eliminada correctamente');
       logoutAndRedirect();
 
     } catch (error) {
-
       console.error(error);
-      alert('Error del servidor');
-
+      alert('❌ Error del servidor');
     } finally {
       setLoading(false);
     }
@@ -176,12 +150,10 @@ const CuentaModal = ({ isOpen, onClose }) => {
 
           <div className="flex items-center justify-between">
 
-            {/* Ícono de cuenta para balancear el layout */}
             <span className="text-2xl">👤</span>
 
             <h2 className="text-2xl font-bold">Cuenta</h2>
 
-            {/* Botón X para cerrar — igual al modal de Notificaciones */}
             <button
               onClick={onClose}
               className="text-white hover:bg-white hover:bg-opacity-20 rounded-full w-9 h-9 flex items-center justify-center transition-colors"
@@ -270,7 +242,7 @@ const CuentaModal = ({ isOpen, onClose }) => {
         loading={loading}
         deactivateReason={deactivateReason}
         onReasonChange={setDeactivateReason}
-        onSubmit={handleDeactivateAccount}
+        onSubmit={handleEliminarCuenta}
       />
 
     </div>
@@ -413,7 +385,6 @@ const DeactivateModal = ({
 
         <div className="p-6 space-y-4">
 
-          
           <div className="flex gap-3">
 
             <button
@@ -428,7 +399,7 @@ const DeactivateModal = ({
               disabled={loading}
               className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
             >
-              {loading ? 'Desactivando...' : 'Eliminar'}
+              {loading ? 'Eliminando...' : 'Eliminar'}
             </button>
 
           </div>
