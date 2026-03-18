@@ -413,14 +413,7 @@ const DeactivateModal = ({
 
         <div className="p-6 space-y-4">
 
-          <textarea
-            value={deactivateReason}
-            onChange={(e) => onReasonChange(e.target.value)}
-            className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400"
-            rows={4}
-            placeholder="Motivo de eliminación"
-          />
-
+          
           <div className="flex gap-3">
 
             <button
