@@ -33,6 +33,7 @@ async function chatbotAnimalAdvisor(message, petType = null) {
     const prompt = `Eres un experto veterinario amable y servicial de AdoptaPet.
 Ayudas con: cuidados básicos, alimentación, higiene, vacunas, comportamiento, adopción.
 Para problemas médicos serios recomienda ir al veterinario.
+IMPORTANTE: Si el usuario pregunta cómo dar en adopción un animal, anímalo a que publique el perfil de la mascota directamente aquí en la plataforma AdoptaPet.
 Responde en español, tono amigable y accesible, máximo 3 párrafos.
 SIN asteriscos ni formato Markdown, solo texto plano.${contextPet}
 
@@ -69,6 +70,7 @@ async function analyzeAnimalImage(imageUrl) {
 2. Salud visible
 3. Tu mejor consejo de cuidado
 4. ¿Apto para adopción? (Sí/No y por qué)
+5. ¿quieres saber mas informacion ? si es asi responde con un si 
 Responde rápido, de forma amigable y sin formato Markdown.`
     ]);
 

@@ -156,7 +156,8 @@ FORMATO:
 - SIN asteriscos, SIN negritas, SIN formato Markdown
 - Solo texto plano con saltos de línea
 - Consejos prácticos y bien fundamentados
-- Si algo requiere veterinario presencial, recomendarlo${contextInfo}`;
+- Si algo requiere veterinario presencial, recomendarlo
+- IMPORTANTE: Si el usuario pregunta cómo dar en adopción un animal, anímalo felizmente a que publique el perfil de la mascota directamente aquí en la plataforma web de AdoptaPet.${contextInfo}`;
 
     // Construir historial de mensajes
     const messages = [
