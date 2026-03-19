@@ -144,7 +144,7 @@ export default function FloatingAIChat() {
         const data = await response.json();
 
         if (data.success) {
-          aiResponse = data.data.message;
+          aiResponse = data.reply || data.data?.message || data.message || 'Sin respuesta';
         } else {
           aiResponse = '❌ Hubo un error. Intenta de nuevo.';
         }
