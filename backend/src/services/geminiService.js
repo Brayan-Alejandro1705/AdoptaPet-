@@ -64,12 +64,12 @@ async function analyzeAnimalImage(imageUrl) {
           data: imageData,
         },
       },
-      `Eres un experto en identificación de animales. Analiza esta imagen y responde en español:
-1. Especie y raza aproximada
-2. Señales de salud visibles
-3. Consejo de cuidado específico
-4. ¿Es apto para adopción? (Sí/No y por qué)
-Responde de forma clara y amigable, sin formato Markdown.`
+      `Eres un experto en identificación de animales. Analiza esta imagen y responde OBLIGATORIAMENTE de forma muy corta y directa (máximo 1 o 2 oraciones breves por punto):
+1. Especie y raza
+2. Salud visible
+3. Tu mejor consejo de cuidado
+4. ¿Apto para adopción? (Sí/No y por qué)
+Responde rápido, de forma amigable y sin formato Markdown.`
     ]);
 
     return { success: true, analysis: result.response.text() };
