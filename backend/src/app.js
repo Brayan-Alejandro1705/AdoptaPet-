@@ -6,7 +6,7 @@ let genAI;
 let model;
 try {
   genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-  model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   console.log('✅ Gemini SDK inicializado correctamente');
 } catch (error) {
   console.error('❌ Error inicializando Gemini:', error.message);
