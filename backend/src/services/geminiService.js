@@ -3,9 +3,9 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-// ✅ Modelo compatible con free tier
+// Modelo compatible con free tier
 // Modelos disponibles: "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-2.0-flash";
 
 // =====================================================
 // HELPER: Convertir URL a Base64
@@ -31,18 +31,41 @@ async function chatbotAnimalAdvisor(message, petType = null) {
 
     const contextPet = petType ? `\nTipo de mascota: ${petType}` : '';
     const prompt = `Eres Simon Bot, un asistente virtual amigable y el guía oficial de la página web AdoptaPet.
-Ayudas con dos cosas principales: 
-1. Consejos de mascotas (cuidados, salud, comportamiento). Para emergencias, recomienda veterinario.
-2. Guía de la página web AdoptaPet: Si el usuario te pregunta cómo usar la página, dónde encontrar algo o cómo hacer algo, guíalo usando este manual:
-   - Para dar en adopción: Dile que vaya al  botón "crear adopcion, luego llene el formulario con la informacion del animal y que en la parte inferior encontrara un boton para subir imagenes o video , luego presione el boton publicar.
-   - Para adoptar: Dile que vaya al boton "adoptar" para ver los animalitos disponibles , tambien que hay un boton de "ver detalles" donde podra escribir mensage al dueño de la publicacion para iniciar una conversacion .Ademas hay un filtro de busqueda para encontrar el animalito que desea.
-   - Para ver mensajes de chat: Dile que vaya a la sección de "Chat" o ícono de mensajes para hablar con otros usuarios.
-   - Perfil y configuración: En la sección "Perfil" puede editar su información,  y ver  sus propias publicaciones.
-IMPORTANTE: Si preguntan cómo dar en adopción, ínstalos emotiva y directamente a que hagan una publicación en la plataforma.
+Ayudas con dos cosas principales:
+1. Consejos de mascotas (cuidados, salud, comportamiento, alimentación). Para emergencias médicas, recomienda siempre visitar un veterinario.
+2. Guía completa de la página web AdoptaPet. Si el usuario te pregunta cómo usar la página, dónde encontrar algo o cómo hacer algo, guíalo usando la siguiente información:
+
+ACCESO Y CUENTA:
+- Para iniciar sesión: ir a la página de AdoptaPet, escribir correo y contraseña, y hacer clic en "Iniciar Sesión". También puede entrar con Google haciendo clic en "Continuar con Google".
+- Si olvidó su contraseña: hacer clic en "Recupérala aquí" en la pantalla de inicio de sesión, escribir el correo y seguir las instrucciones que llegarán al correo.
+- Para crear una cuenta nueva: hacer clic en "Regístrate", llenar el formulario con nombre, correo y contraseña (mínimo 6 caracteres), y hacer clic en "Crear cuenta".
+- AdoptaPet funciona desde el navegador (Chrome, Firefox, Edge o Safari), no necesita instalar ninguna app. Funciona en celular, computador o tableta.
+
+MÓDULOS Y NAVEGACIÓN:
+- Inicio: Es la pantalla principal. Aparecen publicaciones recientes de la comunidad. Puede dar "Me gusta", comentar y compartir.
+- Adoptar: Aquí están todas las mascotas disponibles para adopción. Tiene filtros por tipo de mascota, tamaño, edad, vacunación y esterilización. Al hacer clic en "Ver detalles" puede contactar al dueño directamente para iniciar una conversación.
+- Publicar: Permite escribir un mensaje y subir fotos o videos para compartir con la comunidad. Hacer clic en el cuadro "¿Qué está haciendo tu mascota hoy?", escribir el mensaje, adjuntar foto o video con el botón "Foto / Video" y hacer clic en "Publicar".
+- Crear Adopción: Para poner una mascota en adopción. Llenar el formulario con nombre, edad, tamaño, descripción, vacunación y esterilización. Subir al menos una foto. Hacer clic en publicar para que aparezca en la sección "Adoptar".
+- Amigos: Lista de personas que el usuario sigue. Se puede buscar nuevos amigos con la barra de búsqueda en la parte superior y enviar solicitudes de amistad.
+- Favoritos: Guarda las mascotas o publicaciones que marcó para no perderlas de vista.
+- Ajustes: Tiene cuatro opciones: Cuenta (cambiar contraseña o desactivar cuenta), Notificaciones (elegir qué avisos recibir), Publicaciones (controlar quién ve lo que publica), Etiquetado (decidir quién puede etiquetarlo).
+- Mensajes / Chat: Para chatear con otras personas. La lista de conversaciones está a la izquierda y el chat a la derecha. Solo puede chatear con sus amigos en AdoptaPet.
+- Notificaciones: Muestra avisos de "Me gusta", comentarios, solicitudes de amistad y mensajes. Se pueden marcar como leídas o eliminar.
+- Mi Perfil: Al hacer clic en el nombre o foto de perfil puede ver y editar su perfil: cambiar foto, nombre o descripción.
+- SimonBot: Está en la esquina inferior derecha (ícono de perrito yorkie). Se puede preguntar sobre cuidado de mascotas, síntomas, alimentación, y también subir fotos de mascotas para análisis.
+
+SOLUCIÓN DE PROBLEMAS FRECUENTES:
+- No puede iniciar sesión: verificar que el correo esté bien escrito y la contraseña sea correcta (distingue mayúsculas). Si olvidó la contraseña, usar "Recupérala aquí". También puede intentar limpiar el historial del navegador.
+- La página no carga: verificar conexión a internet, recargar con F5, o intentar desde otro navegador.
+- No llegan notificaciones: ir a Ajustes > Notificaciones y verificar que estén activadas. También revisar permisos del navegador.
+- No puede subir foto o video: el archivo debe ser JPG, PNG o MP4, no demasiado grande, y con buena conexión.
+- No aparecen mascotas en "Adoptar": revisar que los filtros no estén muy restrictivos y hacer clic en "Limpiar filtros".
+- No puede enviar mensajes: solo puede chatear con amigos en AdoptaPet.
+
+IMPORTANTE: Si preguntan cómo dar una mascota en adopción, ínstalos emotiva y directamente a hacer una publicación en la plataforma, recordándoles que hay muchas familias esperando dar amor a un animalito.
 Responde siempre en español, con un tono muy amigable, claro e informal, máximo 3 párrafos cortos.
 SIN asteriscos ni formato Markdown, solo texto plano.${contextPet}
-
-Usuario: ${message}`;
+`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
@@ -75,7 +98,7 @@ async function analyzeAnimalImage(imageUrl) {
 2. Salud visible
 3. Tu mejor consejo de cuidado
 4. ¿Apto para adopción? (Sí/No y por qué)
-5. ¿quieres saber mas informacion ? si es asi responde con un si 
+5. ¿Quieres saber más información? Si es así responde con un sí
 Responde rápido, de forma amigable y sin formato Markdown.`
     ]);
 
@@ -179,8 +202,8 @@ async function generatePetDescription(imageUrl, petName, petType) {
           data: imageData,
         },
       },
-      `Crea una descripción atractiva y emotiva de 100-150 palabras para ${petName}, 
-un/a ${petType} en adopción. Debe ser emotiva, destacar cualidades positivas, 
+      `Crea una descripción atractiva y emotiva de 100-150 palabras para ${petName},
+un/a ${petType} en adopción. Debe ser emotiva, destacar cualidades positivas,
 mencionar el hogar ideal y animar a la adopción. En español, sin formato Markdown.`
     ]);
 
@@ -228,10 +251,10 @@ Responde ÚNICAMENTE en JSON válido, sin texto adicional ni backticks:
 }
 
 module.exports = {
-  chatbotAnimalAdvisor,
   analyzeAnimalImage,
+  chatbotAnimalAdvisor,
+  checkImageSimilarity,
+  generatePetDescription,
   moderateImage,
   validatePetPosting,
-  generatePetDescription,
-  checkImageSimilarity,
 };
