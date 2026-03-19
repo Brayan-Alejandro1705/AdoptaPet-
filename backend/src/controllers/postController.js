@@ -4,6 +4,7 @@
 
 const Post = require('../models/Post');
 const User = require('../models/User');
+const { moderateImage } = require('../services/geminiService');
 
 console.log('📝 Controlador de publicaciones cargado');
 
@@ -46,6 +47,22 @@ exports.createPost = async (req, res) => {
         
         // Agregar imágenes si existen (deberían venir procesadas de Cloudinary)
         if (req.body.images && Array.isArray(req.body.images)) {
+            // IA Moderación de Contenido Inapropiado
+            for (const imgUrl of req.body.images) {
+                try {
+                    console.log(`🔍 Moderando imagen vía Gemini: ${imgUrl}`);
+                    const modResult = await moderateImage(imgUrl);
+                    if (modResult.success && !modResult.moderation.isAppropriate) {
+                        console.log(`❌ Imagen rechazada: ${modResult.moderation.reason}`);
+                        return res.status(400).json({
+                            success: false,
+                            message: 'No puedes publicar esta imagen. Ha sido bloqueada por la Inteligencia Artificial por la siguiente razón: ' + modResult.moderation.reason
+                        });
+                    }
+                } catch (err) {
+                    console.error('⚠️ Error al moderar la imagen con IA:', err);
+                }
+            }
             postData.images = req.body.images;
         }
         
