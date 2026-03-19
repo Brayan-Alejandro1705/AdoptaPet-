@@ -88,46 +88,50 @@ export default function FloatingAIChat() {
       let aiResponse;
 
       if (imageFile) {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64Image = reader.result;
+        try {
+          const formData = new FormData();
+          formData.append('file', imageFile);
+          formData.append('upload_preset', 'adopta_pet_unsigned');
+          formData.append('folder', 'adopta-pet/ai-analysis');
 
-          const response = await fetch(`${API_BASE}/api/ai/identify-breed`, {
+          const cloudRes = await fetch('https://api.cloudinary.com/v1_1/dn9x4ccqk/image/upload', {
+            method: 'POST',
+            body: formData
+          });
+          const cloudData = await cloudRes.json();
+
+          if (!cloudData.secure_url) throw new Error('Error al subir imagen');
+
+          const response = await fetch(`${API_BASE}/api/ai/analyze-pet`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ imageBase64: base64Image })
+            body: JSON.stringify({ imageUrl: cloudData.secure_url })
           });
 
           const data = await response.json();
 
           if (data.success) {
-            const analysis = data.data;
-            aiResponse = `🔍 **Análisis de la imagen:**\n\n` +
-              `🐾 **Animal:** ${analysis.animal}\n` +
-              `🏷️ **Raza:** ${analysis.raza}\n` +
-              `📊 **Confianza:** ${analysis.confianza}%\n` +
-              `📅 **Edad:** ${analysis.edad}\n` +
-              `📏 **Tamaño:** ${analysis.tamaño}\n\n` +
-              `**Razas probables:**\n${analysis.razasProbables.map((r, i) => `${i + 1}. ${r}`).join('\n')}\n\n` +
-              `**Características:**\n${analysis.caracteristicas.map(c => `• ${c}`).join('\n')}`;
+            aiResponse = data.analysis;
           } else {
-            aiResponse = '❌ No pude analizar la imagen. Asegúrate de que sea una foto clara de un perro o gato.';
+            aiResponse = '❌ No pude analizar la imagen. Asegúrate de que sea una foto clara de un animal.';
           }
+        } catch (err) {
+          console.error(err);
+          aiResponse = '❌ Hubo un error procesando la imagen. Intenta de nuevo.';
+        }
 
-          setMessages(prev => [...prev, {
-            id: Date.now() + 1,
-            sender: 'ai',
-            text: aiResponse,
-            timestamp: new Date()
-          }]);
+        setMessages(prev => [...prev, {
+          id: Date.now() + 1,
+          sender: 'ai',
+          text: aiResponse,
+          timestamp: new Date()
+        }]);
 
-          setLoading(false);
-          removeImage();
-        };
-        reader.readAsDataURL(imageFile);
+        setLoading(false);
+        removeImage();
 
       } else {
         const response = await fetch(`${API_BASE}/api/ai/chatbot`, {
