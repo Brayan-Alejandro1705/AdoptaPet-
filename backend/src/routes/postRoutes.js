@@ -254,6 +254,23 @@ router.post('/', auth, async (req, res) => {
     };
 
     if (imageUrls.length > 0) {
+      // IA Moderación de Contenido Inapropiado
+      const { moderateImage } = require('../services/geminiService');
+      for (const imgUrl of imageUrls) {
+          try {
+              console.log(`🔍 Moderando imagen vía Gemini: ${imgUrl}`);
+              const modResult = await moderateImage(imgUrl);
+              if (modResult.success && !modResult.moderation.isAppropriate) {
+                  console.log(`❌ Imagen rechazada: ${modResult.moderation.reason}`);
+                  return res.status(400).json({
+                      success: false,
+                      message: 'No puedes publicar esta imagen. Ha sido bloqueada por la Inteligencia Artificial por la siguiente razón: ' + modResult.moderation.reason
+                  });
+              }
+          } catch (err) {
+              console.error('⚠️ Error al moderar la imagen con IA:', err);
+          }
+      }
       postData.media.images = imageUrls;
       console.log('✅ Imágenes Cloudinary agregadas:', postData.media.images);
     }
