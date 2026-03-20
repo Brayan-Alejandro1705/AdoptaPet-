@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { chatService } from '../services/chatService';
 import Header from '../components/common/Header';
+import Sidebar from '../components/common/Sidebar';
 import ChatList from '../components/common/ChatList';
 import ChatWindow from '../components/common/ChatWindow';
 
@@ -315,12 +316,17 @@ export default function Chat() {
 
         {/* ─── Desktop: side-by-side ─── */}
         <div className="hidden md:flex w-full h-full">
-          {/* List Panel */}
-          <div className="w-80 xl:w-96 flex-shrink-0 h-full border-r border-gray-200 overflow-hidden shadow-lg">
+          {/* Sidebar (menu izquierdo) */}
+          <div className="w-56 xl:w-64 flex-shrink-0 h-full border-r border-gray-100 overflow-hidden">
+            <Sidebar />
+          </div>
+
+          {/* Chat List Panel */}
+          <div className="w-72 xl:w-80 flex-shrink-0 h-full border-r border-gray-200 overflow-hidden shadow-sm">
             <ChatList chats={chats} selectedChat={selectedChat} onSelectChat={handleSelectChat} />
           </div>
 
-          {/* Window Panel */}
+          {/* Chat Window Panel */}
           <div className="flex-1 h-full overflow-hidden p-4" style={{ background: 'linear-gradient(180deg, #f3f0ff, #fdf2f8)' }}>
             {selectedChat ? (
               <ChatWindow
