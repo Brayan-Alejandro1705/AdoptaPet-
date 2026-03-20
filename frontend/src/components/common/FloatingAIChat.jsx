@@ -187,11 +187,11 @@ export default function FloatingAIChat() {
     <>
       {/* VENTANA DEL CHAT */}
       {isOpen && (
-        <div className={`fixed z-50 transition-all duration-300 ${
-          isMinimized 
-            ? 'bottom-28 right-6 w-80' 
-            : 'bottom-28 right-6 w-96 h-[500px] md:w-[380px] md:h-[550px]'
-        }`}>
+        <div className={`fixed z-50 transition-all duration-300
+          ${isMinimized
+            ? 'bottom-28 right-6 w-80 md:bottom-28 md:right-6'
+            : 'inset-0 md:inset-auto md:bottom-28 md:right-6 md:w-[380px] md:h-[550px]'
+          }`}>
           <div className="bg-white rounded-2xl shadow-2xl flex flex-col h-full overflow-hidden">
             
             {/* HEADER */}
@@ -357,7 +357,7 @@ export default function FloatingAIChat() {
       {/* PERRO FLOTANTE */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 w-24 h-24 z-50 hover:scale-110 transition-transform duration-300 group"
+        className="fixed bottom-6 right-6 w-20 h-20 md:w-24 md:h-24 z-50 hover:scale-110 transition-transform duration-300 group"
         style={{ background: 'transparent', border: 'none' }}
       >
         <img 
