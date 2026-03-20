@@ -207,8 +207,14 @@ router.put('/profile', protect, async (req, res) => {
         console.log(`📍 Ubicación actualizada: ${JSON.stringify(user.location)}`);
       } else {
         user.location = user.location || {};
-        user.location.city = ubicacion.trim();
-        console.log(`📍 Ciudad actualizada: ${user.location.city}`);
+        if (ubicacion.includes(',')) {
+          const parts = ubicacion.split(',');
+          user.location.city = parts[0].trim();
+          user.location.country = parts.slice(1).join(',').trim();
+        } else {
+          user.location.city = ubicacion.trim();
+        }
+        console.log(`📍 Ciudad/País actualizado: ${user.location.city}`);
       }
     }
 

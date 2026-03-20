@@ -18,6 +18,7 @@ import AIAssistant from './pages/AIAssistant';
 import FloatingAIChat from './components/common/FloatingAIChat';
 import Feedback from './pages/Feedback';
 import RecuperarPassword from './pages/RecuperarPassword';
+import PostDetalle from './pages/PostDetalle';
 
 // ✅ Maneja /home con o sin token de Google en la URL
 const GoogleCallbackOrHome = () => {
@@ -101,6 +102,7 @@ function App() {
         {/* ✅ Perfil propio y perfil de otro usuario */}
         <Route path="/perfil" element={<PrivateRoute><Perfil /></PrivateRoute>} />
         <Route path="/perfil/:userId" element={<PrivateRoute><Perfil /></PrivateRoute>} />
+        <Route path="/post/:postId" element={<PrivateRoute><PostDetalle /></PrivateRoute>} />
 
         <Route path="/notificaciones" element={<PrivateRoute><Notificaciones /></PrivateRoute>} />
         <Route path="/publicar" element={<PrivateRoute><Publicar /></PrivateRoute>} />

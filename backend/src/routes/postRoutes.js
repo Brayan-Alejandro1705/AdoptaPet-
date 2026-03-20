@@ -196,6 +196,43 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// =====================================================
+// GET - BÚSQUEDA DE PUBLICACIONES
+// =====================================================
+router.get('/search', auth, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) {
+      return res.status(400).json({ success: false, message: 'Parámetro de búsqueda requerido' });
+    }
+
+    const filter = buildVisibilityFilter(req);
+    
+    const searchFilter = {
+      $and: [
+        filter,
+        {
+          $or: [
+            { content: { $regex: q, $options: 'i' } },
+            { type: { $regex: q, $options: 'i' } }
+          ]
+        }
+      ]
+    };
+
+    const posts = await Post.find(searchFilter)
+      .populate('author', 'name nombre email avatar role verified')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    res.json({ success: true, data: posts });
+  } catch (error) {
+    console.error('❌ Error buscando posts:', error);
+    res.status(500).json({ success: false, message: 'Error al buscar publicaciones' });
+  }
+});
+
 // ✅ CREAR PUBLICACIÓN — SIN multer, acepta JSON con URLs de Cloudinary
 router.post('/', auth, async (req, res) => {
   try {

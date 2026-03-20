@@ -233,7 +233,22 @@ function Perfil() {
 
   const openEditModal = () => {
     if (user) {
-      setEditForm({ nombre: user.nombre || user.name || '', email: user.email || '', bio: user.bio || '', telefono: user.telefono || user.phone || '', ubicacion: user.ubicacion || user.location || '' });
+      let ubicacionFinal = '';
+      if (user.location && typeof user.location === 'object') {
+        const parts = [];
+        if (user.location.city) parts.push(user.location.city);
+        if (user.location.country) parts.push(user.location.country);
+        ubicacionFinal = parts.join(', ');
+      } else {
+        ubicacionFinal = user.ubicacion || user.location || '';
+      }
+      setEditForm({ 
+        nombre: user.nombre || user.name || '', 
+        email: user.email || '', 
+        bio: user.bio || '', 
+        telefono: user.telefono || user.phone || '', 
+        ubicacion: ubicacionFinal 
+      });
     }
     setShowEditModal(true);
   };
