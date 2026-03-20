@@ -412,111 +412,112 @@ router.get('/user/:userId', auth, async (req, res) => {
   }
 });
 
-// 5. DAR/QUITAR LIKE ✅ (CON notificationSettings)
+// 5. DAR LIKE ✅ OPTIMIZADO — operación atómica, sin bloqueo
 router.post('/:postId/like', auth, async (req, res) => {
   try {
-    console.log('❤️ ===== PROCESANDO LIKE =====');
-    console.log('📝 Post ID:', req.params.postId);
-    console.log('👤 Usuario:', req.userId);
+    const { postId } = req.params;
+    const userId = req.userId;
 
-    const post = await Post.findById(req.params.postId);
-    if (!post) {
+    // Verificar si ya le dio like (sin cargar el documento entero)
+    const existing = await Post.findOne(
+      { _id: postId, 'stats.likes': userId },
+      { _id: 1 }
+    ).lean();
+
+    let updatedPost;
+    let liked;
+
+    if (existing) {
+      // Ya le dio like → quitarlo
+      updatedPost = await Post.findByIdAndUpdate(
+        postId,
+        { $pull: { 'stats.likes': userId } },
+        { new: true, select: 'stats.likes author' }
+      ).lean();
+      liked = false;
+    } else {
+      // No tiene like → darlo
+      updatedPost = await Post.findByIdAndUpdate(
+        postId,
+        { $addToSet: { 'stats.likes': userId } },
+        { new: true, select: 'stats.likes author' }
+      ).lean();
+      liked = true;
+    }
+
+    if (!updatedPost) {
       return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
 
-    const likeIndex = post.stats.likes.findIndex(
-      like => like.toString() === req.userId.toString()
-    );
+    const likesCount = updatedPost.stats?.likes?.length || 0;
 
-    let liked = false;
+    // ✅ Responder INMEDIATAMENTE sin esperar la notificación
+    res.json({ success: true, message: liked ? 'Like agregado' : 'Like removido', data: { liked, likesCount } });
 
-    if (likeIndex > -1) {
-      post.stats.likes.splice(likeIndex, 1);
-      liked = false;
-      console.log('💔 Like removido');
-    } else {
-      post.stats.likes.push(req.userId);
-      liked = true;
-      console.log('❤️ Like agregado');
-
-      if (post.author.toString() !== req.userId.toString()) {
+    // ✅ Enviar notificación en background (no bloquea)
+    if (liked && updatedPost.author.toString() !== userId.toString()) {
+      setImmediate(async () => {
         try {
           const [liker, postAuthor] = await Promise.all([
-            User.findById(req.userId),
-            User.findById(post.author).select('notificationSettings')
+            User.findById(userId).select('name nombre avatar').lean(),
+            User.findById(updatedPost.author).select('notificationSettings').lean()
           ]);
-
-          // ✅ VERIFICAR si el autor tiene likes activados
           const likesEnabled = postAuthor?.notificationSettings?.likes !== false;
-
-          if (likesEnabled) {
-            const notification = await Notification.create({
-              recipient: post.author,
-              sender: req.userId,
-              type: 'like',
-              title: 'Le gustó tu publicación',
-              message: `A ${liker.name || liker.nombre} le gustó tu publicación`,
-              icon: '❤️',
-              color: 'pink',
-              relatedId: post._id,
-              relatedModel: 'Post',
-              actionUrl: `/post/${post._id}`
+          if (!likesEnabled) return;
+          const notification = await Notification.create({
+            recipient: updatedPost.author,
+            sender: userId,
+            type: 'like',
+            title: 'Le gustó tu publicación',
+            message: `A ${liker?.name || liker?.nombre || 'alguien'} le gustó tu publicación`,
+            icon: '❤️',
+            color: 'pink',
+            relatedId: postId,
+            relatedModel: 'Post',
+            actionUrl: `/post/${postId}`
+          });
+          const io = req.app.get('io');
+          if (io) {
+            io.to(updatedPost.author.toString()).emit('nueva-notificacion', {
+              ...notification.toObject(),
+              sender: { _id: liker?._id, name: liker?.name || liker?.nombre, avatar: liker?.avatar }
             });
-
-            const io = req.app.get('io');
-            if (io) {
-              io.to(post.author.toString()).emit('nueva-notificacion', {
-                ...notification.toObject(),
-                sender: { _id: liker._id, name: liker.name || liker.nombre, avatar: liker.avatar }
-              });
-            }
-            console.log('🔔 Notificación de like creada:', notification._id);
-          } else {
-            console.log('🔕 Usuario desactivó notificaciones de likes — omitida');
           }
-        } catch (notifError) {
-          console.error('⚠️ Error creando notificación de like:', notifError);
+        } catch (e) {
+          console.error('⚠️ Error enviando notificación de like (background):', e.message);
         }
-      }
+      });
     }
-
-    await post.save();
-
-    res.json({
-      success: true,
-      message: liked ? 'Like agregado' : 'Like removido',
-      data: { liked, likesCount: post.stats.likes.length }
-    });
   } catch (error) {
     console.error('❌ Error con like:', error);
     res.status(500).json({ success: false, message: 'Error al procesar like' });
   }
 });
 
-// 5b. QUITAR LIKE (DELETE)
+// 5b. QUITAR LIKE (DELETE) — también atómico
 router.delete('/:postId/like', auth, async (req, res) => {
   try {
-    const post = await Post.findById(req.params.postId);
-    if (!post) {
+    const updatedPost = await Post.findByIdAndUpdate(
+      req.params.postId,
+      { $pull: { 'stats.likes': req.userId } },
+      { new: true, select: 'stats.likes' }
+    ).lean();
+
+    if (!updatedPost) {
       return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
     }
-
-    post.stats.likes = post.stats.likes.filter(
-      like => like.toString() !== req.userId.toString()
-    );
-
-    await post.save();
 
     res.json({
       success: true,
       message: 'Like removido',
-      data: { unliked: true, likesCount: post.stats.likes.length }
+      data: { unliked: true, likesCount: updatedPost.stats?.likes?.length || 0 }
     });
   } catch (error) {
     console.error('❌ Error quitando like:', error);
     res.status(500).json({ success: false, message: 'Error al quitar like' });
   }
 });
+
 
 // 6. AGREGAR COMENTARIO ✅ (CON notificationSettings)
 router.post('/:postId/comments', auth, async (req, res) => {
