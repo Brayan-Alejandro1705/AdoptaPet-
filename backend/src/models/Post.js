@@ -14,7 +14,12 @@ const commentSchema = new mongoose.Schema({
     trim: true,
     required: [true, 'El contenido del comentario es obligatorio'],
     maxlength: [1000, 'El comentario no puede exceder 1000 caracteres']
-  }
+  },
+  replies: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    content: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true  // agrega createdAt y updatedAt automáticamente
 });
@@ -56,13 +61,28 @@ const postSchema = new mongoose.Schema({
   // ===== COMENTARIOS =====
   comments: [commentSchema],
 
+  // Reportes
+  reports: [{
+    reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    reason: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now }
+  }],
+
   // Estadísticas
   stats: {
     likes: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     }],
+    likesCount: {
+      type: Number,
+      default: 0
+    },
     commentsCount: {
+      type: Number,
+      default: 0
+    },
+    reportsCount: {
       type: Number,
       default: 0
     },
