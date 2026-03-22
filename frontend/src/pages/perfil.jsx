@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { friendRequestService } from '../services/friendRequestService';
+import PostCard from '../components/common/PostCard';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -418,43 +419,75 @@ function Perfil() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {posts.map(post => (
-                      <div key={post._id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition">
-                        <div className="p-4 flex items-center justify-between border-b">
-                          <div className="flex items-center gap-3">
-                            <img src={post.author?.avatar || avatarUrl} alt={post.author?.nombre || post.author?.name || userName} className="w-10 h-10 rounded-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(userName); }} />
-                            <div>
-                              <p className="font-semibold">{post.author?.nombre || post.author?.name || userName}</p>
-                              <p className="text-xs text-gray-500">{formatTimeAgo(post.createdAt)}</p>
-                            </div>
-                          </div>
-                          {isOwnProfile && (
-                            <button onClick={() => handleDeletePost(post._id)} className="text-gray-400 hover:text-red-500 transition" title="Eliminar">🗑️</button>
-                          )}
-                        </div>
-
-                        {/* ✅ FIX 3: usar getImageUrl para imágenes del post */}
-                        {(() => {
-                          const rawImg = post.media?.images?.[0] || post.images?.[0]?.url || post.images?.[0];
-                          const imgUrl = getImageUrl(rawImg);
-                          return imgUrl ? (
-                            <div className="w-full">
-                              <img src={imgUrl} alt="Publicación" className="w-full h-auto max-h-96 object-cover" onError={(e) => { e.target.onerror = null; e.target.style.display = 'none'; }} />
-                            </div>
-                          ) : null;
-                        })()}
-
-                        <div className="p-4">
-                          {post.title && <h3 className="text-lg font-bold mb-2">{post.title}</h3>}
-                          {post.content && <p className="text-gray-800 whitespace-pre-wrap">{post.content}</p>}
-                          <span className="inline-block mt-3 px-3 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">{getTypeText(post.type)}</span>
-                        </div>
-                        <div className="px-4 py-3 bg-gray-50 border-t flex items-center justify-between text-sm">
-                          <span className="text-gray-600">❤️ {post.stats?.likes?.length || post.stats?.likesCount || 0} Me gusta</span>
-                          <span className="text-gray-600">💬 {post.stats?.commentsCount || 0} Comentarios</span>
-                        </div>
-                      </div>
-                    ))}
+                    {posts.map(post => {
+                      // Asegurar que el autor tenga los datos necesarios si vienen por separado
+                      const postWithFullAuthor = { 
+                        ...post, 
+                        author: post.author?._id ? post.author : user 
+                      };
+                      
+                      return (
+                        <PostCard
+                          key={post._id}
+                          post={postWithFullAuthor}
+                          currentUser={user} // 'user' es el perfil actual, pero 'currentUser' en PostCard espera el logueado
+                          // Pero en Perfil, 'user' es el del perfil que vemos. 
+                          // Necesitamos el usuario logueado real para los likes.
+                          onDelete={handleDeletePost}
+                          onLike={(id, isLiked) => {
+                            setPosts(prev => prev.map(p => {
+                              if (p._id === id) {
+                                const currentLikes = p.stats?.likes || [];
+                                const loggedInUserStr = localStorage.getItem('user');
+                                let uid = '';
+                                if (loggedInUserStr) {
+                                  const lu = JSON.parse(loggedInUserStr);
+                                  uid = lu._id || lu.id;
+                                }
+                                
+                                let newLikes = [...currentLikes];
+                                if (isLiked) {
+                                  if (!newLikes.includes(uid)) newLikes.push(uid);
+                                } else {
+                                  newLikes = newLikes.filter(lid => String(lid) !== String(uid));
+                                }
+                                return { ...p, stats: { ...p.stats, likes: newLikes, likesCount: isLiked ? (p.stats?.likesCount || 0) + 1 : Math.max(0, (p.stats?.likesCount || 1) - 1) } };
+                              }
+                              return p;
+                            }));
+                          }}
+                          onComment={(id, comment) => {
+                            setPosts(prev => prev.map(p => {
+                              if (p._id === id) {
+                                return { ...p, comments: [...(p.comments || []), comment], stats: { ...p.stats, commentsCount: (p.stats?.commentsCount || 0) + 1 } };
+                              }
+                              return p;
+                            }));
+                          }}
+                          onDeleteComment={(id, commentId) => {
+                            setPosts(prev => prev.map(p => {
+                              if (p._id === id) {
+                                return { ...p, comments: p.comments.filter(c => c._id !== commentId), stats: { ...p.stats, commentsCount: Math.max(0, (p.stats?.commentsCount || 1) - 1) } };
+                              }
+                              return p;
+                            }));
+                          }}
+                          onDeleteReply={(id, commentId, replyId) => {
+                            setPosts(prev => prev.map(p => {
+                              if (p._id === id) {
+                                return { ...p, comments: p.comments.map(c => {
+                                  if (c._id === commentId) {
+                                    return { ...c, replies: c.replies.filter(r => r._id !== replyId) };
+                                  }
+                                  return c;
+                                })};
+                              }
+                              return p;
+                            }));
+                          }}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
