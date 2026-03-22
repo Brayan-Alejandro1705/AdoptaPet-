@@ -334,7 +334,7 @@ const ShareModal = ({ post, currentUser, onClose }) => {
 
 
 // ===== POST CARD =====
-const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) => {
+const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDeleteComment, onDeleteReply }) => {
     if (!post)        { console.error('PostCard: post es null o undefined'); return null; }
     if (!currentUser) { console.error('PostCard: currentUser es null o undefined'); return null; }
 
@@ -562,8 +562,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
-                setCommentsCount(prev => prev - 1);
-                // Opcional: callback al padre para remover el comentario del array local
+                setCommentsCount(prev => Math.max(0, prev - 1));
+                if (onDeleteComment) onDeleteComment(post._id, commentId);
                 alert('Comentario eliminado');
             }
         } catch { alert('Error al eliminar el comentario'); }
@@ -577,7 +577,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` }
             });
-            if (res.ok) alert('Respuesta eliminada');
+            if (res.ok) {
+                if (onDeleteReply) onDeleteReply(post._id, commentId, replyId);
+                alert('Respuesta eliminada');
+            }
         } catch { alert('Error al eliminar la respuesta'); }
     };
 
@@ -787,7 +790,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                                         {(isCommentOwner || isOwner) && (
                                                             <button 
                                                                 onClick={() => handleDeleteComment(comment._id)}
-                                                                className="absolute -right-2 -top-2 w-6 h-6 bg-white border border-gray-100 rounded-full flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition shadow-sm hover:text-red-600"
+                                                                className="absolute -right-2 -top-2 w-6 h-6 bg-white border border-gray-100 rounded-full flex items-center justify-center text-red-400 transition shadow-sm hover:text-red-600 z-10"
                                                             >
                                                                 <Trash2 className="w-3 h-3" />
                                                             </button>
@@ -822,7 +825,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                                                                 {(isReplyOwner || isOwner) && (
                                                                                     <button 
                                                                                         onClick={() => handleDeleteReply(comment._id, reply._id)}
-                                                                                        className="absolute -right-2 top-0 w-5 h-5 bg-white border border-gray-100 rounded-full flex items-center justify-center text-red-400 opacity-0 group-hover/reply:opacity-100 transition shadow-sm hover:text-red-600"
+                                                                                        className="absolute -right-2 top-0 w-5 h-5 bg-white border border-gray-100 rounded-full flex items-center justify-center text-red-400 transition shadow-sm hover:text-red-600 z-10"
                                                                                     >
                                                                                         <Trash2 className="w-2.5 h-2.5" />
                                                                                     </button>

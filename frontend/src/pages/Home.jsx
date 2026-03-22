@@ -108,6 +108,36 @@ export default function Home() {
     }));
   };
 
+  const handleRemoveComment = (postId, commentId) => {
+    setPosts(posts.map(post => {
+      if (post._id === postId) {
+        return { 
+          ...post, 
+          comments: post.comments.filter(c => c._id !== commentId),
+          stats: { ...post.stats, commentsCount: Math.max(0, (post.stats?.commentsCount || 1) - 1) }
+        };
+      }
+      return post;
+    }));
+  };
+
+  const handleRemoveReply = (postId, commentId, replyId) => {
+    setPosts(posts.map(post => {
+      if (post._id === postId) {
+        return {
+          ...post,
+          comments: post.comments.map(c => {
+            if (c._id === commentId) {
+              return { ...c, replies: c.replies.filter(r => r._id !== replyId) };
+            }
+            return c;
+          })
+        };
+      }
+      return post;
+    }));
+  };
+
   const handleOpenPublicar = () => navigate('/publicar');
 
   return (
@@ -237,6 +267,8 @@ export default function Home() {
                   onDelete={handleDelete}
                   onLike={handleLike}
                   onComment={handleComment}
+                  onDeleteComment={handleRemoveComment}
+                  onDeleteReply={handleRemoveReply}
                 />
               ))}
             </main>

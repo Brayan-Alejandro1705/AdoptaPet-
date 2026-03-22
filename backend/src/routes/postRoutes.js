@@ -201,26 +201,30 @@ router.post('/:postId/like', auth, async (req, res) => {
     const { postId } = req.params;
     const userId = req.userId;
 
-    const existing = await Post.findOne({ _id: postId, 'stats.likes': userId }, { _id: 1 }).lean();
-    let updatedPost;
-    let liked;
+    // 1. Intentar dar like (si no existe ya)
+    let updatedPost = await Post.findOneAndUpdate(
+      { _id: postId, 'stats.likes': { $ne: userId } },
+      { $addToSet: { 'stats.likes': userId }, $inc: { 'stats.likesCount': 1 } },
+      { new: true, select: 'stats.likesCount author' }
+    ).lean();
 
-    if (existing) {
-      updatedPost = await Post.findByIdAndUpdate(postId, 
+    let liked = true;
+
+    // 2. Si no se pudo dar like (porque ya existía), entonces quitarlo
+    if (!updatedPost) {
+      updatedPost = await Post.findOneAndUpdate(
+        { _id: postId, 'stats.likes': userId },
         { $pull: { 'stats.likes': userId }, $inc: { 'stats.likesCount': -1 } },
-        { new: true, select: 'stats.likesCount author' }).lean();
+        { new: true, select: 'stats.likesCount author' }
+      ).lean();
       liked = false;
-    } else {
-      updatedPost = await Post.findByIdAndUpdate(postId, 
-        { $addToSet: { 'stats.likes': userId }, $inc: { 'stats.likesCount': 1 } },
-        { new: true, select: 'stats.likesCount author' }).lean();
-      liked = true;
     }
 
-    const likesCount = updatedPost.stats?.likesCount ?? 0;
-    res.json({ success: true, data: { liked, likesCount } });
+    if (!updatedPost) return res.status(404).json({ success: false });
 
-    // Notificación en background
+    res.json({ success: true, data: { liked, likesCount: updatedPost.stats.likesCount } });
+
+    // Notificación en background si se dio like
     if (liked && updatedPost.author.toString() !== userId.toString()) {
       setImmediate(async () => {
         try {
@@ -229,7 +233,7 @@ router.post('/:postId/like', auth, async (req, res) => {
             User.findById(updatedPost.author).select('notificationSettings').lean()
           ]);
           if (postAuthor?.notificationSettings?.likes !== false) {
-            const notification = await Notification.create({
+            await Notification.create({
               recipient: updatedPost.author, sender: userId, type: 'like',
               title: 'Le gustó tu publicación', message: `A ${liker?.name || liker?.nombre || 'alguien'} le gustó tu publicación`,
               icon: '❤️', relatedId: postId, relatedModel: 'Post', actionUrl: `/post/${postId}`
@@ -242,6 +246,7 @@ router.post('/:postId/like', auth, async (req, res) => {
     }
   } catch (err) { res.status(500).json({ success: false }); }
 });
+
 
 router.delete('/:postId/like', auth, async (req, res) => {
   try {
