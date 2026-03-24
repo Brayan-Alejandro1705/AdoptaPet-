@@ -691,37 +691,52 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
                 {/* ✅ MOSTRAR IMÁGENES */}
                 {postImages.length > 0 && (
-                    <div className={`grid gap-0.5 ${
-                        postImages.length === 1 ? 'grid-cols-1' :
-                        postImages.length === 2 ? 'grid-cols-2' :
-                        postImages.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
-                    }`}>
-                        {postImages.slice(0, 4).map((image, index) => {
-                            const imageUrl = getImageUrl(image.url || image);
-                            return (
-                                <div key={index}
-                                    className={`relative overflow-hidden bg-gray-100 cursor-zoom-in ${getImageHeight(postImages.length)}`}
-                                    onClick={() => setLightbox({ images: postImages.map(img => getImageUrl(img.url || img)), index })}
-                                >
-                                    {imageUrl ? (
-                                        <img src={imageUrl} alt={`Imagen ${index + 1}`}
-                                            className="w-full h-full object-cover hover:opacity-90 transition"
-                                            onError={e => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">Error cargando imagen</div>'; }}
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">
-                                            URL inválida
-                                        </div>
-                                    )}
-                                    {index === 3 && postImages.length > 4 && (
-                                        <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
-                                            <span className="text-white text-xl font-bold">+{postImages.length - 4}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+                    postImages.length === 1 ? (
+                        // Una sola imagen: mostrar en proporción natural, sin recortar
+                        <div
+                            className="cursor-zoom-in overflow-hidden bg-gray-100"
+                            onClick={() => setLightbox({ images: [getImageUrl(postImages[0].url || postImages[0])], index: 0 })}
+                        >
+                            {getImageUrl(postImages[0].url || postImages[0]) ? (
+                                <img
+                                    src={getImageUrl(postImages[0].url || postImages[0])}
+                                    alt="Imagen"
+                                    className="w-full h-auto max-h-[600px] object-contain hover:opacity-95 transition bg-gray-50"
+                                    onError={e => { e.target.style.display = 'none'; }}
+                                />
+                            ) : null}
+                        </div>
+                    ) : (
+                        // Múltiples imágenes: grid con altura fija para layout limpio
+                        <div className={`grid gap-0.5 ${
+                            postImages.length === 2 ? 'grid-cols-2' :
+                            postImages.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
+                        }`}>
+                            {postImages.slice(0, 4).map((image, index) => {
+                                const imageUrl = getImageUrl(image.url || image);
+                                return (
+                                    <div key={index}
+                                        className={`relative overflow-hidden bg-gray-100 cursor-zoom-in ${getImageHeight(postImages.length)}`}
+                                        onClick={() => setLightbox({ images: postImages.map(img => getImageUrl(img.url || img)), index })}
+                                    >
+                                        {imageUrl ? (
+                                            <img src={imageUrl} alt={`Imagen ${index + 1}`}
+                                                className="w-full h-full object-cover hover:opacity-90 transition"
+                                                onError={e => { e.target.style.display = 'none'; }}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400 text-xs">URL inválida</div>
+                                        )}
+                                        {index === 3 && postImages.length > 4 && (
+                                            <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                                                <span className="text-white text-xl font-bold">+{postImages.length - 4}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )
                 )}
 
                 <div className="px-3 sm:px-4 py-2 border-t border-gray-100 flex justify-between text-xs sm:text-sm text-gray-500">

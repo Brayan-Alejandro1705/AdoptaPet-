@@ -19,7 +19,7 @@ import FloatingAIChat from './components/common/FloatingAIChat';
 import Feedback from './pages/Feedback';
 import RecuperarPassword from './pages/RecuperarPassword';
 import PostDetalle from './pages/PostDetalle';
-import ResetPassword from './pages/ResetPassword';
+import ResetPassword from './pages/Resetpassword';
 
 // ✅ Maneja /home con o sin token de Google en la URL
 const GoogleCallbackOrHome = () => {
