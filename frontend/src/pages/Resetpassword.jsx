@@ -91,7 +91,7 @@ export default function ResetPassword() {
           </p>
           <button
             onClick={() => navigate("/login")}
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 hover:border-blue-500 transition-all duration-300 font-semibold mt-4"
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-xl transition-colors"
           >
             Ir al inicio de sesión
           </button>
@@ -110,11 +110,11 @@ export default function ResetPassword() {
       <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div className="flex justify-center mb-4">
           <div className="bg-blue-100 p-4 rounded-full">
-            <Lock className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 hover:border-blue-500 transition-all duration-300 font-semibold mt-4" />
+            <Lock className="w-8 h-8 text-blue-500" />
           </div>
         </div>
 
-        <h2 className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 hover:border-blue-500 transition-all duration-300 font-semibold mt-4">
+        <h2 className="text-2xl font-bold text-center text-blue-600 mb-1">
           Nueva contraseña
         </h2>
         <p className="text-center text-gray-500 text-sm mb-6">
@@ -133,7 +133,7 @@ export default function ResetPassword() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 8 caracteres, letras, números y un símbolo"
                 required
-                className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 hover:border-blue-500 transition-all duration-300 font-semibold mt-4"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
               <button
                 type="button"
@@ -198,7 +198,7 @@ export default function ResetPassword() {
         <div className="mt-4 text-center">
           <Link
             to="/login"
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 hover:border-blue-500 transition-all duration-300 font-semibold mt-4"
+            className="text-sm text-blue-500 hover:underline"
           >
             ← Volver al inicio de sesión
           </Link>
