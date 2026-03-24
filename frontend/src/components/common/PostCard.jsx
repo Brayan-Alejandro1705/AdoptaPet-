@@ -389,7 +389,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
     useEffect(() => {
         if (post.stats) {
-            setLikesCount(post.stats.likesCount || post.stats.likes?.length || 0);
+            // Usar el mayor entre likesCount almacenado y el length real del array
+            const arrayLen = Array.isArray(post.stats.likes) ? post.stats.likes.length : 0;
+            const storedCount = post.stats.likesCount || 0;
+            setLikesCount(Math.max(storedCount, arrayLen));
             setCommentsCount(post.stats.commentsCount || 0);
         }
         if (Array.isArray(post.stats?.likes) && post.stats.likes.length > 0) {
@@ -399,7 +402,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                 return String(like?.user?._id || like?.user || like) === String(uid);
             });
             setIsLiked(liked);
-            if (!post.stats?.likesCount) setLikesCount(post.stats.likes.length);
         }
         if (Array.isArray(post.comments) && !post.stats?.commentsCount) setCommentsCount(post.comments.length);
     }, [post, currentUser]);

@@ -204,8 +204,8 @@ router.post('/:postId/like', auth, async (req, res) => {
     // 1. Intentar dar like (si no existe ya)
     let updatedPost = await Post.findOneAndUpdate(
       { _id: postId, 'stats.likes': { $ne: userId } },
-      { $addToSet: { 'stats.likes': userId }, $inc: { 'stats.likesCount': 1 } },
-      { new: true, select: 'stats.likesCount author' }
+      { $addToSet: { 'stats.likes': userId } },
+      { new: true, select: 'stats.likes author' }
     ).lean();
 
     let liked = true;
@@ -214,15 +214,23 @@ router.post('/:postId/like', auth, async (req, res) => {
     if (!updatedPost) {
       updatedPost = await Post.findOneAndUpdate(
         { _id: postId, 'stats.likes': userId },
-        { $pull: { 'stats.likes': userId }, $inc: { 'stats.likesCount': -1 } },
-        { new: true, select: 'stats.likesCount author' }
+        { $pull: { 'stats.likes': userId } },
+        { new: true, select: 'stats.likes author' }
       ).lean();
       liked = false;
     }
 
     if (!updatedPost) return res.status(404).json({ success: false });
 
-    res.json({ success: true, data: { liked, likesCount: updatedPost.stats.likesCount } });
+    // Usar la longitud real del array como fuente de verdad
+    const likesCount = Array.isArray(updatedPost.stats?.likes) ? updatedPost.stats.likes.length : 0;
+
+    // Mantener likesCount en sync en background (no bloquea la respuesta)
+    setImmediate(() => {
+      Post.findByIdAndUpdate(postId, { 'stats.likesCount': likesCount }).catch(() => {});
+    });
+
+    res.json({ success: true, data: { liked, likesCount } });
 
     // Notificación en background si se dio like
     if (liked && updatedPost.author.toString() !== userId.toString()) {
@@ -239,7 +247,7 @@ router.post('/:postId/like', auth, async (req, res) => {
               icon: '❤️', relatedId: postId, relatedModel: 'Post', actionUrl: `/post/${postId}`
             });
             const io = req.app.get('io');
-            if (io) io.to(updatedPost.author.toString()).emit('nueva-notificacion', { ...notification.toObject(), sender: liker });
+            if (io) io.to(updatedPost.author.toString()).emit('nueva-notificacion', { sender: liker });
           }
         } catch (e) {}
       });
@@ -248,14 +256,6 @@ router.post('/:postId/like', auth, async (req, res) => {
 });
 
 
-router.delete('/:postId/like', auth, async (req, res) => {
-  try {
-    const updatedPost = await Post.findByIdAndUpdate(req.params.postId, 
-      { $pull: { 'stats.likes': req.userId }, $inc: { 'stats.likesCount': -1 } },
-      { new: true, select: 'stats.likesCount' }).lean();
-    res.json({ success: true, data: { likesCount: updatedPost.stats?.likesCount || 0 } });
-  } catch (err) { res.status(500).json({ success: false }); }
-});
 
 // 6. COMENTARIOS
 router.post('/:postId/comments', auth, async (req, res) => {
