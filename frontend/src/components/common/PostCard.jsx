@@ -468,7 +468,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
     // Optimistic update — actualiza inmediatamente
     setIsLiked(!likedAntes);
-    setLikesCount(likedAntes ? countAntes - 1 : countAntes + 1);
+    setLikesCount(likedAntes ? Math.max(0, countAntes - 1) : countAntes + 1);
     if (onLike) onLike(post._id, !likedAntes);
 
     try {
@@ -723,7 +723,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                 )}
 
                 <div className="px-3 sm:px-4 py-2 border-t border-gray-100 flex justify-between text-xs sm:text-sm text-gray-500">
-                    <span>{likesCount} me gusta</span>
+                    <span>{Math.max(0, likesCount)} me gusta</span>
                     <span>{commentsCount} comentarios</span>
                 </div>
 
