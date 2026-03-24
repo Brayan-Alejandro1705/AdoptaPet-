@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, MoreVertical, Trash2, Edit2, X, Globe, Smile, Send, Search, Copy, Check } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Trash2, Edit2, X, Globe, Smile, Send, Search, Copy, Check, BadgeCheck, Reply, Flag } from 'lucide-react';
 
 const PURPLE   = '#7C3AED';
 const PINK     = '#EC4899';
@@ -334,7 +334,7 @@ const ShareModal = ({ post, currentUser, onClose }) => {
 
 
 // ===== POST CARD =====
-const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) => {
+const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDeleteComment, onDeleteReply }) => {
     if (!post)        { console.error('PostCard: post es null o undefined'); return null; }
     if (!currentUser) { console.error('PostCard: currentUser es null o undefined'); return null; }
 
@@ -349,6 +349,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
     const [likesCount, setLikesCount]         = useState(0);
     const [commentsCount, setCommentsCount]   = useState(0);
     const [showShareModal, setShowShareModal] = useState(false);
+    const [replyingTo, setReplyingTo]         = useState(null); // { commentId, userName }
+    const [replyText, setReplyText]           = useState('');
     const [lightbox, setLightbox]             = useState(null);
 
     const getAvatarUrl = (user) => {
@@ -466,7 +468,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
 
     // Optimistic update — actualiza inmediatamente
     setIsLiked(!likedAntes);
-    setLikesCount(likedAntes ? countAntes - 1 : countAntes + 1);
+    setLikesCount(likedAntes ? Math.max(0, countAntes - 1) : countAntes + 1);
     if (onLike) onLike(post._id, !likedAntes);
 
     try {
@@ -514,6 +516,74 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
         } catch { alert('Error al eliminar publicación'); }
     };
 
+    const handleReport = async () => {
+        const reason = window.prompt('¿Por qué reportas esta publicación?', 'Contenido inapropiado');
+        if (!reason) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/api/posts/${post._id}/report`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason })
+            });
+            const data = await res.json();
+            if (data.success) alert('Gracias por tu reporte. Lo revisaremos pronto.');
+        } catch { alert('Error al enviar el reporte'); }
+    };
+
+    const handleReply = async (commentId) => {
+        if (!replyText.trim()) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}/replies`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: replyText })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setReplyText('');
+                setReplyingTo(null);
+                // Aquí podrías actualizar el estado local del post si es necesario, 
+                // pero usualmente el padre recarga el feed o tú mutas el post prop (no recomendado)
+                // Por ahora, recargamos la info del comentario si es posible o notificamos
+                if (onComment) onComment(post._id, data.data.reply); 
+                alert('Respuesta enviada');
+            }
+        } catch { alert('Error al enviar respuesta'); }
+    };
+
+    const handleDeleteComment = async (commentId) => {
+        if (!window.confirm('¿Eliminar este comentario?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setCommentsCount(prev => Math.max(0, prev - 1));
+                if (onDeleteComment) onDeleteComment(post._id, commentId);
+                alert('Comentario eliminado');
+            }
+        } catch { alert('Error al eliminar el comentario'); }
+    };
+
+    const handleDeleteReply = async (commentId, replyId) => {
+        if (!window.confirm('¿Eliminar esta respuesta?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}/replies/${replyId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                if (onDeleteReply) onDeleteReply(post._id, commentId, replyId);
+                alert('Respuesta eliminada');
+            }
+        } catch { alert('Error al eliminar la respuesta'); }
+    };
+
     const getImageHeight = (count) => {
         if (count === 1) return 'h-48 sm:h-72';
         return 'h-36 sm:h-52';
@@ -543,7 +613,9 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                 >
                                     {author.nombre || author.name || 'Usuario eliminado'}
                                 </h3>
-                                {author.verified?.email && <span className="text-blue-500 text-xs">✓</span>}
+                                {(author.isVerified || author.verified?.email) && (
+                                    <BadgeCheck className="w-4 h-4 text-blue-500 fill-blue-50" />
+                                )}
                                 <span className="text-xs">{getPostTypeIcon(post.type)}</span>
                             </div>
                             <p className="text-xs text-gray-500">
@@ -562,6 +634,9 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                                     <button onClick={() => { setShowMenu(false); handleFavorite(); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2 text-sm">
                                         <span>{isFavorite ? '⭐' : '☆'}</span>
                                         {isFavorite ? 'Quitar favorito' : 'Agregar favorito'}
+                                    </button>
+                                    <button onClick={() => { setShowMenu(false); handleReport(); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2 text-sm text-amber-600 border-t border-gray-100">
+                                        <Flag className="w-4 h-4" /> Reportar publicación
                                     </button>
                                     {isOwner && (
                                         <>
@@ -648,7 +723,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                 )}
 
                 <div className="px-3 sm:px-4 py-2 border-t border-gray-100 flex justify-between text-xs sm:text-sm text-gray-500">
-                    <span>{likesCount} me gusta</span>
+                    <span>{Math.max(0, likesCount)} me gusta</span>
                     <span>{commentsCount} comentarios</span>
                 </div>
 
@@ -690,20 +765,108 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit }) =>
                         </form>
 
                         {Array.isArray(post.comments) && post.comments.length > 0 && (
-                            <div className="mt-3 space-y-2.5">
-                                {post.comments.map(comment => (
-                                    <div key={comment._id || Math.random()} className="flex gap-2">
-                                        <img src={getAvatarUrl(comment.user)} alt={comment.user?.nombre || 'Usuario'}
-                                            className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-0.5"
-                                            onError={e => { e.target.onError = null; e.target.src = generateAvatarSVG(comment.user?.nombre || comment.user?.name || 'U'); }}
-                                        />
-                                        <div className="flex-1 bg-white rounded-xl px-3 py-2 shadow-sm">
-                                            <h4 className="font-semibold text-xs text-gray-900">{comment.user?.nombre || comment.user?.name || 'Usuario'}</h4>
-                                            <p className="text-sm text-gray-800 mt-0.5 break-words">{comment.content}</p>
-                                            <p className="text-xs text-gray-400 mt-1">{formatTimeAgo(comment.createdAt)}</p>
+                            <div className="mt-3 space-y-4">
+                                {post.comments.map(comment => {
+                                    const isCommentOwner = String(comment.user?._id || comment.user) === String(currentUserId);
+                                    return (
+                                        <div key={comment._id} className="group">
+                                            <div className="flex gap-2">
+                                                <img src={getAvatarUrl(comment.user)} alt={comment.user?.nombre || 'U'}
+                                                    className="w-8 h-8 rounded-full object-cover flex-shrink-0 mt-0.5 cursor-pointer"
+                                                    onClick={() => navigate(String(comment.user?._id || comment.user) === currentUserId ? '/perfil' : `/perfil/${comment.user?._id || comment.user}`)}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="bg-white rounded-2xl px-3 py-2 shadow-sm relative group">
+                                                        <div className="flex items-center gap-1">
+                                                            <h4 className="font-bold text-xs text-gray-900 truncate">
+                                                                {comment.user?.nombre || comment.user?.name || 'Usuario'}
+                                                            </h4>
+                                                            {(comment.user?.isVerified || comment.user?.verified?.email) && (
+                                                                <BadgeCheck className="w-3 h-3 text-blue-500" />
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm text-gray-800 mt-0.5 break-words">{comment.content}</p>
+                                                        
+                                                        {(isCommentOwner || isOwner) && (
+                                                            <button 
+                                                                onClick={() => handleDeleteComment(comment._id)}
+                                                                className="absolute -right-2 -top-2 w-6 h-6 bg-white border border-gray-100 rounded-full flex items-center justify-center text-red-400 transition shadow-sm hover:text-red-600 z-10"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-3 mt-1.5 ml-2">
+                                                        <span className="text-[10px] text-gray-400">{formatTimeAgo(comment.createdAt)}</span>
+                                                        <button 
+                                                            onClick={() => setReplyingTo({ commentId: comment._id, userName: comment.user?.nombre || comment.user?.name })}
+                                                            className="text-[10px] font-bold text-gray-500 hover:text-purple-600 transition flex items-center gap-1"
+                                                        >
+                                                            <Reply className="w-3 h-3" /> Responder
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Respuestas (Replies) */}
+                                                    {comment.replies?.length > 0 && (
+                                                        <div className="mt-3 ml-4 space-y-3 border-l-2 border-gray-100 pl-3">
+                                                            {comment.replies.map(reply => {
+                                                                const isReplyOwner = String(reply.user?._id || reply.user) === String(currentUserId);
+                                                                return (
+                                                                    <div key={reply._id} className="flex gap-2 group/reply">
+                                                                        <img src={getAvatarUrl(reply.user)} alt="U" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="bg-gray-100/50 rounded-xl px-2.5 py-1.5 relative">
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <span className="font-bold text-[10px] text-gray-900">{reply.user?.nombre || reply.user?.name || 'Usuario'}</span>
+                                                                                    {(reply.user?.isVerified || reply.user?.verified?.email) && <BadgeCheck className="w-2.5 h-2.5 text-blue-500" />}
+                                                                                </div>
+                                                                                <p className="text-xs text-gray-700 leading-tight">{reply.content}</p>
+                                                                                {(isReplyOwner || isOwner) && (
+                                                                                    <button 
+                                                                                        onClick={() => handleDeleteReply(comment._id, reply._id)}
+                                                                                        className="absolute -right-2 top-0 w-5 h-5 bg-white border border-gray-100 rounded-full flex items-center justify-center text-red-400 transition shadow-sm hover:text-red-600 z-10"
+                                                                                    >
+                                                                                        <Trash2 className="w-2.5 h-2.5" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
+                                                                            <span className="text-[9px] text-gray-400 ml-1">{formatTimeAgo(reply.createdAt)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Formulario de respuesta */}
+                                                    {replyingTo?.commentId === comment._id && (
+                                                        <div className="mt-2 ml-4 flex gap-2 animate-in slide-in-from-left-2 duration-200">
+                                                            <input 
+                                                                autoFocus
+                                                                type="text" 
+                                                                value={replyText}
+                                                                onChange={e => setReplyText(e.target.value)}
+                                                                placeholder={`Respondiendo a ${replyingTo.userName}...`}
+                                                                className="flex-1 bg-white border border-purple-100 rounded-full px-3 py-1 text-xs outline-none focus:border-purple-400 shadow-sm"
+                                                                onKeyDown={e => e.key === 'Enter' && handleReply(comment._id)}
+                                                            />
+                                                            <button 
+                                                                onClick={() => handleReply(comment._id)}
+                                                                disabled={!replyText.trim()}
+                                                                className="w-7 h-7 rounded-full flex items-center justify-center text-white disabled:opacity-50 transition active:scale-95 shadow-sm"
+                                                                style={{ background: GRADIENT }}
+                                                            >
+                                                                <Send className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button onClick={() => setReplyingTo(null)} className="text-[10px] text-gray-400 font-bold hover:text-gray-600 mt-1">Cancelar</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

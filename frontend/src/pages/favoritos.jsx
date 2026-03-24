@@ -247,6 +247,51 @@ export default function Favoritos() {
                     post={post}
                     currentUser={currentUser}
                     onDelete={(id) => setPosts(prev => prev.filter(p => p._id !== id))}
+                    onLike={(id, isLiked) => {
+                      setPosts(prev => prev.map(p => {
+                        if (p._id === id) {
+                          const currentLikes = p.stats?.likes || [];
+                          const uid = currentUser?._id || currentUser?.id;
+                          let newLikes = [...currentLikes];
+                          if (isLiked) {
+                            if (!newLikes.includes(uid)) newLikes.push(uid);
+                          } else {
+                            newLikes = newLikes.filter(lid => String(lid) !== String(uid));
+                          }
+                          return { ...p, stats: { ...p.stats, likes: newLikes, likesCount: isLiked ? (p.stats?.likesCount || 0) + 1 : Math.max(0, (p.stats?.likesCount || 1) - 1) } };
+                        }
+                        return p;
+                      }));
+                    }}
+                    onComment={(id, comment) => {
+                      setPosts(prev => prev.map(p => {
+                        if (p._id === id) {
+                          return { ...p, comments: [...(p.comments || []), comment], stats: { ...p.stats, commentsCount: (p.stats?.commentsCount || 0) + 1 } };
+                        }
+                        return p;
+                      }));
+                    }}
+                    onDeleteComment={(id, commentId) => {
+                      setPosts(prev => prev.map(p => {
+                        if (p._id === id) {
+                          return { ...p, comments: p.comments.filter(c => c._id !== commentId), stats: { ...p.stats, commentsCount: Math.max(0, (p.stats?.commentsCount || 1) - 1) } };
+                        }
+                        return p;
+                      }));
+                    }}
+                    onDeleteReply={(id, commentId, replyId) => {
+                      setPosts(prev => prev.map(p => {
+                        if (p._id === id) {
+                          return { ...p, comments: p.comments.map(c => {
+                            if (c._id === commentId) {
+                              return { ...c, replies: c.replies.filter(r => r._id !== replyId) };
+                            }
+                            return c;
+                          })};
+                        }
+                        return p;
+                      }));
+                    }}
                   />
                 ))}
               </div>

@@ -88,6 +88,17 @@ const userSchema = new mongoose.Schema({
         index: true
     },
     
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    
+    badgeType: {
+        type: String,
+        enum: ['none', 'verified', 'shelter', 'pro', 'staff'],
+        default: 'none'
+    },
+    
     // =============================================
     // PERFIL DEL USUARIO
     // =============================================

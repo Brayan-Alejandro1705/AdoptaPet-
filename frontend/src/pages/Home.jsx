@@ -93,7 +93,24 @@ export default function Home() {
   const handleLike = (postId, isLiked) => {
     setPosts(posts.map(post => {
       if (post._id === postId) {
-        return { ...post, stats: { ...post.stats, likesCount: isLiked ? (post.stats?.likesCount || 0) + 1 : (post.stats?.likesCount || 1) - 1 } };
+        const currentLikes = post.stats?.likes || [];
+        const uid = currentUser?._id || currentUser?.id;
+        
+        let newLikes = [...currentLikes];
+        if (isLiked) {
+          if (!newLikes.includes(uid)) newLikes.push(uid);
+        } else {
+          newLikes = newLikes.filter(id => String(id) !== String(uid));
+        }
+
+        return { 
+          ...post, 
+          stats: { 
+            ...post.stats, 
+            likes: newLikes,
+            likesCount: isLiked ? (post.stats?.likesCount || 0) + 1 : Math.max(0, (post.stats?.likesCount || 1) - 1) 
+          } 
+        };
       }
       return post;
     }));
@@ -103,6 +120,36 @@ export default function Home() {
     setPosts(posts.map(post => {
       if (post._id === postId) {
         return { ...post, comments: [...(post.comments || []), comment], stats: { ...post.stats, commentsCount: (post.stats?.commentsCount || 0) + 1 } };
+      }
+      return post;
+    }));
+  };
+
+  const handleRemoveComment = (postId, commentId) => {
+    setPosts(posts.map(post => {
+      if (post._id === postId) {
+        return { 
+          ...post, 
+          comments: post.comments.filter(c => c._id !== commentId),
+          stats: { ...post.stats, commentsCount: Math.max(0, (post.stats?.commentsCount || 1) - 1) }
+        };
+      }
+      return post;
+    }));
+  };
+
+  const handleRemoveReply = (postId, commentId, replyId) => {
+    setPosts(posts.map(post => {
+      if (post._id === postId) {
+        return {
+          ...post,
+          comments: post.comments.map(c => {
+            if (c._id === commentId) {
+              return { ...c, replies: c.replies.filter(r => r._id !== replyId) };
+            }
+            return c;
+          })
+        };
       }
       return post;
     }));
@@ -237,6 +284,8 @@ export default function Home() {
                   onDelete={handleDelete}
                   onLike={handleLike}
                   onComment={handleComment}
+                  onDeleteComment={handleRemoveComment}
+                  onDeleteReply={handleRemoveReply}
                 />
               ))}
             </main>

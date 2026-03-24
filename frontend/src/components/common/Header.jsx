@@ -82,15 +82,30 @@ export default function Header({ onOpenModal }) {
       setSearchLoading(true);
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE}/api/users/search?q=${encodeURIComponent(searchQuery)}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setSearchResults(data || []);
-          setShowResults(true);
-          if (data && data.length > 0) cargarEstadosAmistad(data);
+        const headers = { Authorization: `Bearer ${token}` };
+        
+        const [usersRes, postsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/users/search?q=${encodeURIComponent(searchQuery)}`, { headers }),
+          fetch(`${API_BASE}/api/posts/search?q=${encodeURIComponent(searchQuery)}`, { headers })
+        ]);
+
+        let combined = [];
+        let usersData = [];
+        let postsData = [];
+
+        if (usersRes.ok) {
+           const d = await usersRes.json();
+           usersData = (d.data || d || []).map(u => ({ ...u, _searchType: 'user' }));
         }
+        if (postsRes.ok) {
+           const d = await postsRes.json();
+           postsData = (d.data || []).map(p => ({ ...p, _searchType: 'post' }));
+        }
+
+        combined = [...usersData, ...postsData];
+        setSearchResults(combined);
+        setShowResults(true);
+        if (usersData.length > 0) cargarEstadosAmistad(usersData);
       } catch (error) {
         setSearchResults([]);
       } finally {
@@ -201,18 +216,36 @@ export default function Header({ onOpenModal }) {
         </div>
       ) : searchResults.length > 0 ? (
         <div className="py-2">
-          {searchResults.map((result) => (
-            <div key={result._id || result.id} className="w-full px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3">
-              <button onClick={() => handleUserClick(result._id || result.id)} className="flex items-center gap-3 flex-1 text-left">
-                <img src={getAvatarUrl(result)} alt={result.name || result.nombre} className="w-10 h-10 rounded-full object-cover border-2 border-gray-100" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate text-sm">{result.name || result.nombre}</p>
-                  <p className="text-xs text-gray-500 truncate">{result.email}</p>
+          {searchResults.map((result) => {
+            if (result._searchType === 'user') {
+              return (
+                <div key={`user-${result._id || result.id}`} className="w-full px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3">
+                  <button onClick={() => handleUserClick(result._id || result.id)} className="flex items-center gap-3 flex-1 text-left">
+                    <img src={getAvatarUrl(result)} alt={result.name || result.nombre} className="w-10 h-10 rounded-full object-cover border-2 border-gray-100" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate text-sm">{result.name || result.nombre}</p>
+                      <p className="text-xs text-gray-500 truncate">{result.email}</p>
+                    </div>
+                  </button>
+                  {getFriendButton(result._id || result.id)}
                 </div>
-              </button>
-              {getFriendButton(result._id || result.id)}
-            </div>
-          ))}
+              );
+            } else {
+              return (
+                <div key={`post-${result._id || result.id}`} className="w-full px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3">
+                  <button onClick={() => { setSearchQuery(''); setShowResults(false); navigate(`/post/${result._id}`); }} className="flex items-center gap-3 flex-1 text-left">
+                    <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0">
+                      <span className="text-xl">📝</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate text-sm">{result.author?.name || result.author?.nombre || 'Usuario'}</p>
+                      <p className="text-xs text-gray-500 truncate">{result.content ? result.content.substring(0, 45) + '...' : 'Publicación'}</p>
+                    </div>
+                  </button>
+                </div>
+              );
+            }
+          })}
         </div>
       ) : (
         <div className="p-6 text-center">
