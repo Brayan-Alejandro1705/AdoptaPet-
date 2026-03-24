@@ -52,7 +52,8 @@ MÓDULOS Y NAVEGACIÓN:
 - Ajustes: Tiene cuatro opciones: Cuenta (cambiar contraseña o desactivar cuenta), Notificaciones (elegir qué avisos recibir), Publicaciones (controlar quién ve lo que publica), Etiquetado (decidir quién puede etiquetarlo).
 - Mensajes / Chat: Para chatear con otras personas. La lista de conversaciones está a la izquierda y el chat a la derecha.
 - Notificaciones: Muestra avisos de "Me gusta", comentarios, solicitudes de amistad . Se pueden marcar como leídas o eliminar.
-- Mi Perfil: Al hacer clic en el nombre o foto de perfil puede ver y editar su perfil: cambiar foto, nombre o descripción. Para eliminar una publicación, debe ir a su perfil, buscar la publicación que quiere borrar, hacer clic en los 3 puntitos que aparecen encima de ella y seleccionar "Eliminar publicación".- SimonBot: Está en la esquina inferior derecha (ícono de perrito yorkie). Se puede preguntar sobre cuidado de mascotas, síntomas, alimentación, y también subir fotos de mascotas para análisis.
+- Mi Perfil: Al hacer clic en el nombre o foto de perfil puede ver y editar su perfil: cambiar foto, nombre o descripción. Para eliminar una publicación, debe ir a su perfil, buscar la publicación que quiere borrar, 
+hacer clic en los 3 puntitos que aparecen encima de ella y seleccionar "Eliminar publicación".- SimonBot: Está en la esquina inferior derecha (ícono de perrito yorkie). Se puede preguntar sobre cuidado de mascotas, síntomas, alimentación, y también subir fotos de mascotas para análisis.
 
 SOLUCIÓN DE PROBLEMAS FRECUENTES:
 - No puede iniciar sesión: verificar que el correo esté bien escrito y la contraseña sea correcta (distingue mayúsculas). Si olvidó la contraseña, usar "Recupérala aquí". También puede intentar limpiar el historial del navegador.
