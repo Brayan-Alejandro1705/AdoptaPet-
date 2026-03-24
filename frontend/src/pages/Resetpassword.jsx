@@ -46,10 +46,12 @@ export default function ResetPassword() {
     e.preventDefault();
     setError("");
 
-    if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres.");
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      setError("La contraseña debe tener al menos 8 caracteres, una letra, un número y un carácter especial.");
       return;
     }
+
     if (password !== passwordConfirm) {
       setError("Las contraseñas no coinciden.");
       return;
@@ -129,7 +131,7 @@ export default function ResetPassword() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Mínimo 8 caracteres, letras, números y un símbolo"
                 required
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
@@ -145,6 +147,9 @@ export default function ResetPassword() {
                 )}
               </button>
             </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Debe incluir letras, números y al menos un símbolo (!@#$%...).
+            </p>
           </div>
 
           <div>
