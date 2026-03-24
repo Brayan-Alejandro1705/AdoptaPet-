@@ -475,7 +475,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
     try {
         const res = await fetch(`${API_BASE}/api/posts/${post._id}/like`, {
-            method: likedAntes ? 'DELETE' : 'POST', // ✅ usa likedAntes, no isLiked
+            method: 'POST', // El backend ahora hace toggle automático (like/unlike en un solo endpoint)
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
         const data = await res.json();
