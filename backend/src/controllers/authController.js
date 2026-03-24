@@ -5,7 +5,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendVerificationEmail } = require('../utils/email');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
 
 // =============================================
 // GENERAR TOKEN
@@ -59,7 +59,6 @@ exports.registro = async (req, res) => {
       await sendVerificationEmail(user.email, user.name, verificationCode);
     } catch (emailError) {
       console.error('❌ Error enviando email:', emailError.message);
-      // No interrumpir el flujo si falla el email
     }
 
     res.status(201).json({
@@ -243,6 +242,110 @@ exports.resendVerification = async (req, res) => {
   } catch (error) {
     console.error('❌ Error al reenviar verificación:', error);
     res.status(500).json({ success: false, message: 'Error al reenviar el código.' });
+  }
+};
+
+// =============================================
+// RECUPERAR CONTRASEÑA - Enviar correo
+// =============================================
+exports.recuperarPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'El email es requerido' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    // Respuesta genérica para no revelar si el email existe o no
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'Si ese email está registrado, recibirás un enlace en tu correo.'
+      });
+    }
+
+    // Generar token seguro
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.resetPasswordToken = resetTokenHash;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    try {
+      await sendPasswordResetEmail(user.email, user.name, resetUrl);
+      console.log('✅ Email de recuperación enviado a:', user.email);
+    } catch (emailError) {
+      // Si falla el correo, limpiar el token para no dejar datos colgados
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      console.error('❌ Error enviando email de recuperación:', emailError.message);
+      return res.status(500).json({ success: false, message: 'Error al enviar el correo. Intenta de nuevo.' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Si ese email está registrado, recibirás un enlace en tu correo.'
+    });
+
+  } catch (error) {
+    console.error('❌ Error en recuperarPassword:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+};
+
+// =============================================
+// RESET CONTRASEÑA - Guardar nueva contraseña
+// =============================================
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password, passwordConfirm } = req.body;
+
+    if (!token || !password || !passwordConfirm) {
+      return res.status(400).json({ success: false, message: 'Todos los campos son requeridos' });
+    }
+
+    if (password !== passwordConfirm) {
+      return res.status(400).json({ success: false, message: 'Las contraseñas no coinciden' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    // Hashear el token recibido para comparar con el guardado en BD
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: tokenHash,
+      resetPasswordExpires: { $gt: Date.now() }
+    }).select('+resetPasswordToken +resetPasswordExpires');
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'El enlace es inválido o ha expirado.' });
+    }
+
+    // Actualizar contraseña y limpiar token
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    console.log('✅ Contraseña restablecida para:', user.email);
+
+    res.json({
+      success: true,
+      message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.'
+    });
+
+  } catch (error) {
+    console.error('❌ Error en resetPassword:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 };
 

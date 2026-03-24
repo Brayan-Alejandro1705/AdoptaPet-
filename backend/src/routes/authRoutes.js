@@ -15,8 +15,6 @@ try {
   console.error('❌ authValidations FALLA:', e.message);
 }
 
-
-
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
@@ -59,6 +57,20 @@ router.post('/verify-email', authController.verifyEmail);
  * @access  Public
  */
 router.post('/resend-verification', authController.resendVerification);
+
+/**
+ * @route   POST /api/auth/recuperar-password
+ * @desc    Enviar correo con link de recuperación
+ * @access  Public
+ */
+router.post('/recuperar-password', authController.recuperarPassword);
+
+/**
+ * @route   POST /api/auth/reset-password
+ * @desc    Resetear contraseña con token del correo
+ * @access  Public
+ */
+router.post('/reset-password', authController.resetPassword);
 
 /**
  * @route   GET /api/auth/test
