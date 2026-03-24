@@ -19,6 +19,7 @@ import FloatingAIChat from './components/common/FloatingAIChat';
 import Feedback from './pages/Feedback';
 import RecuperarPassword from './pages/RecuperarPassword';
 import PostDetalle from './pages/PostDetalle';
+import ResetPassword from './pages/ResetPassword';
 
 // ✅ Maneja /home con o sin token de Google en la URL
 const GoogleCallbackOrHome = () => {
@@ -84,6 +85,7 @@ function App() {
         <Route path="/registro" element={<Registro />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/recuperar-password" element={<RecuperarPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Redirigir raíz al login */}
         <Route path="/" element={<Navigate to="/login" replace />} />
