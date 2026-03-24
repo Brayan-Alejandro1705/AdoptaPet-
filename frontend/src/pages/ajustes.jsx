@@ -6,7 +6,6 @@ import SettingsOption from '../components/common/SettingsOption';
 import CuentaModal from '../components/common/CuentaModal';
 import NotificacionesModal from '../components/common/NotificacionesModal';
 import PublicacionesModal from '../components/common/PublicacionesModal';
-import EtiquetadoModal from '../components/common/EtiquetadoModal';
 
 const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}`;
 
@@ -14,7 +13,6 @@ const Ajustes = () => {
   const [modalCuenta, setModalCuenta] = useState(false);
   const [modalNotificaciones, setModalNotificaciones] = useState(false);
   const [modalPublicaciones, setModalPublicaciones] = useState(false);
-  const [modalEtiquetado, setModalEtiquetado] = useState(false);
 
   const [settings, setSettings] = useState({
     privacidadPorDefecto: 'publico',
@@ -130,12 +128,6 @@ const Ajustes = () => {
             onClick={() => setModalPublicaciones(true)}
           />
 
-          <SettingsOption
-            icon="🏷️"
-            title="Etiquetado"
-            onClick={() => setModalEtiquetado(true)}
-          />
-
         </div>
       </div>
 
@@ -162,22 +154,8 @@ const Ajustes = () => {
         setSettings={setSettings}
         onSave={handleGuardar}
       />
-
-      <EtiquetadoModal
-        isOpen={modalEtiquetado}
-        onClose={() => setModalEtiquetado(false)}
-        settings={settings}
-        setSettings={setSettings}
-      />
     </div>
   );
 };
 
 export default Ajustes;
-
-
-
-
-
-
-
