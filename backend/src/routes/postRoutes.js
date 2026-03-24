@@ -113,6 +113,8 @@ router.get('/', auth, async (req, res) => {
     const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
       .populate('comments.user', 'name nombre email avatar')
+      .populate('comments.replies.user', 'name nombre email avatar')
+      .populate('comments.replies.replyTo', 'name nombre avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -140,6 +142,8 @@ router.get('/feed', auth, async (req, res) => {
     const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
       .populate('comments.user', 'name nombre email avatar')
+      .populate('comments.replies.user', 'name nombre email avatar')
+      .populate('comments.replies.replyTo', 'name nombre avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -301,27 +305,54 @@ router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 6c. RESPONDER A COMENTARIO (REPLIES) ✅ NUEVO
+// 6c. RESPONDER A COMENTARIO (REPLIES) ✅ ACTUALIZADO CON replyTo
 router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
   try {
-    const { content } = req.body;
-    if (!content?.trim()) return res.status(400).json({ success: false });
+    const { content, replyTo } = req.body;
+    if (!content?.trim()) return res.status(400).json({ success: false, message: 'Contenido requerido' });
+
+    // Validar que replyTo sea un ID válido si se proporciona
+    let replyToData = null;
+    if (replyTo) {
+      try {
+        const replyToUser = await User.findById(replyTo).select('name nombre avatar').lean();
+        if (replyToUser) {
+          replyToData = replyTo;
+        }
+      } catch (e) {
+        console.log('Advertencia: replyTo no es un ID válido');
+      }
+    }
 
     const post = await Post.findOneAndUpdate(
       { _id: req.params.postId, "comments._id": req.params.commentId },
       { 
-        $push: { "comments.$.replies": { user: req.userId, content: content.trim(), createdAt: new Date() } }
+        $push: { 
+          "comments.$.replies": { 
+            user: req.userId, 
+            content: content.trim(), 
+            createdAt: new Date(),
+            replyTo: replyToData || null
+          } 
+        }
       },
       { new: true }
-    ).populate('comments.replies.user', 'name nombre avatar');
+    )
+    .populate('comments.replies.user', 'name nombre avatar verified')
+    .populate('comments.replies.replyTo', 'name nombre avatar');
 
-    if (!post) return res.status(404).json({ success: false });
+    if (!post) return res.status(404).json({ success: false, message: 'Post no encontrado' });
 
     const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
+
     const newReply = comment.replies[comment.replies.length - 1];
 
     res.status(201).json({ success: true, data: { reply: newReply } });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) { 
+    console.error('❌ Error en replies:', err);
+    res.status(500).json({ success: false, message: 'Error al crear respuesta' }); 
+  }
 });
 
 // 6d. ELIMINAR RESPUESTA ✅ NUEVO
@@ -365,6 +396,7 @@ router.get('/:postId', auth, async (req, res) => {
       .populate('author', 'name nombre avatar role verified')
       .populate('comments.user', 'name nombre avatar')
       .populate('comments.replies.user', 'name nombre avatar')
+      .populate('comments.replies.replyTo', 'name nombre avatar')
       .lean();
     if (!post) return res.status(404).json({ success: false, message: 'No encontrado' });
     res.json({ success: true, data: { post } });
