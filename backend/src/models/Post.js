@@ -18,10 +18,11 @@ const commentSchema = new mongoose.Schema({
   replies: [{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     content: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null } // ✅ FIX: campo agregado para soportar populate en postRoutes.js
   }]
 }, {
-  timestamps: true  // agrega createdAt y updatedAt automáticamente
+  timestamps: true
 });
 
 // ===== ESQUEMA DEL POST =====
@@ -119,7 +120,6 @@ const postSchema = new mongoose.Schema({
     enum: ['active', 'archived', 'deleted', 'reported'],
     default: 'active'
   },
-  // ⭐⭐⭐ AGREGAR ESTOS CAMPOS ⭐⭐⭐
 
   // Información de moderación
   moderatedBy: {
@@ -163,8 +163,6 @@ const postSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-
-  // ⭐⭐⭐ FIN DE LOS CAMPOS A AGREGAR ⭐⭐⭐
 
   // Información de adopción (si aplica)
   adoptionInfo: {
