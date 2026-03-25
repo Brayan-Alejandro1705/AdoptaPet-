@@ -16,6 +16,7 @@ const commentSchema = new mongoose.Schema({
     maxlength: [1000, 'El comentario no puede exceder 1000 caracteres']
   },
   replies: [{
+<<<<<<< HEAD
     user: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'User',
@@ -36,9 +37,15 @@ const commentSchema = new mongoose.Schema({
       ref: 'User',
       default: null
     }
+=======
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    content: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+    replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null } // ✅ FIX: campo agregado para soportar populate en postRoutes.js
+>>>>>>> 61a79de714d1952597ef829a3cac9b68db02b169
   }]
 }, {
-  timestamps: true  // agrega createdAt y updatedAt automáticamente
+  timestamps: true
 });
 
 // ===== ESQUEMA DEL POST =====

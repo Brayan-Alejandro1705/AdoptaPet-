@@ -8,24 +8,40 @@ const getAuthHeaders = () => {
   };
 };
 
+// ✅ Manejo centralizado de token expirado
+const handleUnauthorized = () => {
+  console.warn('🔒 Token expirado o inválido — cerrando sesión');
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  // Redirigir al login solo si no estamos ya ahí
+  if (!window.location.pathname.includes('/login')) {
+    window.location.href = '/login';
+  }
+};
+
 export const notificationService = {
   // Obtener todas las notificaciones
   getNotifications: async (page = 1, limit = 50, filters = {}) => {
     try {
       console.log('🔍 Obteniendo notificaciones...');
-      
+
       const response = await fetch(`${API_URL}/notifications`, {
         headers: getAuthHeaders()
       });
-      
+
+      // ✅ Detectar token expirado
+      if (response.status === 401) {
+        handleUnauthorized();
+        return { notifications: [], unreadCount: 0 };
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       console.log('📦 Notificaciones recibidas:', data);
-      
-      // El backend devuelve un array directamente
+
       return {
         notifications: Array.isArray(data) ? data : [],
         unreadCount: Array.isArray(data) ? data.filter(n => !n.read).length : 0
@@ -42,11 +58,17 @@ export const notificationService = {
       const response = await fetch(`${API_URL}/notifications/unread-count`, {
         headers: getAuthHeaders()
       });
-      
+
+      // ✅ Detectar token expirado — dejar de hacer polling silencioso
+      if (response.status === 401) {
+        handleUnauthorized();
+        return 0;
+      }
+
       if (!response.ok) {
         return 0;
       }
-      
+
       const data = await response.json();
       return data.count || 0;
     } catch (error) {
@@ -62,11 +84,16 @@ export const notificationService = {
         method: 'PUT',
         headers: getAuthHeaders()
       });
-      
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return null;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return data.notification || data;
     } catch (error) {
@@ -82,11 +109,16 @@ export const notificationService = {
         method: 'PUT',
         headers: getAuthHeaders()
       });
-      
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return 0;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return data.count || 0;
     } catch (error) {
@@ -102,11 +134,16 @@ export const notificationService = {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
-      
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return false;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return true;
     } catch (error) {
       console.error('❌ Error en deleteNotification:', error);
@@ -121,11 +158,16 @@ export const notificationService = {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
-      
+
+      if (response.status === 401) {
+        handleUnauthorized();
+        return 0;
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return data.count || 0;
     } catch (error) {
