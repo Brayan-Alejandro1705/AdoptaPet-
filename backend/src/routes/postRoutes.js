@@ -112,13 +112,8 @@ router.get('/', auth, async (req, res) => {
 
     const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
-<<<<<<< HEAD
       .populate('comments.user', 'name nombre email avatar verified')
       .populate('comments.replies.user', 'name nombre email avatar verified')
-=======
-      .populate('comments.user', 'name nombre email avatar')
-      .populate('comments.replies.user', 'name nombre email avatar')
->>>>>>> 61a79de714d1952597ef829a3cac9b68db02b169
       .populate('comments.replies.replyTo', 'name nombre avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -147,13 +142,8 @@ router.get('/feed', auth, async (req, res) => {
 
     const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
-<<<<<<< HEAD
       .populate('comments.user', 'name nombre email avatar verified')
       .populate('comments.replies.user', 'name nombre email avatar verified')
-=======
-      .populate('comments.user', 'name nombre email avatar')
-      .populate('comments.replies.user', 'name nombre email avatar')
->>>>>>> 61a79de714d1952597ef829a3cac9b68db02b169
       .populate('comments.replies.replyTo', 'name nombre avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -345,7 +335,6 @@ router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 // 6c. RESPONDER A COMENTARIO (REPLIES) ✅ COMPLETO Y CORRECTO
 router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
   try {
@@ -366,15 +355,6 @@ router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
       });
     }
 
-=======
-// 6c. RESPONDER A COMENTARIO (REPLIES) ✅ ACTUALIZADO CON replyTo
-router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
-  try {
-    const { content, replyTo } = req.body;
-    if (!content?.trim()) return res.status(400).json({ success: false, message: 'Contenido requerido' });
-
-    // Validar que replyTo sea un ID válido si se proporciona
->>>>>>> 61a79de714d1952597ef829a3cac9b68db02b169
     let replyToData = null;
     if (replyTo) {
       try {
@@ -397,7 +377,8 @@ router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
             createdAt: new Date(),
             replyTo: replyToData || null
           } 
-        }
+        },
+        $inc: { 'stats.commentsCount': 1 }
       },
       { new: true }
     )
@@ -411,7 +392,37 @@ router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
 
     const newReply = comment.replies[comment.replies.length - 1];
 
-    res.status(201).json({ success: true, data: { reply: newReply } });
+    res.status(201).json({ success: true, data: { reply: newReply, commentsCount: post.stats.commentsCount } });
+
+    // Notificación al autor del comentario original
+    if (comment.user.toString() !== req.userId.toString()) {
+      setImmediate(async () => {
+        try {
+          const [replier, commentAuthor] = await Promise.all([
+            User.findById(req.userId).select('name nombre avatar').lean(),
+            User.findById(comment.user).select('notificationSettings').lean()
+          ]);
+          if (commentAuthor?.notificationSettings?.comments !== false) {
+            await Notification.create({
+              recipient: comment.user,
+              sender: req.userId,
+              type: 'comment',
+              title: 'Nueva respuesta',
+              message: `${replier?.name || replier?.nombre || 'Alguien'} respondió a tu comentario`,
+              icon: '💬',
+              relatedId: post._id,
+              relatedModel: 'Post',
+              actionUrl: `/post/${post._id}`
+            });
+            const io = req.app.get('io');
+            if (io) io.to(comment.user.toString()).emit('nueva-notificacion', { sender: replier });
+          }
+        } catch (e) {
+          console.error('Error enviando notificación de respuesta:', e);
+        }
+      });
+    }
+
   } catch (err) { 
     console.error('❌ Error en replies:', err);
     res.status(500).json({ success: false, message: 'Error al crear respuesta' }); 
@@ -447,7 +458,10 @@ router.delete('/:postId/comments/:commentId/replies/:replyId', auth, async (req,
     // Ahora sí actualizar
     const updatedPost = await Post.findOneAndUpdate(
       { _id: req.params.postId, "comments._id": req.params.commentId },
-      { $pull: { "comments.$.replies": { _id: req.params.replyId } } },
+      { 
+        $pull: { "comments.$.replies": { _id: req.params.replyId } },
+        $inc: { 'stats.commentsCount': -1 }
+      },
       { new: true }
     );
 
@@ -486,13 +500,8 @@ router.get('/:postId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId)
       .populate('author', 'name nombre avatar role verified')
-<<<<<<< HEAD
       .populate('comments.user', 'name nombre avatar verified')
       .populate('comments.replies.user', 'name nombre avatar verified')
-=======
-      .populate('comments.user', 'name nombre avatar')
-      .populate('comments.replies.user', 'name nombre avatar')
->>>>>>> 61a79de714d1952597ef829a3cac9b68db02b169
       .populate('comments.replies.replyTo', 'name nombre avatar')
       .lean();
     if (!post) return res.status(404).json({ success: false, message: 'No encontrado' });
