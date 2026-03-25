@@ -16,10 +16,33 @@ const commentSchema = new mongoose.Schema({
     maxlength: [1000, 'El comentario no puede exceder 1000 caracteres']
   },
   replies: [{
+<<<<<<< HEAD
+    user: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'User',
+      required: true
+    },
+    content: { 
+      type: String, 
+      required: true,
+      maxlength: [1000, 'La respuesta no puede exceder 1000 caracteres']
+    },
+    createdAt: { 
+      type: Date, 
+      default: Date.now 
+    },
+    // 🆕 NUEVO: Campo para mencionar a quién se responde
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    }
+=======
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     content: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null } // ✅ FIX: campo agregado para soportar populate en postRoutes.js
+>>>>>>> 61a79de714d1952597ef829a3cac9b68db02b169
   }]
 }, {
   timestamps: true
@@ -183,19 +206,84 @@ const postSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Índices para optimizar búsquedas
+// ===== ÍNDICES PARA OPTIMIZAR BÚSQUEDAS =====
 postSchema.index({ author: 1, createdAt: -1 });
 postSchema.index({ status: 1, createdAt: -1 });
 postSchema.index({ type: 1 });
+postSchema.index({ 'stats.likes': 1 });
+postSchema.index({ 'comments.user': 1 });
+postSchema.index({ 'comments.replies.user': 1 });
 
-// Permitir posts con solo contenido o solo imagen
+// ===== MIDDLEWARE PRE-SAVE =====
 postSchema.pre('validate', function(next) {
   next();
 });
+
+// ===== MÉTODOS DE INSTANCIA =====
+
+// Obtener comentarios populados con replies
+postSchema.methods.getCommentsWithReplies = async function() {
+  return await this.populate([
+    {
+      path: 'comments.user',
+      select: 'nombre name avatar verified'
+    },
+    {
+      path: 'comments.replies.user',
+      select: 'nombre name avatar verified'
+    },
+    {
+      path: 'comments.replies.replyTo',
+      select: 'nombre name avatar'
+    }
+  ]).execPopulate();
+};
+
+// Agregar like a un post
+postSchema.methods.addLike = async function(userId) {
+  if (!this.stats.likes.includes(userId)) {
+    this.stats.likes.push(userId);
+    this.stats.likesCount = this.stats.likes.length;
+    await this.save();
+  }
+  return this;
+};
+
+// Remover like
+postSchema.methods.removeLike = async function(userId) {
+  this.stats.likes = this.stats.likes.filter(id => id.toString() !== userId.toString());
+  this.stats.likesCount = this.stats.likes.length;
+  await this.save();
+  return this;
+};
+
+// ===== MÉTODOS ESTÁTICOS =====
+
+// Obtener posts con todas las relaciones populadas
+postSchema.statics.getPostsWithDetails = async function(filter = {}, options = {}) {
+  const { page = 1, limit = 20, sort = { createdAt: -1 } } = options;
+  const skip = (page - 1) * limit;
+
+  return this.find(filter)
+    .populate('author', 'nombre name email avatar verified')
+    .populate('comments.user', 'nombre name avatar verified')
+    .populate('comments.replies.user', 'nombre name avatar verified')
+    .populate('comments.replies.replyTo', 'nombre name avatar')
+    .sort(sort)
+    .skip(skip)
+    .limit(limit)
+    .lean();
+};
+
+// Contar posts activos
+postSchema.statics.countActive = async function(filter = {}) {
+  return this.countDocuments({ ...filter, status: 'active' });
+};
 
 const Post = mongoose.model('Post', postSchema);
 
 console.log('✅ Modelo Post creado exitosamente');
 console.log('📋 Collection en MongoDB: posts');
+console.log('🆕 Campo replyTo agregado en replies para menciones');
 
 module.exports = Post;

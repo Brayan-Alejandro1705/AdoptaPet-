@@ -841,10 +841,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                                                         {reply.user?.nombre || reply.user?.name || 'Usuario'}
                                                                                     </span>
                                                                                     
-                                                                                    {/* 🆕 MENCIÓN A QUIÉN SE RESPONDE (tipo @usuario) */}
+                                                                                    {/* 🆕 MENCIÓN A QUIÉN SE RESPONDE */}
                                                                                     {hasReplyTo && (
                                                                                         <span className="text-[10px] text-purple-600 font-semibold">
-                                                                                            @{replyToName}
+                                                                                            {replyToName}
                                                                                         </span>
                                                                                     )}
                                                                                     
