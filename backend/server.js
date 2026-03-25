@@ -228,7 +228,7 @@ try {
 })();
 
 // ============================================
-// 9. SOCKET.IO — CHAT EN TIEMPO REAL (CORREGIDO)
+// 9. SOCKET.IO — CHAT EN TIEMPO REAL
 // ============================================
 let io;
 
@@ -246,54 +246,43 @@ try {
   app.set('io', io);
   console.log('✅ Socket.io inicializado correctamente');
 
-  // Mapa userId -> socketId para presencia online
   const onlineUsers = new Map();
 
   io.on("connection", (socket) => {
     console.log("🟢 Usuario conectado:", socket.id);
 
-    // ─── Registrar usuario y notificar presencia ───────────────────────────
     socket.on("register", (userId) => {
       const uid = String(userId);
       onlineUsers.set(uid, socket.id);
-      socket.userId = uid; // guardar en el socket para usarlo al desconectar
+      socket.userId = uid;
       console.log("👤 Usuario registrado en socket:", uid);
-
-      // Notificar a todos que este usuario está online
       socket.broadcast.emit("user_online", { userId: uid });
-
-      // Enviar lista completa de online al usuario que se acaba de conectar
       const onlineIds = Array.from(onlineUsers.keys());
       socket.emit("online_users", { userIds: onlineIds });
     });
 
-    // ─── Unirse a la sala de un chat ───────────────────────────────────────
     socket.on("join_chat", (chatId) => {
       socket.join(String(chatId));
       console.log(`🚪 Socket ${socket.id} unido al chat: ${chatId}`);
     });
 
-    // ─── Obtener usuarios online ───────────────────────────────────────────
     socket.on("get_online_users", () => {
       const onlineIds = Array.from(onlineUsers.keys());
       socket.emit("online_users", { userIds: onlineIds });
     });
 
-    // ─── ENVIAR MENSAJE ────────────────────────────────────────────────────
     socket.on("send_message", async ({ chatId, senderId, text }) => {
       try {
         const Message = require('./src/models/Message');
         const Chat    = require('./src/models/Chat');
 
-        // ✅ Usar los campos correctos del modelo: "chat" y "sender"
         const saved = await Message.create({
-          chat:   chatId,   // el modelo usa "chat", no "chatId"
-          sender: senderId, // el modelo usa "sender", no "senderId"
+          chat:   chatId,
+          sender: senderId,
           text,
           status: 'sent'
         });
 
-        // ✅ Actualizar lastMessage del chat
         await Chat.findByIdAndUpdate(chatId, {
           lastMessage: text,
           updatedAt: new Date()
@@ -303,17 +292,15 @@ try {
           ...saved.toObject(),
           id:       saved._id.toString(),
           _id:      saved._id.toString(),
-          chatId:   String(chatId),   // el frontend espera chatId
-          senderId: String(senderId), // el frontend espera senderId
+          chatId:   String(chatId),
+          senderId: String(senderId),
           time:     new Date(saved.createdAt).toLocaleTimeString('es-ES', {
                       hour: '2-digit', minute: '2-digit'
                     }),
           status: 'sent'
         };
 
-        // ✅ Emitir a todos en la sala del chat
         io.to(String(chatId)).emit("receive_message", payload);
-
         console.log(`💬 Mensaje guardado y emitido en chat ${chatId}`);
 
       } catch (err) {
@@ -322,47 +309,30 @@ try {
       }
     });
 
-    // ─── Marcar mensajes como leídos ──────────────────────────────────────
     socket.on("mark_read", async ({ chatId, readerId }) => {
       try {
         const Message = require('./src/models/Message');
 
-        // ✅ Usar los campos correctos del modelo: "chat" y "sender"
         await Message.updateMany(
-          {
-            chat:   chatId,              // el modelo usa "chat"
-            sender: { $ne: readerId },   // el modelo usa "sender"
-            status: { $ne: 'read' }
-          },
-          {
-            status: 'read',
-            read:   true,                // el modelo tiene este campo también
-            readAt: new Date()
-          }
+          { chat: chatId, sender: { $ne: readerId }, status: { $ne: 'read' } },
+          { status: 'read', read: true, readAt: new Date() }
         );
 
         const readAt = new Date().toISOString();
-
-        // Notificar a todos en el chat que los mensajes fueron leídos
         io.to(String(chatId)).emit("messages_read", { chatId, readAt });
 
-        // Actualizar contador de no leídos para el lector
         const unreadCount = await Message.countDocuments({
           sender: { $ne: readerId },
           status: { $ne: 'read' }
         });
 
-        socket.emit("unread_count", {
-          chatUnreadCount: unreadCount,
-          unreadByChat: {}
-        });
+        socket.emit("unread_count", { chatUnreadCount: unreadCount, unreadByChat: {} });
 
       } catch (err) {
         console.error('❌ Error marcando mensajes como leídos:', err.message);
       }
     });
 
-    // ─── Desconexión ──────────────────────────────────────────────────────
     socket.on("disconnect", () => {
       const uid = socket.userId;
       if (uid) {
@@ -370,7 +340,6 @@ try {
         socket.broadcast.emit("user_offline", { userId: uid });
         console.log(`🔴 Usuario desconectado: ${uid} (${socket.id})`);
       } else {
-        // Búsqueda por socketId como fallback
         for (const [userId, socketId] of onlineUsers.entries()) {
           if (socketId === socket.id) {
             onlineUsers.delete(userId);
@@ -400,6 +369,21 @@ app.use((req, res, next) => {
     logger.log.request(req.method, req.path, res.statusCode, duration);
   });
   next();
+});
+
+// ============================================
+// ✅ RUTA RAÍZ — evita 404/500 en GET /
+// ============================================
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    name: 'Adoptapet API',
+    version: '2.0.0',
+    status: 'online',
+    message: '🐾 Bienvenido a la API de Adoptapet',
+    docs: '/api/info',
+    health: '/health'
+  });
 });
 
 // ============================================
