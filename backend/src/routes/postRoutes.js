@@ -334,7 +334,8 @@ router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
             createdAt: new Date(),
             replyTo: replyToData || null
           } 
-        }
+        },
+        $inc: { 'stats.commentsCount': 1 }
       },
       { new: true }
     )
@@ -348,7 +349,37 @@ router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
 
     const newReply = comment.replies[comment.replies.length - 1];
 
-    res.status(201).json({ success: true, data: { reply: newReply } });
+    res.status(201).json({ success: true, data: { reply: newReply, commentsCount: post.stats.commentsCount } });
+
+    // Notificación al autor del comentario original
+    if (comment.user.toString() !== req.userId.toString()) {
+      setImmediate(async () => {
+        try {
+          const [replier, commentAuthor] = await Promise.all([
+            User.findById(req.userId).select('name nombre avatar').lean(),
+            User.findById(comment.user).select('notificationSettings').lean()
+          ]);
+          if (commentAuthor?.notificationSettings?.comments !== false) {
+            await Notification.create({
+              recipient: comment.user,
+              sender: req.userId,
+              type: 'comment',
+              title: 'Nueva respuesta',
+              message: `${replier?.name || replier?.nombre || 'Alguien'} respondió a tu comentario`,
+              icon: '💬',
+              relatedId: post._id,
+              relatedModel: 'Post',
+              actionUrl: `/post/${post._id}`
+            });
+            const io = req.app.get('io');
+            if (io) io.to(comment.user.toString()).emit('nueva-notificacion', { sender: replier });
+          }
+        } catch (e) {
+          console.error('Error enviando notificación de respuesta:', e);
+        }
+      });
+    }
+
   } catch (err) { 
     console.error('❌ Error en replies:', err);
     res.status(500).json({ success: false, message: 'Error al crear respuesta' }); 
@@ -360,7 +391,10 @@ router.delete('/:postId/comments/:commentId/replies/:replyId', auth, async (req,
   try {
     const post = await Post.findOneAndUpdate(
       { _id: req.params.postId, "comments._id": req.params.commentId },
-      { $pull: { "comments.$.replies": { _id: req.params.replyId } } },
+      { 
+        $pull: { "comments.$.replies": { _id: req.params.replyId } },
+        $inc: { 'stats.commentsCount': -1 }
+      },
       { new: true }
     );
     if (!post) return res.status(404).json({ success: false });
