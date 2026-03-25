@@ -54,7 +54,7 @@ const buildVisibilityFilter = (req) => {
   const friendsIds = req.user?.friends || [];
 
   return {
-    status: { $ne: 'deleted' }, // No mostrar eliminados
+    status: { $ne: 'deleted' },
     $or: [
       { "settings.visibility": "public" },
       { "settings.visibility": { $exists: false } },
@@ -112,7 +112,9 @@ router.get('/', auth, async (req, res) => {
 
     const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
-      .populate('comments.user', 'name nombre email avatar')
+      .populate('comments.user', 'name nombre email avatar verified')
+      .populate('comments.replies.user', 'name nombre email avatar verified')
+      .populate('comments.replies.replyTo', 'name nombre avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -125,6 +127,7 @@ router.get('/', auth, async (req, res) => {
       data: { posts, pagination: { page, limit, total: totalPosts, pages: Math.ceil(totalPosts / limit) } }
     });
   } catch (error) {
+    console.error('❌ Error al obtener posts:', error);
     res.status(500).json({ success: false, message: 'Error al obtener publicaciones' });
   }
 });
@@ -139,7 +142,9 @@ router.get('/feed', auth, async (req, res) => {
 
     const posts = await Post.find(filter)
       .populate('author', 'name nombre email avatar role verified')
-      .populate('comments.user', 'name nombre email avatar')
+      .populate('comments.user', 'name nombre email avatar verified')
+      .populate('comments.replies.user', 'name nombre email avatar verified')
+      .populate('comments.replies.replyTo', 'name nombre avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -147,7 +152,10 @@ router.get('/feed', auth, async (req, res) => {
 
     const totalPosts = await Post.countDocuments(filter);
     res.json({ success: true, data: { posts, pagination: { page, limit, total: totalPosts } } });
-  } catch (error) { res.status(500).json({ success: false }); }
+  } catch (error) {
+    console.error('❌ Error en /feed:', error);
+    res.status(500).json({ success: false });
+  }
 });
 
 // 3. POSTS DE UN USUARIO ESPECÍFICO
@@ -155,11 +163,17 @@ router.get('/user/:userId', auth, async (req, res) => {
   try {
     const posts = await Post.find({ author: req.params.userId, status: 'active' })
       .populate('author', 'name nombre email avatar role verified')
+      .populate('comments.user', 'name nombre email avatar verified')
+      .populate('comments.replies.user', 'name nombre email avatar verified')
+      .populate('comments.replies.replyTo', 'name nombre avatar')
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
     res.json({ success: true, data: { posts } });
-  } catch (error) { res.status(500).json({ success: false }); }
+  } catch (error) {
+    console.error('❌ Error al obtener posts del usuario:', error);
+    res.status(500).json({ success: false });
+  }
 });
 
 // 4. CREAR PUBLICACIÓN
@@ -191,6 +205,7 @@ router.post('/', auth, async (req, res) => {
 
     res.status(201).json({ success: true, data: { post: newPost } });
   } catch (error) {
+    console.error('❌ Error al crear post:', error);
     res.status(500).json({ success: false, message: 'Error al crear la publicación' });
   }
 });
@@ -201,7 +216,6 @@ router.post('/:postId/like', auth, async (req, res) => {
     const { postId } = req.params;
     const userId = req.userId;
 
-    // 1. Intentar dar like (si no existe ya)
     let updatedPost = await Post.findOneAndUpdate(
       { _id: postId, 'stats.likes': { $ne: userId } },
       { $addToSet: { 'stats.likes': userId } },
@@ -210,7 +224,6 @@ router.post('/:postId/like', auth, async (req, res) => {
 
     let liked = true;
 
-    // 2. Si no se pudo dar like (porque ya existía), entonces quitarlo
     if (!updatedPost) {
       updatedPost = await Post.findOneAndUpdate(
         { _id: postId, 'stats.likes': userId },
@@ -222,17 +235,14 @@ router.post('/:postId/like', auth, async (req, res) => {
 
     if (!updatedPost) return res.status(404).json({ success: false });
 
-    // Usar la longitud real del array como fuente de verdad
     const likesCount = Array.isArray(updatedPost.stats?.likes) ? updatedPost.stats.likes.length : 0;
 
-    // Mantener likesCount en sync en background (no bloquea la respuesta)
     setImmediate(() => {
       Post.findByIdAndUpdate(postId, { 'stats.likesCount': likesCount }).catch(() => {});
     });
 
     res.json({ success: true, data: { liked, likesCount } });
 
-    // Notificación en background si se dio like
     if (liked && updatedPost.author.toString() !== userId.toString()) {
       setImmediate(async () => {
         try {
@@ -252,29 +262,42 @@ router.post('/:postId/like', auth, async (req, res) => {
         } catch (e) {}
       });
     }
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) {
+    console.error('❌ Error en like:', err);
+    res.status(500).json({ success: false });
+  }
 });
-
-
 
 // 6. COMENTARIOS
 router.post('/:postId/comments', auth, async (req, res) => {
   try {
     const { content } = req.body;
-    if (!content?.trim()) return res.status(400).json({ success: false });
+    if (!content?.trim()) {
+      return res.status(400).json({ success: false, message: 'El comentario no puede estar vacío' });
+    }
+
+    if (content.trim().length > 1000) {
+      return res.status(400).json({ success: false, message: 'El comentario no puede exceder 1000 caracteres' });
+    }
 
     const updatedPost = await Post.findByIdAndUpdate(req.params.postId, 
       { 
         $push: { comments: { user: req.userId, content: content.trim(), createdAt: new Date() } },
         $inc: { 'stats.commentsCount': 1 }
       },
-      { new: true }).populate('comments.user', 'name nombre avatar');
+      { new: true }).populate('comments.user', 'name nombre avatar verified');
+
+    if (!updatedPost) {
+      return res.status(404).json({ success: false, message: 'Post no encontrado' });
+    }
 
     const newComment = updatedPost.comments[updatedPost.comments.length - 1];
     res.status(201).json({ success: true, data: { comment: newComment, commentsCount: updatedPost.stats.commentsCount } });
 
-    // Notificación... (omitida por brevedad en background similar a like)
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) {
+    console.error('❌ Error al crear comentario:', err);
+    res.status(500).json({ success: false });
+  }
 });
 
 // 6b. ELIMINAR COMENTARIO ✅
@@ -286,55 +309,137 @@ router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
     const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ success: false });
 
-    // Solo autor del comentario o autor del post
-    if (comment.user.toString() !== req.userId && post.author.toString() !== req.userId) {
-      return res.status(403).json({ success: false });
+    // 🆕 Validar permisos
+    const isCommentAuthor = comment.user.toString() === req.userId;
+    const isPostAuthor = post.author.toString() === req.userId;
+
+    if (!isCommentAuthor && !isPostAuthor) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'No tienes permiso para eliminar este comentario' 
+      });
     }
 
-    const removedCount = 1;
+    // Contar replies para decrementar correctamente
+    const repliesCount = comment.replies?.length || 0;
+    
     await Post.findByIdAndUpdate(req.params.postId, {
       $pull: { comments: { _id: req.params.commentId } },
-      $inc: { 'stats.commentsCount': -removedCount }
+      $inc: { 'stats.commentsCount': -(repliesCount + 1) }
     });
 
     res.json({ success: true, message: 'Comentario eliminado' });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) {
+    console.error('❌ Error al eliminar comentario:', err);
+    res.status(500).json({ success: false });
+  }
 });
 
-// 6c. RESPONDER A COMENTARIO (REPLIES) ✅ NUEVO
+// 6c. RESPONDER A COMENTARIO (REPLIES) ✅ COMPLETO Y CORRECTO
 router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
   try {
-    const { content } = req.body;
-    if (!content?.trim()) return res.status(400).json({ success: false });
+    const { content, replyTo } = req.body;
+
+    // 🆕 Validación mejorada
+    if (!content || !content.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'La respuesta no puede estar vacía' 
+      });
+    }
+
+    if (content.trim().length > 1000) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'La respuesta no puede exceder 1000 caracteres' 
+      });
+    }
+
+    let replyToData = null;
+    if (replyTo) {
+      try {
+        const replyToUser = await User.findById(replyTo).select('name nombre avatar').lean();
+        if (replyToUser) {
+          replyToData = replyTo;
+        }
+      } catch (e) {
+        console.log('Advertencia: replyTo no es un ID válido');
+      }
+    }
 
     const post = await Post.findOneAndUpdate(
       { _id: req.params.postId, "comments._id": req.params.commentId },
       { 
-        $push: { "comments.$.replies": { user: req.userId, content: content.trim(), createdAt: new Date() } }
+        $push: { 
+          "comments.$.replies": { 
+            user: req.userId, 
+            content: content.trim(), 
+            createdAt: new Date(),
+            replyTo: replyToData || null
+          } 
+        },
+        $inc: { 'stats.commentsCount': 1 }  // 🆕 CRÍTICO
       },
       { new: true }
-    ).populate('comments.replies.user', 'name nombre avatar');
+    )
+    .populate('comments.replies.user', 'name nombre avatar verified')
+    .populate('comments.replies.replyTo', 'name nombre avatar');
 
-    if (!post) return res.status(404).json({ success: false });
+    if (!post) return res.status(404).json({ success: false, message: 'Post no encontrado' });
 
     const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
+
     const newReply = comment.replies[comment.replies.length - 1];
 
-    res.status(201).json({ success: true, data: { reply: newReply } });
-  } catch (err) { res.status(500).json({ success: false }); }
+    res.status(201).json({ success: true, data: { reply: newReply, commentsCount: post.stats.commentsCount } });
+  } catch (err) { 
+    console.error('❌ Error en replies:', err);
+    res.status(500).json({ success: false, message: 'Error al crear respuesta' }); 
+  }
 });
 
-// 6d. ELIMINAR RESPUESTA ✅ NUEVO
+// 6d. ELIMINAR RESPUESTA ✅ CON VALIDACIONES
 router.delete('/:postId/comments/:commentId/replies/:replyId', auth, async (req, res) => {
   try {
-    const post = await Post.findOneAndUpdate(
+    // Obtener el post sin actualizar aún
+    const post = await Post.findById(req.params.postId);
+    if (!post) return res.status(404).json({ success: false, message: 'Post no encontrado' });
+
+    // Buscar el comentario
+    const comment = post.comments.id(req.params.commentId);
+    if (!comment) return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
+
+    // Buscar la reply
+    const reply = comment.replies.id(req.params.replyId);
+    if (!reply) return res.status(404).json({ success: false, message: 'Respuesta no encontrada' });
+
+    // 🆕 VALIDAR PERMISOS
+    const isReplyAuthor = reply.user.toString() === req.userId;
+    const isPostAuthor = post.author.toString() === req.userId;
+    
+    if (!isReplyAuthor && !isPostAuthor) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'No tienes permiso para eliminar esta respuesta' 
+      });
+    }
+
+    // Ahora sí actualizar
+    const updatedPost = await Post.findOneAndUpdate(
       { _id: req.params.postId, "comments._id": req.params.commentId },
-      { $pull: { "comments.$.replies": { _id: req.params.replyId } } },
+      { 
+        $pull: { "comments.$.replies": { _id: req.params.replyId } },
+        $inc: { 'stats.commentsCount': -1 }  // 🆕 CRÍTICO
+      },
       { new: true }
     );
-    if (!post) return res.status(404).json({ success: false });
+
     res.json({ success: true, message: 'Respuesta eliminada' });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) { 
+    console.error('❌ Error al eliminar reply:', err);
+    res.status(500).json({ success: false }); 
+  }
 });
 
 // 7. REPORTAR PUBLICACIÓN ✅ NUEVO
@@ -348,14 +453,16 @@ router.post('/:postId/report', auth, async (req, res) => {
     
     if (!post) return res.status(404).json({ success: false });
 
-    // Si tiene muchos reportes, marcar como 'reported' automáticamente
     if (post.stats.reportsCount >= 5) {
       post.status = 'reported';
       await post.save();
     }
 
     res.json({ success: true, message: 'Reporte enviado' });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) {
+    console.error('❌ Error al reportar:', err);
+    res.status(500).json({ success: false });
+  }
 });
 
 // 8. OBTENER POST POR ID
@@ -363,12 +470,16 @@ router.get('/:postId', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId)
       .populate('author', 'name nombre avatar role verified')
-      .populate('comments.user', 'name nombre avatar')
-      .populate('comments.replies.user', 'name nombre avatar')
+      .populate('comments.user', 'name nombre avatar verified')
+      .populate('comments.replies.user', 'name nombre avatar verified')
+      .populate('comments.replies.replyTo', 'name nombre avatar')
       .lean();
     if (!post) return res.status(404).json({ success: false, message: 'No encontrado' });
     res.json({ success: true, data: { post } });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) {
+    console.error('❌ Error al obtener post:', err);
+    res.status(500).json({ success: false });
+  }
 });
 
 // 9. ELIMINAR POST (AUTOR)
@@ -379,7 +490,10 @@ router.delete('/:postId', auth, async (req, res) => {
     post.status = 'deleted';
     await post.save();
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) {
+    console.error('❌ Error al eliminar post:', err);
+    res.status(500).json({ success: false });
+  }
 });
 
 // 10. EDITAR POST
@@ -393,7 +507,10 @@ router.put('/:postId', auth, async (req, res) => {
     ).populate('author', 'name nombre avatar');
     if (!post) return res.status(404).json({ success: false });
     res.json({ success: true, data: { post } });
-  } catch (err) { res.status(500).json({ success: false }); }
+  } catch (err) {
+    console.error('❌ Error al editar post:', err);
+    res.status(500).json({ success: false });
+  }
 });
 
 module.exports = router;

@@ -349,7 +349,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
     const [likesCount, setLikesCount]         = useState(0);
     const [commentsCount, setCommentsCount]   = useState(0);
     const [showShareModal, setShowShareModal] = useState(false);
-    const [replyingTo, setReplyingTo]         = useState(null); // { commentId, userName }
+    const [replyingTo, setReplyingTo]         = useState(null);
     const [replyText, setReplyText]           = useState('');
     const [lightbox, setLightbox]             = useState(null);
 
@@ -376,7 +376,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
         return [];
     };
 
-    // ✅ NUEVO: Detectar videos
     const getPostVideos = () => {
         if (post.media?.videos?.length > 0) return post.media.videos;
         if (post.video) return [post.video];
@@ -389,7 +388,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
     useEffect(() => {
         if (post.stats) {
-            // Usar el mayor entre likesCount almacenado y el length real del array
             const arrayLen = Array.isArray(post.stats.likes) ? post.stats.likes.length : 0;
             const storedCount = post.stats.likesCount || 0;
             setLikesCount(Math.max(storedCount, arrayLen));
@@ -440,7 +438,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
     const currentUserId = currentUser._id || currentUser.id || currentUser;
     const isOwner       = authorId !== null && String(authorId) === String(currentUserId);
 
-    // ✅ Navegar al perfil del autor al hacer click en su nombre o avatar
     const handleGoToProfile = () => {
         if (!authorId) return;
         if (isOwner) {
@@ -460,40 +457,37 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
         } catch { alert('Error al procesar favorito'); }
     };
 
-   const handleLike = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) { alert('Debes iniciar sesión para dar like'); return; }
+    const handleLike = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) { alert('Debes iniciar sesión para dar like'); return; }
 
-    // ✅ Guardar valor original ANTES de actualizar
-    const likedAntes = isLiked;
-    const countAntes = likesCount;
+        const likedAntes = isLiked;
+        const countAntes = likesCount;
 
-    // Optimistic update — actualiza inmediatamente
-    setIsLiked(!likedAntes);
-    setLikesCount(likedAntes ? Math.max(0, countAntes - 1) : countAntes + 1);
-    if (onLike) onLike(post._id, !likedAntes);
+        setIsLiked(!likedAntes);
+        setLikesCount(likedAntes ? Math.max(0, countAntes - 1) : countAntes + 1);
+        if (onLike) onLike(post._id, !likedAntes);
 
-    try {
-        const res = await fetch(`${API_BASE}/api/posts/${post._id}/like`, {
-            method: 'POST', // El backend ahora hace toggle automático (like/unlike en un solo endpoint)
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-        });
-        const data = await res.json();
+        try {
+            const res = await fetch(`${API_BASE}/api/posts/${post._id}/like`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
 
-        if (!data.success) {
-            // Revertir si el servidor falla
+            if (!data.success) {
+                setIsLiked(likedAntes);
+                setLikesCount(countAntes);
+                if (onLike) onLike(post._id, likedAntes);
+            } else {
+                setLikesCount(data.data.likesCount);
+            }
+        } catch {
             setIsLiked(likedAntes);
             setLikesCount(countAntes);
-            if (onLike) onLike(post._id, likedAntes);
-        } else {
-            setLikesCount(data.data.likesCount);
         }
-    } catch {
-        // Revertir si hay error de red
-        setIsLiked(likedAntes);
-        setLikesCount(countAntes);
-    }
-};
+    };
+
     const handleComment = async (e) => {
         e.preventDefault();
         if (!commentText.trim()) return;
@@ -533,26 +527,29 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
         } catch { alert('Error al enviar el reporte'); }
     };
 
-    const handleReply = async (commentId) => {
+    const handleReply = async (commentId, replyToUserId) => {
         if (!replyText.trim()) return;
         try {
             const token = localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}/replies`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: replyText })
+                body: JSON.stringify({ 
+                    content: replyText,
+                    replyTo: replyToUserId
+                })
             });
             const data = await res.json();
             if (data.success) {
                 setReplyText('');
                 setReplyingTo(null);
-                // Aquí podrías actualizar el estado local del post si es necesario, 
-                // pero usualmente el padre recarga el feed o tú mutas el post prop (no recomendado)
-                // Por ahora, recargamos la info del comentario si es posible o notificamos
                 if (onComment) onComment(post._id, data.data.reply); 
-                alert('Respuesta enviada');
+            } else {
+                alert(data.message || 'Error al enviar respuesta');
             }
-        } catch { alert('Error al enviar respuesta'); }
+        } catch { 
+            alert('Error al enviar respuesta'); 
+        }
     };
 
     const handleDeleteComment = async (commentId) => {
@@ -597,7 +594,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
                 <div className="p-3 sm:p-4 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        {/* ✅ Avatar clickeable */}
                         <img
                             src={getAvatarUrl(author)}
                             alt={author.nombre || author.name || 'Usuario'}
@@ -607,7 +603,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                         />
                         <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
-                                {/* ✅ Nombre clickeable → va al perfil */}
                                 <h3
                                     className="font-semibold text-gray-900 text-sm sm:text-base leading-tight cursor-pointer hover:underline"
                                     style={{ color: authorId ? 'inherit' : 'gray' }}
@@ -671,7 +666,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                     )}
                 </div>
 
-                {/* ✅ MOSTRAR VIDEOS */}
                 {postVideos.length > 0 && (
                     <div className="px-3 sm:px-4 py-2 space-y-2">
                         {postVideos.map((videoUrl, index) => (
@@ -689,10 +683,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                     </div>
                 )}
 
-                {/* ✅ MOSTRAR IMÁGENES */}
                 {postImages.length > 0 && (
                     postImages.length === 1 ? (
-                        // Una sola imagen: mostrar en proporción natural, sin recortar
                         <div
                             className="cursor-zoom-in overflow-hidden bg-gray-100"
                             onClick={() => setLightbox({ images: [getImageUrl(postImages[0].url || postImages[0])], index: 0 })}
@@ -707,7 +699,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                             ) : null}
                         </div>
                     ) : (
-                        // Múltiples imágenes: grid con altura fija para layout limpio
                         <div className={`grid gap-0.5 ${
                             postImages.length === 2 ? 'grid-cols-2' :
                             postImages.length === 3 ? 'grid-cols-3' : 'grid-cols-2'
@@ -817,7 +808,11 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                     <div className="flex items-center gap-3 mt-1.5 ml-2">
                                                         <span className="text-[10px] text-gray-400">{formatTimeAgo(comment.createdAt)}</span>
                                                         <button 
-                                                            onClick={() => setReplyingTo({ commentId: comment._id, userName: comment.user?.nombre || comment.user?.name })}
+                                                            onClick={() => setReplyingTo({ 
+                                                                commentId: comment._id, 
+                                                                userName: comment.user?.nombre || comment.user?.name,
+                                                                userId: comment.user?._id || comment.user
+                                                            })}
                                                             className="text-[10px] font-bold text-gray-500 hover:text-purple-600 transition flex items-center gap-1"
                                                         >
                                                             <Reply className="w-3 h-3" /> Responder
@@ -829,16 +824,42 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                         <div className="mt-3 ml-4 space-y-3 border-l-2 border-gray-100 pl-3">
                                                             {comment.replies.map(reply => {
                                                                 const isReplyOwner = String(reply.user?._id || reply.user) === String(currentUserId);
+                                                                
+                                                                // 🆕 DETECTAR SI HAY MENCIÓN A OTRO USUARIO
+                                                                const hasReplyTo = reply.replyTo && (reply.replyTo._id || reply.replyTo.id);
+                                                                const replyToName = reply.replyTo?.nombre || reply.replyTo?.name || 'Usuario';
+                                                                
                                                                 return (
                                                                     <div key={reply._id} className="flex gap-2 group/reply">
                                                                         <img src={getAvatarUrl(reply.user)} alt="U" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
                                                                         <div className="flex-1 min-w-0">
-                                                                            <div className="bg-gray-100/50 rounded-xl px-2.5 py-1.5 relative">
-                                                                                <div className="flex items-center gap-1">
-                                                                                    <span className="font-bold text-[10px] text-gray-900">{reply.user?.nombre || reply.user?.name || 'Usuario'}</span>
-                                                                                    {(reply.user?.isVerified || reply.user?.verified?.email) && <BadgeCheck className="w-2.5 h-2.5 text-blue-500" />}
+                                                                            <div className="bg-gray-100/50 rounded-xl px-2.5 py-1.5 relative group">
+                                                                                {/* NOMBRE + MENCIÓN TIPO FACEBOOK */}
+                                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                    {/* Nombre de quien responde */}
+                                                                                    <span className="font-bold text-[10px] text-gray-900">
+                                                                                        {reply.user?.nombre || reply.user?.name || 'Usuario'}
+                                                                                    </span>
+                                                                                    
+                                                                                    {/* 🆕 MENCIÓN A QUIÉN SE RESPONDE (tipo @usuario) */}
+                                                                                    {hasReplyTo && (
+                                                                                        <span className="text-[10px] text-purple-600 font-semibold">
+                                                                                            @{replyToName}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    
+                                                                                    {/* Badge de verificado */}
+                                                                                    {(reply.user?.isVerified || reply.user?.verified?.email) && (
+                                                                                        <BadgeCheck className="w-2.5 h-2.5 text-blue-500" />
+                                                                                    )}
                                                                                 </div>
-                                                                                <p className="text-xs text-gray-700 leading-tight">{reply.content}</p>
+                                                                                
+                                                                                {/* CONTENIDO DEL COMENTARIO */}
+                                                                                <p className="text-xs text-gray-700 leading-tight mt-1">
+                                                                                    {reply.content}
+                                                                                </p>
+                                                                                
+                                                                                {/* BOTÓN DE ELIMINAR */}
                                                                                 {(isReplyOwner || isOwner) && (
                                                                                     <button 
                                                                                         onClick={() => handleDeleteReply(comment._id, reply._id)}
@@ -848,7 +869,11 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                                                     </button>
                                                                                 )}
                                                                             </div>
-                                                                            <span className="text-[9px] text-gray-400 ml-1">{formatTimeAgo(reply.createdAt)}</span>
+                                                                            
+                                                                            {/* TIMESTAMP */}
+                                                                            <span className="text-[9px] text-gray-400 ml-1">
+                                                                                {formatTimeAgo(reply.createdAt)}
+                                                                            </span>
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -866,10 +891,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                                 onChange={e => setReplyText(e.target.value)}
                                                                 placeholder={`Respondiendo a ${replyingTo.userName}...`}
                                                                 className="flex-1 bg-white border border-purple-100 rounded-full px-3 py-1 text-xs outline-none focus:border-purple-400 shadow-sm"
-                                                                onKeyDown={e => e.key === 'Enter' && handleReply(comment._id)}
+                                                                onKeyDown={e => e.key === 'Enter' && handleReply(comment._id, replyingTo.userId)}
                                                             />
                                                             <button 
-                                                                onClick={() => handleReply(comment._id)}
+                                                                onClick={() => handleReply(comment._id, replyingTo.userId)}
                                                                 disabled={!replyText.trim()}
                                                                 className="w-7 h-7 rounded-full flex items-center justify-center text-white disabled:opacity-50 transition active:scale-95 shadow-sm"
                                                                 style={{ background: GRADIENT }}
