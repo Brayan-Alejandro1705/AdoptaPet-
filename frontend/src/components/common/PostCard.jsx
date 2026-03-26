@@ -755,21 +755,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                     )
                 )}
 
-               <div className="px-3 sm:px-4 py-2 border-t border-gray-100 flex justify-between text-xs sm:text-sm text-gray-500">
-    <span>{Math.max(0, likesCount)} me gusta</span>
-    <button
-        onClick={() => {
-            setShowComments(true);
-            setTimeout(() => {
-                const el = document.querySelector(`#post-${post._id} .comments-list`);
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 100);
-        }}
-        className="hover:underline cursor-pointer"
-    >
-        {commentsCount} comentarios
-    </button>
-</div>
+                <div className="px-3 sm:px-4 py-2 border-t border-gray-100 flex justify-between text-xs sm:text-sm text-gray-500">
+                    <span>{Math.max(0, likesCount)} me gusta</span>
+                    <span>{commentsCount} comentarios</span>
+                </div>
 
                 <div className="px-1 py-1 flex items-center border-t border-gray-100">
                     <button onClick={handleLike} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg hover:bg-gray-50 transition ${isLiked ? 'text-red-500' : 'text-gray-600'}`}>
@@ -809,7 +798,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                         </form>
 
                         {Array.isArray(post.comments) && post.comments.length > 0 && (
-                            <div className="mt-3 space-y-4 comments-list">
+                            <div className="mt-3 space-y-4">
                                 {post.comments.map(comment => {
                                     const isCommentOwner = String(comment.user?._id || comment.user) === String(currentUserId);
                                     return (
@@ -899,9 +888,22 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                                                 )}
                                                                             </div>
                                                                             
-                                                                            <span className="text-[9px] text-gray-400 ml-1">
-                                                                                {formatTimeAgo(reply.createdAt)}
-                                                                            </span>
+                                                                            {/* ✅ Timestamp + botón Responder en replies */}
+                                                                            <div className="flex items-center gap-3 mt-1 ml-1">
+                                                                                <span className="text-[9px] text-gray-400">
+                                                                                    {formatTimeAgo(reply.createdAt)}
+                                                                                </span>
+                                                                                <button
+                                                                                    onClick={() => setReplyingTo({
+                                                                                        commentId: comment._id,
+                                                                                        userName: reply.user?.nombre || reply.user?.name,
+                                                                                        userId: reply.user?._id || reply.user
+                                                                                    })}
+                                                                                    className="text-[9px] font-bold text-gray-500 hover:text-purple-600 transition flex items-center gap-0.5"
+                                                                                >
+                                                                                    <Reply className="w-2.5 h-2.5" /> Responder
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
                                                                     </div>
                                                                 );
