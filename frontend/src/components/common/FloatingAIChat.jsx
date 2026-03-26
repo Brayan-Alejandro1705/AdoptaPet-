@@ -16,7 +16,9 @@ export default function FloatingAIChat() {
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
-  const [hasNewMessage, setHasNewMessage] = useState(false); // ✅ FIX: estado declarado
+  const [hasNewMessage, setHasNewMessage] = useState(false);
+  const [userName, setUserName] = useState(null); // ✅ Almacenar nombre del usuario
+  const [isFirstMessage, setIsFirstMessage] = useState(true); // ✅ Controlar si es primer mensaje
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -141,7 +143,9 @@ export default function FloatingAIChat() {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            message: inputMessage
+            message: inputMessage,
+            userName: userName, // ✅ Enviar nombre actual
+            isFirstMessage: isFirstMessage // ✅ Indicar si es primer mensaje
           })
         });
 
@@ -149,6 +153,17 @@ export default function FloatingAIChat() {
 
         if (data.success) {
           aiResponse = data.reply || data.data?.message || data.message || 'Sin respuesta';
+          
+          // ✅ Si se detectó un nombre, guardarlo
+          if (data.detectedName) {
+            setUserName(data.detectedName);
+            console.log(`✅ Nombre detectado: ${data.detectedName}`);
+          }
+          
+          // ✅ Marcar que ya pasó el primer mensaje
+          if (isFirstMessage) {
+            setIsFirstMessage(false);
+          }
         } else {
           aiResponse = '❌ Hubo un error. Intenta de nuevo.';
         }

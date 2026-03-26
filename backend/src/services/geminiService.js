@@ -23,16 +23,49 @@ async function fetchImageAsBase64(imageUrl) {
 }
 
 // =====================================================
+// HELPER: Detectar si el usuario da su nombre
+// =====================================================
+function extractUserName(message) {
+  // Patrones comunes: "soy [nombre]", "me llamo [nombre]", "mi nombre es [nombre]"
+  const patterns = [
+    /(?:soy|me llamo|mi nombre es)\s+([A-Za-záéíóúÁÉÍÓÚñÑ]+)/i,
+    /^([A-Za-záéíóúÁÉÍÓÚñÑ]+)$/i, // Solo un nombre
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.trim().match(pattern);
+    if (match) {
+      return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+    }
+  }
+
+  return null;
+}
+
+// =====================================================
 // 1. CHATBOT DE ASESORAMIENTO ANIMAL
 // =====================================================
-async function chatbotAnimalAdvisor(message, petType = null) {
+async function chatbotAnimalAdvisor(message, petType = null, userName = null, isFirstMessage = false) {
   try {
     const model = genAI.getGenerativeModel({ model: MODEL });
 
+    // Detectar si el usuario proporciona su nombre en este mensaje
+    const detectedName = extractUserName(message);
+    const finalUserName = detectedName || userName;
+
     const contextPet = petType ? `\nTipo de mascota: ${petType}` : '';
+    const contextUser = finalUserName ? `\nNombre del usuario: ${finalUserName}` : '';
+
+    // Si es el primer mensaje Y el usuario proporciona su nombre, no saludar
+    const greeting = finalUserName && detectedName ? '' : 
+      !isFirstMessage ? '' : // Si no es primer mensaje, nunca saludar nuevamente
+      'Ya te saludaste en el mensaje anterior, así que solo responde directamente sin volver a presentarte.';
+
     const prompt = `Eres Simon Bot 🐾, el asistente oficial y amigable de AdoptaPet.
 Tu personalidad es cálida, cercana y profesional, como un experto que también es un gran amigo.
 Usas emojis con moderación para dar calidez, pero sin exagerar.
+
+${finalUserName ? `El usuario se llama ${finalUserName}. Úsalo para dirigirte a él de forma natural y personalizada.` : 'Si el usuario te dice su nombre, úsalo de ahora en adelante para dirigirte a él.'}
 
 Puedes ayudar con dos temas principales:
 
@@ -76,13 +109,20 @@ REGLAS DE RESPUESTA:
 - Tono amigable y profesional, nunca frío ni robótico.
 - Usa emojis con moderación (1-2 por respuesta máximo).
 - Sin asteriscos ni formato Markdown, solo texto plano.
-- No vuelvas a saludarte ni presentarte después de la primera vez, solo responde directamente.${contextPet}`;
+- NO VUELVAS A SALUDARTE ni presentarte nuevamente. Solo responde directamente a lo que pregunta.
+- Si detectaste el nombre del usuario en este mensaje, menciona que es un placer conocerlo de esta manera natural, sin hacer un gran drama.${contextPet}
 
+MENSAJE DEL USUARIO:
+"${message}"`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
-    return { success: true, reply: text };
+    return { 
+      success: true, 
+      reply: text,
+      detectedName: detectedName // Retornar el nombre detectado al frontend
+    };
   } catch (error) {
     console.error("❌ Error en chatbot:", error.message);
     return { success: false, error: error.message };
@@ -269,4 +309,5 @@ module.exports = {
   generatePetDescription,
   moderateImage,
   validatePetPosting,
+  extractUserName, // Exportar función para usarla en frontend si es necesario
 };
