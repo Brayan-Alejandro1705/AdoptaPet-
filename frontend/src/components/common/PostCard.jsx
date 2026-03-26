@@ -20,7 +20,7 @@ const generateAvatarSVG = (name = 'U') => {
 };
 
 const API_BASE   = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const APP_ORIGIN = 'http://localhost:3000';
+const APP_ORIGIN = window.location.origin;
 const buildPostLink = (postId) => `${APP_ORIGIN}/?post=${postId}`;
 
 const ShareArrowIcon = ({ className }) => (
