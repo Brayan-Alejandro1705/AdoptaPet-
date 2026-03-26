@@ -391,8 +391,27 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
             const arrayLen = Array.isArray(post.stats.likes) ? post.stats.likes.length : 0;
             const storedCount = post.stats.likesCount || 0;
             setLikesCount(Math.max(storedCount, arrayLen));
-            setCommentsCount(post.stats.commentsCount || 0);
+
+            // ✅ FIX 1: Usar commentsCount del servidor si existe,
+            // si no, contar comentarios raíz + todas sus replies
+            if (post.stats.commentsCount) {
+                setCommentsCount(post.stats.commentsCount);
+            } else if (Array.isArray(post.comments)) {
+                const total = post.comments.reduce(
+                    (acc, c) => acc + 1 + (c.replies?.length || 0),
+                    0
+                );
+                setCommentsCount(total);
+            }
+        } else if (Array.isArray(post.comments)) {
+            // Sin stats: igual contar raíz + replies
+            const total = post.comments.reduce(
+                (acc, c) => acc + 1 + (c.replies?.length || 0),
+                0
+            );
+            setCommentsCount(total);
         }
+
         if (Array.isArray(post.stats?.likes) && post.stats.likes.length > 0) {
             const uid = currentUser._id || currentUser.id || currentUser;
             const liked = post.stats.likes.some(like => {
@@ -401,7 +420,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
             });
             setIsLiked(liked);
         }
-        if (Array.isArray(post.comments) && !post.stats?.commentsCount) setCommentsCount(post.comments.length);
     }, [post, currentUser]);
 
     useEffect(() => {
@@ -543,6 +561,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
             if (data.success) {
                 setReplyText('');
                 setReplyingTo(null);
+                // ✅ FIX 3: Actualizar el contador con el valor real del servidor
+                setCommentsCount(data.data.commentsCount);
                 if (onComment) onComment(post._id, data.data.reply); 
             } else {
                 alert(data.message || 'Error al enviar respuesta');
@@ -561,7 +581,10 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
-                setCommentsCount(prev => Math.max(0, prev - 1));
+                // ✅ FIX 2: Restar el comentario + todas sus replies
+                const comment = post.comments.find(c => String(c._id) === String(commentId));
+                const repliesCount = comment?.replies?.length || 0;
+                setCommentsCount(prev => Math.max(0, prev - 1 - repliesCount));
                 if (onDeleteComment) onDeleteComment(post._id, commentId);
                 alert('Comentario eliminado');
             }
@@ -577,6 +600,8 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (res.ok) {
+                // ✅ Restar 1 del contador al eliminar una reply
+                setCommentsCount(prev => Math.max(0, prev - 1));
                 if (onDeleteReply) onDeleteReply(post._id, commentId, replyId);
                 alert('Respuesta eliminada');
             }
@@ -825,7 +850,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                             {comment.replies.map(reply => {
                                                                 const isReplyOwner = String(reply.user?._id || reply.user) === String(currentUserId);
                                                                 
-                                                                // 🆕 DETECTAR SI HAY MENCIÓN A OTRO USUARIO
                                                                 const hasReplyTo = reply.replyTo && (reply.replyTo._id || reply.replyTo.id);
                                                                 const replyToName = reply.replyTo?.nombre || reply.replyTo?.name || 'Usuario';
                                                                 
@@ -834,32 +858,26 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                                         <img src={getAvatarUrl(reply.user)} alt="U" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
                                                                         <div className="flex-1 min-w-0">
                                                                             <div className="bg-gray-100/50 rounded-xl px-2.5 py-1.5 relative group">
-                                                                                {/* NOMBRE + MENCIÓN TIPO FACEBOOK */}
                                                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                                                    {/* Nombre de quien responde */}
                                                                                     <span className="font-bold text-[10px] text-gray-900">
                                                                                         {reply.user?.nombre || reply.user?.name || 'Usuario'}
                                                                                     </span>
                                                                                     
-                                                                                    {/* 🆕 MENCIÓN A QUIÉN SE RESPONDE */}
                                                                                     {hasReplyTo && (
                                                                                         <span className="text-[10px] text-purple-600 font-semibold">
                                                                                             {replyToName}
                                                                                         </span>
                                                                                     )}
                                                                                     
-                                                                                    {/* Badge de verificado */}
                                                                                     {(reply.user?.isVerified || reply.user?.verified?.email) && (
                                                                                         <BadgeCheck className="w-2.5 h-2.5 text-blue-500" />
                                                                                     )}
                                                                                 </div>
                                                                                 
-                                                                                {/* CONTENIDO DEL COMENTARIO */}
                                                                                 <p className="text-xs text-gray-700 leading-tight mt-1">
                                                                                     {reply.content}
                                                                                 </p>
                                                                                 
-                                                                                {/* BOTÓN DE ELIMINAR */}
                                                                                 {(isReplyOwner || isOwner) && (
                                                                                     <button 
                                                                                         onClick={() => handleDeleteReply(comment._id, reply._id)}
@@ -870,7 +888,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                                                                 )}
                                                                             </div>
                                                                             
-                                                                            {/* TIMESTAMP */}
                                                                             <span className="text-[9px] text-gray-400 ml-1">
                                                                                 {formatTimeAgo(reply.createdAt)}
                                                                             </span>
