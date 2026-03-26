@@ -757,7 +757,18 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
                 <div className="px-3 sm:px-4 py-2 border-t border-gray-100 flex justify-between text-xs sm:text-sm text-gray-500">
                     <span>{Math.max(0, likesCount)} me gusta</span>
-                    <span>{commentsCount} comentarios</span>
+                    <button
+                        onClick={() => {
+                            setShowComments(true);
+                            setTimeout(() => {
+                                const el = document.querySelector(`#post-${post._id} .comments-list`);
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }, 100);
+                        }}
+                        className="hover:underline cursor-pointer"
+                    >
+                        {commentsCount} comentarios
+                    </button>
                 </div>
 
                 <div className="px-1 py-1 flex items-center border-t border-gray-100">
@@ -798,7 +809,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                         </form>
 
                         {Array.isArray(post.comments) && post.comments.length > 0 && (
-                            <div className="mt-3 space-y-4">
+                            <div className="mt-3 space-y-4 comments-list">
                                 {post.comments.map(comment => {
                                     const isCommentOwner = String(comment.user?._id || comment.user) === String(currentUserId);
                                     return (
