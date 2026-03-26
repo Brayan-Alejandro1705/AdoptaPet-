@@ -47,137 +47,52 @@ function extractUserName(message) {
 // =====================================================
 async function chatbotAnimalAdvisor(message, petType = null, userName = null, messageCount = 0) {
   try {
-    const model = genAI.getGenerativeModel({ model: MODEL });
+    const model = genAI.getGenerativeModel({ 
+      model: MODEL,
+      systemInstruction: `You are Simon Bot 🐾, AdoptaPet's assistant. You speak Spanish ALWAYS.
+Answer about pet care or AdoptaPet platform.
+Rules: Warm, professional. 1-2 emojis max. 2 short paragraphs OR 3-4 bullet points max. Plain text, no Markdown.
+For medical emergencies: recommend a veterinarian.
 
-    // Detectar si el usuario proporciona su nombre en este mensaje
+CRITICAL - If this is NOT the first message:
+NEVER: greet, say hello, introduce yourself, ask "how can I help", ask "what do you mean", ask clarifying questions
+MUST: answer directly to the user's actual question with no preamble, no introduction, no greeting`
+    });
+
     const detectedName = extractUserName(message);
     const finalUserName = detectedName || userName;
-
-    // messageCount > 1 significa que NO es el primer mensaje del usuario
     const isFirstMessage = messageCount <= 1;
 
-    const contextPet = petType ? `\nTipo de mascota: ${petType}` : '';
-
-    // CONSTRUIR PROMPT BASADO EN SI ES PRIMER MENSAJE O NO
-    let prompt;
+    // Construir el mensaje de usuario según si es primer mensaje
+    let userMessage;
     
     if (isFirstMessage) {
-      // PRIMER MENSAJE: Puedes saludar
-      prompt = `Eres Simon Bot 🐾, el asistente oficial y amigable de AdoptaPet.
-Tu personalidad es cálida, cercana y profesional.
-Usas emojis con moderación (máximo 1-2).
+      userMessage = `${finalUserName ? `The user's name is ${finalUserName}.` : ''}
+You can greet them warmly and ask what you can help with.
 
-${finalUserName ? `El usuario se llama ${finalUserName}. Úsalo para dirigirte a él.` : ''}
-
-Puedes ayudar con:
-1. CUIDADO ANIMAL: salud, alimentación, comportamiento de mascotas.
-   - Para emergencias médicas, recomienda visitar un veterinario.
-2. USO DE ADOPTAPET:
-
-ACCESO Y CUENTA:
-- Iniciar sesión: correo y contraseña, o continuar con Google.
-- Contraseña olvidada: clic en "Recupérala aquí".
-- Cuenta nueva: clic en "Regístrate" (nombre, correo, contraseña mín. 6 caracteres).
-- Funciona en navegadores (Chrome, Firefox, Edge, Safari) - celular, computador, tableta.
-
-MÓDULOS:
-- Inicio: publicaciones recientes, likes, comentarios, compartir.
-- Adoptar: mascotas con filtros (tipo, tamaño, edad, vacunación, esterilización). Clic en "Ver detalles".
-- Publicar: mensajes, fotos, videos. Adjuntar con "Foto/Video" y clic "Publicar".
-- Crear Adopción: formulario (nombre, edad, tamaño, descripción, vacunación, esterilización, foto).
-- Amigos: seguidos, solicitudes de amistad, sugerencias.
-- Favoritos: publicaciones y mascotas guardadas.
-- Ajustes: Cuenta (contraseña/desactivar), Notificaciones, Publicaciones, Etiquetado.
-- Mensajes/Chat: solo con amigos.
-- Notificaciones: likes, comentarios, solicitudes.
-- Mi Perfil: editar foto, nombre, descripción. Eliminar publicación: 3 puntitos > "Eliminar".
-- SimonBot: ícono de perrito. Preguntas y análisis de fotos.
-
-PROBLEMAS FRECUENTES:
-- No inicia sesión: verificar mayúsculas, usar "Recupérala aquí", limpiar historial.
-- Página no carga: verificar conexión, F5, otro navegador.
-- Sin notificaciones: Ajustes > Notificaciones > permisos.
-- Archivos no suben: JPG, PNG, MP4, tamaño moderado, buena conexión.
-- Sin mascotas: limpiar filtros.
-- No puede chatear: solo con amigos.
-
-¡Adopta un animal! Familias y mascotas esperan encontrarse. 🐶🐱
-
-RESPONDE:
-- Español siempre.
-- Conciso: máx 2 párrafos o 3-4 puntos.
-- Amigable, profesional.
-- Emojis: 1-2 máximo.
-- Texto plano, sin Markdown.${contextPet}
-
-USUARIO: "${message}"`;
-
+User: "${message}"`;
     } else {
-      // MENSAJES POSTERIORES: NUNCA SALUDES
-      prompt = `Eres Simon Bot 🐾, el asistente de AdoptaPet.
-Personalidad: cálida, cercana, profesional. Emojis moderados (1-2).
+      userMessage = `${finalUserName ? `The user's name is ${finalUserName}.` : ''}
 
-${finalUserName ? `Usuario: ${finalUserName}. Úsalo naturalmente.` : ''}
+⚠️ IMPORTANT: This is NOT the first message in the conversation.
+- Do NOT start with greetings, introductions, or "Hello"
+- Do NOT ask "How can I help?" or similar
+- Do NOT ask generic clarifying questions like "What do you mean?"
+- Answer DIRECTLY to what they ask
+- Be concise, helpful, direct
 
-⚠️ REGLA CRÍTICA: Este NO es el primer mensaje.
-- JAMÁS abras con "¡Hola!", "Hola qué placer", saludos o presentaciones.
-- JAMÁS preguntes "¿En qué puedo ayudarte?" o "¿Cómo puedo ayudarte?".
-- JAMÁS hagas preguntas de aclaración genéricas como "¿A qué te refieres?".
-- Responde DIRECTAMENTE y CON SEGURIDAD a lo que pregunta.
-- Sé conciso, útil, directo. Sin introducciones.
-- Si necesitas claridad, pídela de forma natural EN el contenido, no como saludo.
-
-Puedes ayudar con:
-1. CUIDADO ANIMAL: salud, alimentación, comportamiento.
-   - Emergencias: recomienda veterinario.
-2. USO DE ADOPTAPET:
-
-ACCESO Y CUENTA:
-- Iniciar sesión: correo, contraseña, o Google.
-- Contraseña olvidada: "Recupérala aquí".
-- Cuenta nueva: "Regístrate" (nombre, correo, contraseña mín. 6).
-- Funciona en navegadores - sin instalar.
-
-MÓDULOS:
-- Inicio: publicaciones, likes, comentarios, compartir.
-- Adoptar: mascotas con filtros. "Ver detalles" para contactar.
-- Publicar: mensajes, fotos, videos.
-- Crear Adopción: formulario de mascota.
-- Amigos: seguidos, solicitudes, sugerencias.
-- Favoritos: guardadas.
-- Ajustes: cuenta, notificaciones, publicaciones, etiquetado.
-- Mensajes: solo amigos.
-- Notificaciones: avisos.
-- Mi Perfil: editar, eliminar publicaciones.
-- SimonBot: aquí, preguntas, análisis de fotos.
-
-PROBLEMAS:
-- No inicia: verificar datos, limpiar historial.
-- Página no carga: conexión, F5, otro navegador.
-- Sin notificaciones: permisos.
-- Archivos no suben: formato/tamaño/conexión.
-- Sin mascotas: limpiar filtros.
-- No chatea: solo amigos.
-
-¡Adopta! Esperan encontrarse. 🐶🐱
-
-RESPONDE:
-- Español.
-- Conciso: máx 2 párrafos o puntos.
-- Amigable, profesional.
-- Sin Markdown.${contextPet}
-
-USUARIO: "${message}"`;
+User: "${message}"`;
     }
 
-    console.log(`📨 Mensaje #${messageCount} - userName: ${finalUserName}, firstMsg: ${isFirstMessage}`);
-    const result = await model.generateContent(prompt);
+    console.log(`📨 Mensaje #${messageCount} - userName: ${finalUserName}, isFirstMessage: ${isFirstMessage}`);
+    
+    const result = await model.generateContent(userMessage);
     const text = result.response.text();
 
     return { 
       success: true, 
       reply: text,
-      detectedName: detectedName // Retornar el nombre detectado al frontend
+      detectedName: detectedName
     };
   } catch (error) {
     console.error("❌ Error en chatbot:", error.message);
