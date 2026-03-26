@@ -15,13 +15,13 @@ const { protect } = require('../middleware/auth');
 // 1. CHATBOT
 router.post('/chatbot', protect, async (req, res) => {
   try {
-    const { message, petType } = req.body;
+    const { message, petType, userName, messageCount, history } = req.body;
 
     if (!message || !message.trim()) {
       return res.status(400).json({ success: false, error: 'El mensaje es requerido' });
     }
 
-    const result = await chatbotAnimalAdvisor(message, petType);
+    const result = await chatbotAnimalAdvisor(message, petType, userName, messageCount, history);
 
     if (!result.success) {
       return res.status(500).json({ success: false, error: result.error });

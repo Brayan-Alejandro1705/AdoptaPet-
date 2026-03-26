@@ -136,6 +136,14 @@ export default function FloatingAIChat() {
         removeImage();
 
       } else {
+        // ✅ Construir historial para Gemini (formato: role, parts)
+        const historyToSend = messages
+          .filter(m => m.text) // Asegurar que tenga texto
+          .map(m => ({
+            role: m.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: m.text }]
+          }));
+
         const response = await fetch(`${API_BASE}/api/ai/chatbot`, {
           method: 'POST',
           headers: {
@@ -145,7 +153,8 @@ export default function FloatingAIChat() {
           body: JSON.stringify({
             message: inputMessage,
             userName: userName, // ✅ Enviar nombre actual
-            messageCount: messageCount + 1 // ✅ Enviar contador (se incrementa después)
+            messageCount: messageCount + 1, // ✅ Enviar contador (se incrementa después)
+            history: historyToSend // ✅ Enviar historial
           })
         });
 

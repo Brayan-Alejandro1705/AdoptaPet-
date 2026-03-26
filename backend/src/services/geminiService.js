@@ -45,48 +45,37 @@ function extractUserName(message) {
 // =====================================================
 // 1. CHATBOT DE ASESORAMIENTO ANIMAL
 // =====================================================
-async function chatbotAnimalAdvisor(message, petType = null, userName = null, messageCount = 0) {
+async function chatbotAnimalAdvisor(message, petType = null, userName = null, messageCount = 0, history = []) {
   try {
     const model = genAI.getGenerativeModel({ 
       model: MODEL,
-      systemInstruction: `You are Simon Bot 🐾, AdoptaPet's assistant. You speak Spanish ALWAYS.
-Answer about pet care or AdoptaPet platform.
-Rules: Warm, professional. 1-2 emojis max. 2 short paragraphs OR 3-4 bullet points max. Plain text, no Markdown.
-For medical emergencies: recommend a veterinarian.
-
-CRITICAL - If this is NOT the first message:
-NEVER: greet, say hello, introduce yourself, ask "how can I help", ask "what do you mean", ask clarifying questions
-MUST: answer directly to the user's actual question with no preamble, no introduction, no greeting`
+      systemInstruction: `Eres Simon Bot 🐾, el asistente veterinario de AdoptaPet. REGLAS ESTRICTAS E INQUEBRANTABLES:
+1. NUNCA saludes, ni te presentes bajo ninguna circunstancia. El historial ya incluye tu presentación. NUNCA digas "Hola", "Soy Simon", "¿En qué puedo ayudarte?", ni nada similar.
+2. Responde DIRECTAMENTE a la pregunta de forma cálida, profesional y al grano.
+3. Máximo 1-2 emojis. Máximo 2 párrafos cortos. Únicamente texto plano (sin asteriscos, sin Markdown, sin viñetas).
+4. El chat tiene memoria: recuerda lo que el usuario ha dicho antes basándote en el historial de la conversación. No pidas que te repitan información.
+5. Si hablan de un problema médico grave, recomienda siempre ir al veterinario.`
     });
 
     const detectedName = extractUserName(message);
     const finalUserName = detectedName || userName;
-    const isFirstMessage = messageCount <= 1;
 
-    // Construir el mensaje de usuario según si es primer mensaje
-    let userMessage;
-    
-    if (isFirstMessage) {
-      userMessage = `${finalUserName ? `The user's name is ${finalUserName}.` : ''}
-You can greet them warmly and ask what you can help with.
+    // Iniciar chat con memoria
+    const chat = model.startChat({
+      history: history || []
+    });
 
-User: "${message}"`;
-    } else {
-      userMessage = `${finalUserName ? `The user's name is ${finalUserName}.` : ''}
-
-⚠️ IMPORTANT: This is NOT the first message in the conversation.
-- Do NOT start with greetings, introductions, or "Hello"
-- Do NOT ask "How can I help?" or similar
-- Do NOT ask generic clarifying questions like "What do you mean?"
-- Answer DIRECTLY to what they ask
-- Be concise, helpful, direct
-
-User: "${message}"`;
+    let contextPrefix = '';
+    if (finalUserName) {
+      contextPrefix = `[Contexto oculto: el usuario se llama ${finalUserName}]\n`;
     }
-
-    console.log(`📨 Mensaje #${messageCount} - userName: ${finalUserName}, isFirstMessage: ${isFirstMessage}`);
     
-    const result = await model.generateContent(userMessage);
+    // Concatenamos el contexto con el mensaje del usuario
+    const finalMessage = `${contextPrefix}${message}`;
+
+    console.log(`📨 Mensaje al chat - userName: ${finalUserName}, history length: ${history ? history.length : 0}`);
+    
+    const result = await chat.sendMessage(finalMessage);
     const text = result.response.text();
 
     return { 
