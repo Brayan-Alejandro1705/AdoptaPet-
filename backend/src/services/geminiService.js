@@ -60,9 +60,35 @@ async function chatbotAnimalAdvisor(message, petType = null, userName = null, me
     const detectedName = extractUserName(message);
     const finalUserName = detectedName || userName;
 
+    // Sanitizar historial: debe empezar con 'user' y alternar 'user'/'model'
+    let sanitizedHistory = [];
+    let expectedRole = 'user';
+    
+    if (history && Array.isArray(history)) {
+      // Ignorar mensajes iniciales del modelo
+      let startIndex = 0;
+      while (startIndex < history.length && history[startIndex].role === 'model') {
+        startIndex++;
+      }
+      
+      for (let i = startIndex; i < history.length; i++) {
+        const msg = history[i];
+        if (msg.role === expectedRole) {
+          sanitizedHistory.push({
+            role: msg.role,
+            parts: [{ text: msg.parts[0].text }]
+          });
+          expectedRole = expectedRole === 'user' ? 'model' : 'user';
+        } else if (sanitizedHistory.length > 0) {
+          // Unir mensajes del mismo rol si se envían seguidos
+          sanitizedHistory[sanitizedHistory.length - 1].parts[0].text += `\n\n${msg.parts[0].text}`;
+        }
+      }
+    }
+
     // Iniciar chat con memoria
     const chat = model.startChat({
-      history: history || []
+      history: sanitizedHistory
     });
 
     let contextPrefix = '';
@@ -73,7 +99,8 @@ async function chatbotAnimalAdvisor(message, petType = null, userName = null, me
     // Concatenamos el contexto con el mensaje del usuario
     const finalMessage = `${contextPrefix}${message}`;
 
-    console.log(`📨 Mensaje al chat - userName: ${finalUserName}, history length: ${history ? history.length : 0}`);
+    console.log(`📨 Mensaje al chat - userName: ${finalUserName}, history length: ${sanitizedHistory.length}`);
+
     
     const result = await chat.sendMessage(finalMessage);
     const text = result.response.text();
