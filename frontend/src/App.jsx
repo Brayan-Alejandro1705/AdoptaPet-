@@ -60,13 +60,16 @@ const GoogleCallbackOrHome = () => {
   return <Home />;
 };
 
-// 🎯 FloatingAIChat solo en rutas privadas
+// 🎯 FloatingAIChat solo en rutas permitidas
 const FloatingAIChatCondicional = () => {
   const location = useLocation();
-  const rutasPublicas = ['/login', '/registro', '/verify-email'];
-  const esPublica = rutasPublicas.includes(location.pathname);
+  // Rutas donde NO debe aparecer el bot (ej. chat, login, etc)
+  const rutasOcultas = ['/login', '/registro', '/verify-email', '/recuperar-password', '/reset-password', '/mensajes'];
+  
+  const debeOcultarse = rutasOcultas.some(ruta => location.pathname.startsWith(ruta));
   const token = localStorage.getItem('token');
-  if (esPublica || !token) return null;
+  
+  if (debeOcultarse || !token) return null;
   return <FloatingAIChat />;
 };
 

@@ -18,7 +18,7 @@ const formatTime = (time) => {
     const diff = now - d;
     if (diff < 60000) return 'ahora';
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
-    if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });
     return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
   } catch { return time; }
 };

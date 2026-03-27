@@ -89,7 +89,7 @@ export default function Chat() {
       const tempMessage = {
         id: `temp-auto-${Date.now()}`, _id: `temp-auto-${Date.now()}`,
         text, senderId: currentUserId, sender: 'me',
-        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' }),
         status: 'sent',
       };
       setMessages((prev) => [...prev, tempMessage]);
@@ -128,7 +128,7 @@ export default function Chat() {
       if (senderId === currentUserId) return;
       const formattedMessage = {
         ...message, senderId, sender: 'other',
-        time: message.time || new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        time: message.time || new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' }),
       };
       setMessages((prev) => [...prev, formattedMessage]);
       if (senderId) {
@@ -216,7 +216,7 @@ export default function Chat() {
         return {
           ...m, senderId,
           sender: senderId === currentUserId ? 'me' : 'other',
-          time: m.time || (m.createdAt ? new Date(m.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : ''),
+          time: m.time || (m.createdAt ? new Date(m.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' }) : ''),
         };
       });
       setMessages(formatted);
@@ -251,7 +251,7 @@ export default function Chat() {
     const tempMessage = {
       id: `temp-${Date.now()}`, _id: `temp-${Date.now()}`,
       text: text.trim(), senderId: currentUserId, sender: 'me',
-      time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+      time: new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' }),
       status: 'sent',
     };
     setMessages((prev) => [...prev, tempMessage]);

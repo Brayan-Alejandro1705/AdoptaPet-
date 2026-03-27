@@ -129,9 +129,10 @@ const AnimalAdvisorBot = ({ petType = null }) => {
                     : 'text-gray-500'
                 } mt-1 block`}
               >
-                {message.timestamp.toLocaleTimeString('es-ES', {
+                {message.timestamp.toLocaleTimeString('es-CO', {
                   hour: '2-digit',
                   minute: '2-digit',
+                  timeZone: 'America/Bogota'
                 })}
               </span>
             </div>

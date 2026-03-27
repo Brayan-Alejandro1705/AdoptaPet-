@@ -174,7 +174,8 @@ const initializeSocket = (server) => {
           text: newMessage.text,
           time: new Date(newMessage.createdAt).toLocaleTimeString('es-CO', {
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: 'America/Bogota'
           }),
           senderId: String(newMessage.sender._id),
           senderName,

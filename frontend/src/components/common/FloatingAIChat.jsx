@@ -277,9 +277,10 @@ export default function FloatingAIChat() {
                         </p>
                         <div className="flex items-center justify-end gap-1 mt-1">
                           <span className="text-[10px] text-gray-500">
-                            {message.timestamp.toLocaleTimeString('es-ES', { 
+                            {message.timestamp.toLocaleTimeString('es-CO', { 
                               hour: '2-digit', 
-                              minute: '2-digit' 
+                              minute: '2-digit',
+                              timeZone: 'America/Bogota'
                             })}
                           </span>
                         </div>

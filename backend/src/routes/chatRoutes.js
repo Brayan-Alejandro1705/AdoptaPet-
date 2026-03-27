@@ -243,7 +243,8 @@ router.get('/:chatId/messages', authenticate, async (req, res) => {
           'es-CO',
           {
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: 'America/Bogota'
           }
         ),
 

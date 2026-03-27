@@ -366,7 +366,7 @@ export default function AIAssistant() {
                           {message.text}
                         </p>
                         <p style={{ fontSize: 10, color: '#9ca3af', margin: '4px 0 0', textAlign: 'right' }}>
-                          {message.timestamp.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          {message.timestamp.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' })}
                         </p>
                       </div>
                     </div>
