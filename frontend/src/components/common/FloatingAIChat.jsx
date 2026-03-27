@@ -380,7 +380,9 @@ export default function FloatingAIChat() {
       {/* PERRO FLOTANTE */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 w-20 h-20 md:w-24 md:h-24 z-50 hover:scale-110 transition-transform duration-300 group"
+        className={`fixed bottom-6 right-6 w-20 h-20 md:w-24 md:h-24 z-50 hover:scale-110 transition-transform duration-300 group ${
+          isOpen && !isMinimized ? 'hidden md:block' : ''
+        }`}
         style={{ background: 'transparent', border: 'none' }}
       >
         <img 
