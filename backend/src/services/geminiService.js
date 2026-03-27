@@ -47,6 +47,7 @@ function extractUserName(message) {
 // =====================================================
 async function chatbotAnimalAdvisor(message, petType = null, userName = null, messageCount = 0, history = []) {
   try {
+    const contextPet = petType ? `\n- El usuario está preguntando específicamente sobre: ${petType}.` : '';
     const model = genAI.getGenerativeModel({ 
       model: MODEL,
       systemInstruction: `Eres Simon Bot 🐾, el asistente veterinario de AdoptaPet. REGLAS ESTRICTAS E INQUEBRANTABLES:
