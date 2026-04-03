@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
@@ -119,7 +120,7 @@ export default function Amigos() {
       if (msg.toLowerCase().includes('ya') || msg.toLowerCase().includes('exist')) {
         setSentRequests(prev => ({ ...prev, [userId]: 'sent' }));
       } else {
-        alert('❌ Error al enviar solicitud');
+        toast.error('Error al enviar solicitud');
       }
     }
   };
@@ -143,7 +144,7 @@ export default function Amigos() {
   const handleSendMessage = async (friend, message) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) { alert('Debes iniciar sesión'); return; }
+      if (!token) { toast.error('Debes iniciar sesión'); return; }
 
       const chatResponse = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
@@ -162,7 +163,7 @@ export default function Amigos() {
       navigate(`/mensajes?chat=${chatId}&autoMsg=${encodeURIComponent(message)}`);
     } catch (error) {
       console.error('Error al enviar mensaje:', error);
-      alert(`Error: ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     }
   };
 
@@ -170,7 +171,7 @@ export default function Amigos() {
     if (window.confirm(`¿Eliminar a ${friend.name}?`)) {
       setFriends(prev => prev.filter(f => f.id !== friend.id));
       setSelectedFriend(null);
-      alert(`${friend.name} eliminado`);
+      toast.success(`${friend.name} eliminado`);
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import { Heart, MessageCircle, MoreVertical, Trash2, Edit2, X, Globe, Smile, Send, Search, Copy, Check, BadgeCheck, Reply, Flag } from 'lucide-react';
 
 const PURPLE   = '#7C3AED';
@@ -100,8 +101,8 @@ const ShareModal = ({ post, currentUser, onClose }) => {
                 body: JSON.stringify({ text: buildChatMessage() })
             });
             if (res.ok) setSentTo(prev => [...prev, chatId]);
-            else alert('No se pudo enviar el mensaje');
-        } catch { alert('Error de conexión'); }
+            else toast.error('No se pudo enviar el mensaje');
+        } catch { toast.error('Error de conexión'); }
         finally  { setSending(null); }
     };
 
@@ -471,7 +472,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
             if (!token) { alert('Debes iniciar sesión'); return; }
             const res  = await fetch(`${API_BASE}/api/favoritos/${post._id}`, { method: isFavorite ? 'DELETE' : 'POST', headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
-            if (data.success) { setIsFavorite(!isFavorite); alert(isFavorite ? '💔 Quitado de favoritos' : '⭐ Agregado a favoritos'); }
+            if (data.success) { setIsFavorite(!isFavorite); }
         } catch { alert('Error al procesar favorito'); }
     };
 

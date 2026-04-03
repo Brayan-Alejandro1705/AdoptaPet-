@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import Header from '../components/common/Header';
 import Sidebar from '../components/common/Sidebar';
 
@@ -79,9 +80,9 @@ const Ajustes = () => {
       });
       const data = await res.json();
       if (data) {
-        alert("✔️ Ajustes guardados correctamente");
+        toast.success("Ajustes guardados correctamente");
       } else {
-        alert("❌ No se pudieron guardar los ajustes");
+        toast.error("No se pudieron guardar los ajustes");
       }
     } catch (error) {
       console.error("Error guardando ajustes:", error);

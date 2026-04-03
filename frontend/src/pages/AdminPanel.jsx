@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 export default function AdminPanel() {
   const [posts, setPosts] = useState([]);
@@ -17,7 +18,7 @@ export default function AdminPanel() {
     const token = localStorage.getItem('token');
 
     if (!token || !userStr) {
-      alert('Debes iniciar sesión');
+      toast.error('Debes iniciar sesión');
       navigate('/login');
       return;
     }
@@ -26,9 +27,8 @@ export default function AdminPanel() {
       const userData = JSON.parse(userStr);
       setCurrentUser(userData);
 
-      // Verificar si es admin o superadmin
       if (userData.role !== 'admin' && userData.role !== 'superadmin') {
-        alert('No tienes permisos de administrador');
+        toast.error('No tienes permisos de administrador');
         navigate('/');
       }
     } catch (error) {
@@ -65,11 +65,11 @@ export default function AdminPanel() {
         setStats(data.data.stats);
         setTotalPages(data.data.pagination.pages);
       } else {
-        alert('Error al cargar publicaciones: ' + data.message);
+        toast.error('Error al cargar publicaciones: ' + data.message);
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al conectar con el servidor');
+      toast.error('Error al conectar con el servidor');
     } finally {
       setLoading(false);
     }
@@ -96,14 +96,14 @@ export default function AdminPanel() {
       const data = await response.json();
 
       if (data.success) {
-        alert('Publicación moderada exitosamente');
+        toast.success('Publicación moderada exitosamente');
         fetchPosts();
       } else {
-        alert(data.message || 'Error al moderar publicación');
+        toast.error(data.message || 'Error al moderar publicación');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al moderar publicación');
+      toast.error('Error al moderar publicación');
     }
   };
 
@@ -126,14 +126,14 @@ export default function AdminPanel() {
       const data = await response.json();
 
       if (data.success) {
-        alert('Publicación restaurada exitosamente');
+        toast.success('Publicación restaurada exitosamente');
         fetchPosts();
       } else {
-        alert(data.message || 'Error al restaurar publicación');
+        toast.error(data.message || 'Error al restaurar publicación');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al restaurar publicación');
+      toast.error('Error al restaurar publicación');
     }
   };
 
@@ -143,7 +143,7 @@ export default function AdminPanel() {
     );
 
     if (confirmation !== 'ELIMINAR PERMANENTEMENTE') {
-      alert('Acción cancelada');
+      toast.error('Acción cancelada');
       return;
     }
 
@@ -163,14 +163,14 @@ export default function AdminPanel() {
       const data = await response.json();
 
       if (data.success) {
-        alert('Publicación eliminada permanentemente');
+        toast.success('Publicación eliminada permanentemente');
         fetchPosts();
       } else {
-        alert(data.message || 'Error al eliminar permanentemente');
+        toast.error(data.message || 'Error al eliminar permanentemente');
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al eliminar permanentemente');
+      toast.error('Error al eliminar permanentemente');
     }
   };
 

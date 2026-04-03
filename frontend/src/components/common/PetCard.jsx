@@ -47,7 +47,6 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
       const data = await res.json();
       if (data.success) {
         setIsFavorite(!isFavorite);
-        alert(isFavorite ? '💔 Quitado de favoritos' : '⭐ Agregado a favoritos');
       } else {
         alert(data.message || 'Error al procesar favorito');
       }

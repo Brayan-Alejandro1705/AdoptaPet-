@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { X, MapPin, Calendar, Heart, MessageCircle, Phone, Check, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -64,11 +65,11 @@ const PetModal = ({ pet, onClose }) => {
     try {
       const token = localStorage.getItem('token');
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      if (!token || !currentUser.id) { alert('Debes iniciar sesión para enviar mensajes'); return; }
-      if (!pet.owner) { alert('No se puede contactar al dueño de esta mascota'); return; }
+      if (!token || !currentUser.id) { toast.error('Debes iniciar sesión para enviar mensajes'); return; }
+      if (!pet.owner) { toast.error('No se puede contactar al dueño de esta mascota'); return; }
       const ownerId = pet.owner._id || pet.owner.id || pet.owner;
-      if (!ownerId) { alert('No se puede contactar al dueño de esta mascota'); return; }
-      if (String(ownerId) === String(currentUser.id)) { alert('No puedes enviarte mensajes a ti mismo'); return; }
+      if (!ownerId) { toast.error('No se puede contactar al dueño de esta mascota'); return; }
+      if (String(ownerId) === String(currentUser.id)) { toast.error('No puedes enviarte mensajes a ti mismo'); return; }
 
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
@@ -83,7 +84,7 @@ const PetModal = ({ pet, onClose }) => {
         throw new Error(data.error || data.message || 'Error al crear chat');
       }
     } catch (error) {
-      alert(`Error al abrir el chat: ${error.message}`);
+      toast.error(`Error al abrir el chat: ${error.message}`);
     }
   };
 

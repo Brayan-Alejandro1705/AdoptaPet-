@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { MessageCircle, UserPlus, Clock } from 'lucide-react';
 import { connectionService } from '../services/connectionService';
 
@@ -39,12 +40,12 @@ export default function ContactButton({ userId, petId = null, userName = 'este u
         petId
       );
       setStatus('pending');
-      alert('✅ Solicitud de conexión enviada');
+      toast.success('Solicitud de conexión enviada');
     } catch (error) {
       if (error.response?.data?.error) {
-        alert('❌ ' + error.response.data.error);
+        toast.error(error.response.data.error);
       } else {
-        alert('❌ Error al enviar solicitud');
+        toast.error('Error al enviar solicitud');
       }
     } finally {
       setSending(false);

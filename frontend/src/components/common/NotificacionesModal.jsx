@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 // ============================================================
 // CONSTANTS
@@ -67,14 +68,14 @@ const NotificacionesModal = ({
     try {
       if (typeof onSave === 'function') {
         await onSave(); // hace el PUT real (desde Ajustes.jsx)
-        alert('✅ Configuración de notificaciones guardada');
+        toast.success('Configuración de notificaciones guardada');
       } else {
-        alert('❌ Falta conectar onSave desde Ajustes.jsx');
+        toast.error('Falta conectar onSave desde Ajustes.jsx');
       }
       onClose();
     } catch (error) {
       console.error('Error al guardar:', error);
-      alert('❌ Error al guardar la configuración');
+      toast.error('Error al guardar la configuración');
     } finally {
       setLoading(false);
     }

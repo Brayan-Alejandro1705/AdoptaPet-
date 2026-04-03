@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 const EtiquetadoModal = ({ isOpen, onClose }) => {
   const [configuracion, setConfiguracion] = useState({
@@ -33,11 +34,11 @@ const EtiquetadoModal = ({ isOpen, onClose }) => {
 
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      alert('✅ Configuración de etiquetado guardada');
+      toast.success('Configuración de etiquetado guardada');
       onClose();
     } catch (error) {
       console.error('Error al guardar:', error);
-      alert('❌ Error al guardar la configuración');
+      toast.error('Error al guardar la configuración');
     } finally {
       setLoading(false);
     }

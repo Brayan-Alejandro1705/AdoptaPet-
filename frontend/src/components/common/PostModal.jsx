@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { X, MapPin, Calendar, Heart, MessageCircle, Phone, Check, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -43,7 +44,7 @@ const PetModal = ({ pet, onClose }) => {
   const handleOpenAdoptionModal = () => {
     const token = localStorage.getItem('token');
     if (!token) {
-      alert('Debes iniciar sesión para solicitar una adopción');
+      toast.error('Debes iniciar sesión para solicitar una adopción');
       return;
     }
     setAdoptionMessage(`Estoy interesado en adoptar a ${pet.name}. Me gustaría saber más sobre él/ella y el proceso de adopción.`);
@@ -144,21 +145,21 @@ const PetModal = ({ pet, onClose }) => {
       const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
       if (!token || !currentUser.id) {
-        alert('Debes iniciar sesión para enviar mensajes');
+        toast.error('Debes iniciar sesión para enviar mensajes');
         return;
       }
       if (!pet.owner) {
-        alert('No se puede contactar al dueño de esta mascota');
+        toast.error('No se puede contactar al dueño de esta mascota');
         return;
       }
 
       const ownerId = pet.owner._id || pet.owner.id || pet.owner;
       if (!ownerId) {
-        alert('No se puede contactar al dueño de esta mascota');
+        toast.error('No se puede contactar al dueño de esta mascota');
         return;
       }
       if (String(ownerId) === String(currentUser.id)) {
-        alert('No puedes enviarte mensajes a ti mismo');
+        toast.error('No puedes enviarte mensajes a ti mismo');
         return;
       }
 
@@ -182,7 +183,7 @@ const PetModal = ({ pet, onClose }) => {
       }
     } catch (error) {
       console.error('❌ Error al crear chat:', error);
-      alert(`Error al abrir el chat: ${error.message}`);
+      toast.error(`Error al abrir el chat: ${error.message}`);
     }
   };
 

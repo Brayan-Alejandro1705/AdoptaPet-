@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { UserPlus, Check, X, MessageCircle, Clock } from 'lucide-react';
 import { connectionService } from '../services/connectionService';
 import Header from '../components/common/Header';
@@ -34,20 +35,20 @@ export default function ConnectionRequests() {
   const handleAccept = async (requestId) => {
     try {
       await connectionService.acceptRequest(requestId);
-      alert('✅ Solicitud aceptada. ¡Ahora pueden chatear!');
+      toast.success('Solicitud aceptada. ¡Ahora pueden chatear!');
       loadRequests();
     } catch (error) {
-      alert('❌ Error al aceptar solicitud');
+      toast.error('Error al aceptar solicitud');
     }
   };
 
   const handleReject = async (requestId) => {
     try {
       await connectionService.rejectRequest(requestId);
-      alert('❌ Solicitud rechazada');
+      toast.success('Solicitud rechazada');
       loadRequests();
     } catch (error) {
-      alert('❌ Error al rechazar solicitud');
+      toast.error('Error al rechazar solicitud');
     }
   };
 

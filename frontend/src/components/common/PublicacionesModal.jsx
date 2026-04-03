@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { toast } from "react-hot-toast";
 
 const DEFAULT_SETTINGS = {
   privacidadPorDefecto: "publico", // publico | amigos | privado
@@ -94,11 +95,11 @@ const PublicacionesModal = ({ isOpen, onClose }) => {
       setConfiguracion(merged);
       setOriginal(merged);
 
-      alert("✅ Configuración guardada");
+      toast.success("Configuración guardada");
       onClose();
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("❌ Error al guardar la configuración");
+      toast.error("Error al guardar la configuración");
     } finally {
       setLoading(false);
     }

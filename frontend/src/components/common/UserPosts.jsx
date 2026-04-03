@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { Loader2, Heart, MessageCircle, Share2, MoreVertical, Trash2, Edit2 } from 'lucide-react';
 
 // ============================================
@@ -99,7 +100,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike }) => {
             if (data.success) {
                 setCommentText('');
                 setCommentsCount(data.data.commentsCount);
-                alert('Comentario agregado');
+                toast.success('Comentario agregado');
             }
         } catch (error) {
             console.error('Error al comentar:', error);
@@ -120,7 +121,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike }) => {
             const data = await response.json();
             if (data.success) {
                 if (onDelete) onDelete(post._id);
-                alert('Publicación eliminada');
+                toast.success('Publicación eliminada');
             }
         } catch (error) {
             console.error('Error al eliminar:', error);
