@@ -37,7 +37,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
     e.stopPropagation();
     try {
       const token = localStorage.getItem('token');
-      if (!token) { alert('Debes iniciar sesión para guardar favoritos'); return; }
+      if (!token) { toast.error('Debes iniciar sesión para guardar favoritos'); return; }
       setIsLoadingFav(true);
       const method = isFavorite ? 'DELETE' : 'POST';
       const res = await fetch(`${API_BASE}/api/favoritos/pet/${pet._id}`, {
@@ -48,11 +48,11 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
       if (data.success) {
         setIsFavorite(!isFavorite);
       } else {
-        alert(data.message || 'Error al procesar favorito');
+        toast.error(data.message || 'Error al procesar favorito');
       }
     } catch (error) {
       console.error('Error en favorito:', error);
-      alert('Error al procesar favorito');
+      toast.error('Error al procesar favorito');
     } finally {
       setIsLoadingFav(false);
     }
@@ -63,7 +63,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
     if (!window.confirm(`¿Estás seguro de que deseas eliminar a ${pet.name}?`)) return;
     try {
       const token = localStorage.getItem('token');
-      if (!token) { alert('Debes iniciar sesión'); return; }
+      if (!token) { toast.error('Debes iniciar sesión'); return; }
       setIsDeleting(true);
       const res = await fetch(`${API_BASE}/api/pets/${pet._id}`, {
         method: 'DELETE',
@@ -71,14 +71,14 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
       });
       const data = await res.json();
       if (data.success) {
-        alert('✅ Mascota eliminada correctamente');
+        toast.success('Mascota eliminada correctamente');
         if (onDelete) onDelete(pet._id);
       } else {
-        alert(data.message || 'Error al eliminar mascota');
+        toast.error(data.message || 'Error al eliminar mascota');
       }
     } catch (error) {
       console.error('Error eliminando mascota:', error);
-      alert('Error al eliminar mascota');
+      toast.error('Error al eliminar mascota');
     } finally {
       setIsDeleting(false);
     }
