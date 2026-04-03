@@ -5,6 +5,7 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
+const { sendWelcomeEmail } = require('../utils/email');
 
 console.log('🔐 Inicializando Passport con Google OAuth...');
 console.log('   Client ID:', process.env.GOOGLE_CLIENT_ID ? '✅ Configurado' : '❌ NO configurado');
@@ -83,6 +84,13 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
           });
 
           console.log('✅ Usuario creado exitosamente');
+          
+          // Enviar correo de bienvenida
+          try {
+            await sendWelcomeEmail(user.email, user.name);
+          } catch (emailErr) {
+            console.error('❌ Error al enviar correo de bienvenida (Google):', emailErr.message);
+          }
           console.log('   ID:', user._id);
           console.log('   Email:', user.email);
           console.log('   Nombre:', user.name);

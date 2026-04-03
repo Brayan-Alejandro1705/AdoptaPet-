@@ -5,7 +5,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
+const { sendVerificationEmail, sendPasswordResetEmail, sendWelcomeEmail } = require('../utils/email');
 
 // =============================================
 // GENERAR TOKEN
@@ -183,6 +183,13 @@ exports.verifyEmail = async (req, res) => {
     await user.verifyEmail();
     const token = generateToken(user._id);
     console.log(`✅ Email verificado: ${user.email}`);
+
+    // Enviar correo de bienvenida tras verificación exitosa
+    try {
+      await sendWelcomeEmail(user.email, user.name);
+    } catch (emailErr) {
+      console.error('❌ Error enviando email de bienvenida:', emailErr.message);
+    }
 
     res.json({
       success: true,
