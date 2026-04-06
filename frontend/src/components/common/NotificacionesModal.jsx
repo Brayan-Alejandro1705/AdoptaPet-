@@ -18,7 +18,6 @@ const NOTIFICATION_SECTIONS = [
       { key: "likes", label: "❤️ Likes en mis publicaciones" },
       { key: "comments", label: "💬 Comentarios" },
       { key: "followers", label: "👥 Nuevos seguidores" },
-      { key: "mentions", label: "📢 Menciones" },
     ],
   },
   {
