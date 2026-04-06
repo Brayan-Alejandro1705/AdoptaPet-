@@ -50,9 +50,10 @@ const mapPrivacidadToVisibility = (priv) => {
   return 'public';
 };
 
+// ✅ FIX: convertir friends a strings para que la comparación funcione correctamente
 const buildVisibilityFilter = (req) => {
   const viewerId = req.userId;
-  const friendsIds = req.user?.friends || [];
+  const friendsIds = (req.user?.friends || []).map(id => id.toString());
 
   return {
     status: { $ne: 'deleted' },
@@ -159,10 +160,32 @@ router.get('/feed', auth, async (req, res) => {
   }
 });
 
-// 3. POSTS DE UN USUARIO ESPECÍFICO
+// 3. POSTS DE UN USUARIO ESPECÍFICO ✅ FIX: respeta privacidad según relación
 router.get('/user/:userId', auth, async (req, res) => {
   try {
-    const posts = await Post.find({ author: req.params.userId, status: 'active' })
+    const viewerId = req.userId.toString();
+    const targetId = req.params.userId;
+    const isSelf = viewerId === targetId;
+
+    // Verificar si el viewer es amigo del target
+    const targetUser = await User.findById(targetId).select('friends').lean();
+    const isFriend = (targetUser?.friends || []).map(id => id.toString()).includes(viewerId);
+
+    // Filtro según relación
+    let visibilityFilter;
+    if (isSelf) {
+      visibilityFilter = {}; // Veo todos mis posts
+    } else if (isFriend) {
+      visibilityFilter = { "settings.visibility": { $in: ['public', 'friends'] } };
+    } else {
+      visibilityFilter = { "settings.visibility": "public" }; // Solo públicos
+    }
+
+    const posts = await Post.find({
+      author: targetId,
+      status: 'active',
+      ...visibilityFilter
+    })
       .populate('author', 'name nombre email avatar role verified')
       .populate('comments.user', 'name nombre email avatar verified')
       .populate('comments.replies.user', 'name nombre email avatar verified')
@@ -170,6 +193,7 @@ router.get('/user/:userId', auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
+
     res.json({ success: true, data: { posts } });
   } catch (error) {
     console.error('❌ Error al obtener posts del usuario:', error);
@@ -177,7 +201,7 @@ router.get('/user/:userId', auth, async (req, res) => {
   }
 });
 
-// 4. CREAR PUBLICACIÓN
+// 4. CREAR PUBLICACIÓN ✅ FIX: aplica postSettings del usuario automáticamente
 router.post('/', auth, async (req, res) => {
   try {
     const { contenido, tipo, imagenes, videos, visibility } = req.body;
@@ -188,15 +212,20 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Debes proporcionar contenido o media' });
     }
 
+    // ✅ Leer postSettings del usuario para aplicar privacidad por defecto
+    const author = await User.findById(req.userId).select('postSettings').lean();
+    const privacidadUsuario = author?.postSettings?.privacidadPorDefecto || 'publico';
+    const visibilityFinal = visibility || mapPrivacidadToVisibility(privacidadUsuario);
+
     const postData = {
       author: req.userId,
       content: contenido?.trim() || '',
       type: tipo || 'update',
       media: { images: imageUrls, videos: videoUrl ? [videoUrl] : [] },
       settings: {
-        visibility: visibility || 'public',
-        allowComments: true,
-        allowSharing: true
+        visibility: visibilityFinal,
+        allowComments: author?.postSettings?.permitirComentarios !== false,
+        allowSharing: author?.postSettings?.permitirCompartir !== false,
       }
     };
 
@@ -204,6 +233,7 @@ router.post('/', auth, async (req, res) => {
     await newPost.save();
     await newPost.populate('author', 'name nombre email avatar role verified');
 
+    console.log(`✅ Post creado con visibility: ${visibilityFinal}`);
     res.status(201).json({ success: true, data: { post: newPost } });
   } catch (error) {
     console.error('❌ Error al crear post:', error);
@@ -310,7 +340,6 @@ router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
     const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ success: false });
 
-    // 🆕 Validar permisos
     const isCommentAuthor = comment.user.toString() === req.userId;
     const isPostAuthor = post.author.toString() === req.userId;
 
@@ -321,7 +350,6 @@ router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
       });
     }
 
-    // Contar replies para decrementar correctamente
     const repliesCount = comment.replies?.length || 0;
     
     await Post.findByIdAndUpdate(req.params.postId, {
@@ -336,33 +364,24 @@ router.delete('/:postId/comments/:commentId', auth, async (req, res) => {
   }
 });
 
-// 6c. RESPONDER A COMENTARIO (REPLIES) ✅ COMPLETO Y CORRECTO
+// 6c. RESPONDER A COMENTARIO (REPLIES)
 router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
   try {
     const { content, replyTo } = req.body;
 
-    // 🆕 Validación mejorada
     if (!content || !content.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'La respuesta no puede estar vacía' 
-      });
+      return res.status(400).json({ success: false, message: 'La respuesta no puede estar vacía' });
     }
 
     if (content.trim().length > 1000) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'La respuesta no puede exceder 1000 caracteres' 
-      });
+      return res.status(400).json({ success: false, message: 'La respuesta no puede exceder 1000 caracteres' });
     }
 
     let replyToData = null;
     if (replyTo) {
       try {
         const replyToUser = await User.findById(replyTo).select('name nombre avatar').lean();
-        if (replyToUser) {
-          replyToData = replyTo;
-        }
+        if (replyToUser) replyToData = replyTo;
       } catch (e) {
         console.log('Advertencia: replyTo no es un ID válido');
       }
@@ -392,10 +411,8 @@ router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
     if (!comment) return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
 
     const newReply = comment.replies[comment.replies.length - 1];
-
     res.status(201).json({ success: true, data: { reply: newReply, commentsCount: post.stats.commentsCount } });
 
-    // Notificación al autor del comentario original
     if (comment.user.toString() !== req.userId.toString()) {
       setImmediate(async () => {
         try {
@@ -423,41 +440,32 @@ router.post('/:postId/comments/:commentId/replies', auth, async (req, res) => {
         }
       });
     }
-
   } catch (err) { 
     console.error('❌ Error en replies:', err);
     res.status(500).json({ success: false, message: 'Error al crear respuesta' }); 
   }
 });
 
-// 6d. ELIMINAR RESPUESTA ✅ CON VALIDACIONES
+// 6d. ELIMINAR RESPUESTA
 router.delete('/:postId/comments/:commentId/replies/:replyId', auth, async (req, res) => {
   try {
-    // Obtener el post sin actualizar aún
     const post = await Post.findById(req.params.postId);
     if (!post) return res.status(404).json({ success: false, message: 'Post no encontrado' });
 
-    // Buscar el comentario
     const comment = post.comments.id(req.params.commentId);
     if (!comment) return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
 
-    // Buscar la reply
     const reply = comment.replies.id(req.params.replyId);
     if (!reply) return res.status(404).json({ success: false, message: 'Respuesta no encontrada' });
 
-    // 🆕 VALIDAR PERMISOS
     const isReplyAuthor = reply.user.toString() === req.userId;
     const isPostAuthor = post.author.toString() === req.userId;
     
     if (!isReplyAuthor && !isPostAuthor) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'No tienes permiso para eliminar esta respuesta' 
-      });
+      return res.status(403).json({ success: false, message: 'No tienes permiso para eliminar esta respuesta' });
     }
 
-    // Ahora sí actualizar
-    const updatedPost = await Post.findOneAndUpdate(
+    await Post.findOneAndUpdate(
       { _id: req.params.postId, "comments._id": req.params.commentId },
       { 
         $pull: { "comments.$.replies": { _id: req.params.replyId } },
@@ -473,7 +481,7 @@ router.delete('/:postId/comments/:commentId/replies/:replyId', auth, async (req,
   }
 });
 
-// 7. REPORTAR PUBLICACIÓN ✅ NUEVO
+// 7. REPORTAR PUBLICACIÓN
 router.post('/:postId/report', auth, async (req, res) => {
   try {
     const { reason } = req.body;
@@ -491,7 +499,6 @@ router.post('/:postId/report', auth, async (req, res) => {
 
     res.json({ success: true, message: 'Reporte enviado' });
 
-    // ✅ Enviar email al admin de forma asíncrona (no bloquea la respuesta)
     setImmediate(async () => {
       try {
         const reporter = await User.findById(req.userId).select('name nombre email').lean();
@@ -548,8 +555,7 @@ router.put('/:postId', auth, async (req, res) => {
     const post = await Post.findOne({ _id: req.params.postId, author: req.userId });
     if (!post) return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
 
-    // ✅ Validar ventana de edición de 24 horas
-    const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h en ms
+    const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
     const elapsed = Date.now() - new Date(post.createdAt).getTime();
     if (elapsed > EDIT_WINDOW_MS) {
       return res.status(403).json({
