@@ -63,8 +63,8 @@ const Ajustes = () => {
       .catch(err => console.error("Error obteniendo notificaciones:", err));
   }, []);
 
-  // ✅ Guardar ajustes de publicaciones
-  const handleGuardar = async () => {
+  // ✅ Guardar ajustes de publicaciones (Llamado desde el modal)
+  const handleGuardarPostSettings = async (nuevosSettings) => {
     try {
       const res = await fetch(`${API_URL}/api/users/me/post-settings`, {
         method: "PUT",
@@ -72,20 +72,21 @@ const Ajustes = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          privacidadPorDefecto: settings.privacidadPorDefecto,
-          permitirComentarios: settings.permitirComentarios,
-          permitirCompartir: settings.permitirCompartir,
-        }),
+        body: JSON.stringify(nuevosSettings),
       });
       const data = await res.json();
-      if (data) {
-        toast.success("Ajustes guardados correctamente");
+      if (data && !data.success === false) {
+        setSettings(prev => ({ ...prev, ...data }));
+        toast.success("Ajustes de publicaciones guardados");
+        return true;
       } else {
         toast.error("No se pudieron guardar los ajustes");
+        return false;
       }
     } catch (error) {
       console.error("Error guardando ajustes:", error);
+      toast.error("Error de conexión al guardar");
+      return false;
     }
   };
 
@@ -152,8 +153,7 @@ const Ajustes = () => {
         isOpen={modalPublicaciones}
         onClose={() => setModalPublicaciones(false)}
         settings={settings}
-        setSettings={setSettings}
-        onSave={handleGuardar}
+        onSave={handleGuardarPostSettings}
       />
     </div>
   );

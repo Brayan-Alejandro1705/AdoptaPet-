@@ -9,52 +9,27 @@ const DEFAULT_SETTINGS = {
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const PublicacionesModal = ({ isOpen, onClose }) => {
+const PublicacionesModal = ({ isOpen, onClose, settings, onSave }) => {
   const [configuracion, setConfiguracion] = useState(DEFAULT_SETTINGS);
   const [original, setOriginal] = useState(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
-  const [loadingInitial, setLoadingInitial] = useState(false);
 
-  const token = localStorage.getItem("token");
-
-  const dirty = useMemo(
-    () => JSON.stringify(configuracion) !== JSON.stringify(original),
-    [configuracion, original]
-  );
-
+  // Sincronizar con settings del padre al abrir
   useEffect(() => {
-    if (!isOpen) return;
-
-    const load = async () => {
-      setLoadingInitial(true);
-      try {
-        const res = await fetch(`${API_URL}/api/users/me/post-settings`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("No se pudo cargar settings");
-        const data = await res.json();
-
-        const merged = { ...DEFAULT_SETTINGS, ...(data || {}) };
-        setConfiguracion(merged);
-        setOriginal(merged);
-      } catch (e) {
-        console.error("Error al cargar ajustes de publicaciones:", e);
-        setConfiguracion(DEFAULT_SETTINGS);
-        setOriginal(DEFAULT_SETTINGS);
-      } finally {
-        setLoadingInitial(false);
-      }
-    };
-
-    load();
-  }, [isOpen]);
+    if (isOpen && settings) {
+      const current = {
+        privacidadPorDefecto: settings.privacidadPorDefecto || "publico",
+        permitirComentarios: settings.permitirComentarios !== false,
+        permitirCompartir: settings.permitirCompartir !== false,
+      };
+      setConfiguracion(current);
+      setOriginal(current);
+    }
+  }, [isOpen, settings]);
 
   if (!isOpen) return null;
+
+  const dirty = JSON.stringify(configuracion) !== JSON.stringify(original);
 
   const handlePrivacidadChange = (valor) =>
     setConfiguracion((prev) => ({ ...prev, privacidadPorDefecto: valor }));
@@ -62,36 +37,14 @@ const PublicacionesModal = ({ isOpen, onClose }) => {
   const toggleConfiguracion = (key) =>
     setConfiguracion((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  const handleGuardar = async () => {
+  const handleLocalGuardar = async () => {
     setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/users/me/post-settings`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(configuracion),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || "Error al guardar");
-      }
-
-      const data = await res.json().catch(() => ({}));
-      const merged = { ...DEFAULT_SETTINGS, ...(data || configuracion) };
-      setConfiguracion(merged);
-      setOriginal(merged);
-
-      toast.success("Configuración de publicaciones guardada");
+    const success = await onSave(configuracion);
+    if (success) {
+      setOriginal(configuracion);
       onClose();
-    } catch (error) {
-      console.error("Error al guardar:", error);
-      toast.error("Error al guardar la configuración");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   return (
@@ -170,7 +123,7 @@ const PublicacionesModal = ({ isOpen, onClose }) => {
 
               {/* Guardar */}
               <button
-                onClick={handleGuardar}
+                onClick={handleLocalGuardar}
                 disabled={loading || !dirty}
                 className="w-full bg-gradient-to-r from-blue-600 via-purple-500 to-blue-500 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!dirty ? "No hay cambios por guardar" : "Guardar cambios"}

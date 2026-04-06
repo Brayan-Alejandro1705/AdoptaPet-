@@ -29,7 +29,34 @@ const Publicar = () => {
   const [momentText, setMomentText] = useState("");
   const [images, setImages] = useState([]);
   const [videos, setVideos] = useState([]);
+  
+  // ✅ Post Settings
+  const [postSettings, setPostSettings] = useState({
+    privacidadPorDefecto: 'publico',
+    permitirComentarios: true,
+    permitirCompartir: true
+  });
+  const [selectedVisibility, setSelectedVisibility] = useState('publico');
+
   const mediaInputRef = useRef(null);
+
+  // ✅ Cargar ajustes al montar
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch(`${API_BASE}/api/users/me/post-settings`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && !data.success === false) {
+        setPostSettings(data);
+        setSelectedVisibility(data.privacidadPorDefecto || 'publico');
+      }
+    })
+    .catch(err => console.error("Error al cargar ajustes:", err));
+  }, []);
 
   // Acepta tanto imágenes como videos en un solo input
   const handleMediaFiles = (e) => {
@@ -104,9 +131,12 @@ const Publicar = () => {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          contenido: momentText, tipo: "update",
+          contenido: momentText,
+          tipo: "update",
           imagenes: mediaItems.filter(m => m.type === "image").map(m => m.url),
-          videos: mediaItems.find(m => m.type === "video")?.url || null
+          videos: mediaItems.find(m => m.type === "video")?.url || null,
+          visibility: selectedVisibility === 'publico' ? 'public' : 
+                      selectedVisibility === 'amigos' ? 'friends' : 'private'
         }),
       });
       setUploadProgress(90);
@@ -298,7 +328,18 @@ const Publicar = () => {
                 <div className="p-top">
                   <div className="p-avatar">🐾</div>
                   <div className="p-textarea-wrap">
-                    <p className="p-heading">Comparte un momento</p>
+                    <div className="flex justify-between items-center mb-2">
+                       <p className="p-heading">Comparte un momento</p>
+                       <select 
+                        className="text-xs bg-gray-100 border-none rounded-md px-2 py-1 outline-none text-gray-600 font-semibold cursor-pointer hover:bg-gray-200 transition-all"
+                        value={selectedVisibility}
+                        onChange={(e) => setSelectedVisibility(e.target.value)}
+                       >
+                         <option value="publico">🌍 Público</option>
+                         <option value="amigos">👥 Amigos</option>
+                         <option value="privado">🔒 Solo yo</option>
+                       </select>
+                    </div>
                     <textarea
                       className="p-textarea"
                       value={momentText}

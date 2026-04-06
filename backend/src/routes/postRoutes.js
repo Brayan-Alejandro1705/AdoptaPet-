@@ -311,6 +311,19 @@ router.post('/:postId/comments', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'El comentario no puede exceder 1000 caracteres' });
     }
 
+    const post = await Post.findById(req.params.postId).select('settings author');
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Post no encontrado' });
+    }
+
+    // ✅ Verificar si se permiten comentarios
+    if (post.settings?.allowComments === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'Los comentarios están desactivados para esta publicación'
+      });
+    }
+
     const updatedPost = await Post.findByIdAndUpdate(req.params.postId, 
       { 
         $push: { comments: { user: req.userId, content: content.trim(), createdAt: new Date() } },
