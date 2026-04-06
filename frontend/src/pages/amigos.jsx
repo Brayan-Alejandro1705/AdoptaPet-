@@ -6,6 +6,7 @@ import Sidebar from '../components/common/Sidebar';
 import FriendCard from '../components/common/FriendCard';
 import ProfileModal from '../components/common/ProfileModal';
 import MessageModal from '../components/common/MessageModal';
+import ConfirmModal from '../components/common/ConfirmModal';
 import { Users, UserPlus, X } from 'lucide-react';
 import { friendRequestService } from '../services/friendRequestService';
 
@@ -16,6 +17,7 @@ export default function Amigos() {
   const [messageModalFriend, setMessageModalFriend] = useState(null);
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
 
   // Sugerencias
   const [suggestions, setSuggestions] = useState([]);
@@ -185,11 +187,18 @@ export default function Amigos() {
   };
 
   const handleRemoveFriend = (friend) => {
-    if (window.confirm(`¿Eliminar a ${friend.name}?`)) {
-      setFriends(prev => prev.filter(f => f.id !== friend.id));
-      setSelectedFriend(null);
-      toast.success(`${friend.name} eliminado`);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar amigo',
+      message: `¿Estás seguro de que quieres eliminar a ${friend.name} de tus amigos?`,
+      type: 'danger',
+      onConfirm: () => {
+        setFriends(prev => prev.filter(f => f.id !== friend.id));
+        setSelectedFriend(null);
+        toast.success(`${friend.name} eliminado`);
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -375,6 +384,14 @@ export default function Amigos() {
           onSendMessage={handleSendMessage}
         />
       )}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

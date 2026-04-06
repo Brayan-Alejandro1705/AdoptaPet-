@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { Loader2, Heart, MessageCircle, Share2, MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 // ============================================
 // COMPONENTE POST CARD (INLINE)
@@ -23,6 +23,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike }) => {
     const [isLiked, setIsLiked] = useState(false);
     const [likesCount, setLikesCount] = useState(0);
     const [commentsCount, setCommentsCount] = useState(0);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
 
     // Inicializar contadores de forma segura
     useEffect(() => {
@@ -108,24 +109,33 @@ const PostCard = ({ post, currentUser, onDelete, onLike }) => {
     };
 
     // Handler de eliminar
-    const handleDelete = async () => {
-        if (!window.confirm('¿Eliminar esta publicación?')) return;
+    const handleDelete = () => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Eliminar publicación',
+            message: '¿Estás seguro de que quieres eliminar esta publicación?',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch(`/api/posts/${post._id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
 
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/posts/${post._id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            const data = await response.json();
-            if (data.success) {
-                if (onDelete) onDelete(post._id);
-                toast.success('Publicación eliminada');
+                    const data = await response.json();
+                    if (data.success) {
+                        if (onDelete) onDelete(post._id);
+                        toast.success('Publicación eliminada');
+                    }
+                } catch (error) {
+                    console.error('Error al eliminar:', error);
+                    toast.error('Error al eliminar la publicación');
+                } finally {
+                    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                }
             }
-        } catch (error) {
-            console.error('Error al eliminar:', error);
-        }
+        });
     };
 
     // Verificar si es el propietario
@@ -313,6 +323,14 @@ const PostCard = ({ post, currentUser, onDelete, onLike }) => {
                     )}
                 </div>
             )}
+            <ConfirmModal
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+            />
         </div>
     );
 };

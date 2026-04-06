@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { Heart, MessageCircle, MoreVertical, Trash2, Edit2, X, Globe, Smile, Send, Search, Copy, Check, BadgeCheck, Reply, Flag } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Trash2, Edit2, X, Globe, Smile, Send, Search, Copy, Check, BadgeCheck, Reply, Flag, AlertCircle } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 const PURPLE   = '#7C3AED';
 const PINK     = '#EC4899';
@@ -355,6 +356,7 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
     const [lightbox, setLightbox]               = useState(null);
     const [showReportModal, setShowReportModal] = useState(false);
     const [reportReason, setReportReason]       = useState('Contenido inapropiado');
+    const [confirmModal, setConfirmModal]       = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
 
     const getAvatarUrl = (user) => {
         if (!user) return generateAvatarSVG('U');
@@ -471,16 +473,16 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
     const handleFavorite = async () => {
         try {
             const token = localStorage.getItem('token');
-            if (!token) { alert('Debes iniciar sesión'); return; }
+            if (!token) { toast.error('Debes iniciar sesión'); return; }
             const res  = await fetch(`${API_BASE}/api/favoritos/${post._id}`, { method: isFavorite ? 'DELETE' : 'POST', headers: { Authorization: `Bearer ${token}` } });
             const data = await res.json();
             if (data.success) { setIsFavorite(!isFavorite); }
-        } catch { alert('Error al procesar favorito'); }
+        } catch { toast.error('Error al procesar favorito'); }
     };
 
     const handleLike = async () => {
         const token = localStorage.getItem('token');
-        if (!token) { alert('Debes iniciar sesión para dar like'); return; }
+        if (!token) { toast.error('Debes iniciar sesión para dar like'); return; }
 
         const likedAntes = isLiked;
         const countAntes = likesCount;
@@ -514,23 +516,34 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
         if (!commentText.trim()) return;
         try {
             const token = localStorage.getItem('token');
-            if (!token) { alert('Debes iniciar sesión para comentar'); return; }
+            if (!token) { toast.error('Debes iniciar sesión para comentar'); return; }
             const res  = await fetch(`${API_BASE}/api/posts/${post._id}/comments`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: commentText }) });
             const data = await res.json();
             if (data.success) { setCommentText(''); setCommentsCount(data.data.commentsCount); if (onComment) onComment(post._id, data.data.comment); }
-            else alert(data.message || 'Error al agregar comentario');
-        } catch { alert('Error al agregar comentario.'); }
+            else toast.error(data.message || 'Error al agregar comentario');
+        } catch { toast.error('Error al agregar comentario.'); }
     };
 
-    const handleDelete = async () => {
-        if (!window.confirm('¿Estás seguro de eliminar esta publicación?')) return;
-        try {
-            const token = localStorage.getItem('token');
-            const res  = await fetch(`${API_BASE}/api/posts/${post._id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { if (onDelete) onDelete(post._id); }
-            else alert(data.message || 'Error al eliminar publicación');
-        } catch { alert('Error al eliminar publicación'); }
+    const handleDelete = () => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Eliminar publicación',
+            message: '¿Estás seguro de que quieres eliminar esta publicación? Esta acción no se puede deshacer.',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const res  = await fetch(`${API_BASE}/api/posts/${post._id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+                    const data = await res.json();
+                    if (data.success) { 
+                        toast.success('Publicación eliminada');
+                        if (onDelete) onDelete(post._id); 
+                    }
+                    else toast.error(data.message || 'Error al eliminar publicación');
+                } catch { toast.error('Error al eliminar publicación'); }
+                finally { setConfirmModal(prev => ({ ...prev, isOpen: false })); }
+            }
+        });
     };
 
     const handleReport = () => {
@@ -574,47 +587,61 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                 setCommentsCount(data.data.commentsCount);
                 if (onComment) onComment(post._id, data.data.reply); 
             } else {
-                alert(data.message || 'Error al enviar respuesta');
+                toast.error(data.message || 'Error al enviar respuesta');
             }
         } catch { 
-            alert('Error al enviar respuesta'); 
+            toast.error('Error al enviar respuesta'); 
         }
     };
 
-    const handleDeleteComment = async (commentId) => {
-        if (!window.confirm('¿Eliminar este comentario?')) return;
-        try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.ok) {
-                // ✅ FIX 2: Restar el comentario + todas sus replies
-                const comment = post.comments.find(c => String(c._id) === String(commentId));
-                const repliesCount = comment?.replies?.length || 0;
-                setCommentsCount(prev => Math.max(0, prev - 1 - repliesCount));
-                if (onDeleteComment) onDeleteComment(post._id, commentId);
-                alert('Comentario eliminado');
+    const handleDeleteComment = (commentId) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Eliminar comentario',
+            message: '¿Seguro que quieres eliminar este comentario?',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const comment = post.comments.find(c => String(c._id) === String(commentId));
+                        const repliesCount = comment?.replies?.length || 0;
+                        setCommentsCount(prev => Math.max(0, prev - 1 - repliesCount));
+                        if (onDeleteComment) onDeleteComment(post._id, commentId);
+                        toast.success('Comentario eliminado');
+                    }
+                } catch { toast.error('Error al eliminar el comentario'); }
+                finally { setConfirmModal(prev => ({ ...prev, isOpen: false })); }
             }
-        } catch { alert('Error al eliminar el comentario'); }
+        });
     };
 
-    const handleDeleteReply = async (commentId, replyId) => {
-        if (!window.confirm('¿Eliminar esta respuesta?')) return;
-        try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}/replies/${replyId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.ok) {
-                // ✅ Restar 1 del contador al eliminar una reply
-                setCommentsCount(prev => Math.max(0, prev - 1));
-                if (onDeleteReply) onDeleteReply(post._id, commentId, replyId);
-                alert('Respuesta eliminada');
+    const handleDeleteReply = (commentId, replyId) => {
+        setConfirmModal({
+            isOpen: true,
+            title: 'Eliminar respuesta',
+            message: '¿Seguro que quieres eliminar esta respuesta?',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE}/api/posts/${post._id}/comments/${commentId}/replies/${replyId}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    setCommentsCount(prev => Math.max(0, prev - 1));
+                    if (onDeleteReply) onDeleteReply(post._id, commentId, replyId);
+                    toast.success('Respuesta eliminada');
+                }
+                } catch { toast.error('Error al eliminar la respuesta'); }
+                finally { setConfirmModal(prev => ({ ...prev, isOpen: false })); }
             }
-        } catch { alert('Error al eliminar la respuesta'); }
+        });
     };
 
     const getImageHeight = (count) => {
@@ -1010,80 +1037,41 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
 
             {/* ===== MODAL DE REPORTE ===== */}
             {showReportModal && (
-                <div
-                    className="fixed inset-0 flex items-center justify-center z-[9999] px-4"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-                    onClick={() => setShowReportModal(false)}
-                >
-                    <div
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Header */}
-                        <div className="px-5 py-4" style={{ background: 'linear-gradient(135deg, #7C3AED, #EC4899)' }}>
+                <div className="fixed inset-0 flex items-center justify-center z-[9999] px-4 bg-black/50" onClick={() => setShowReportModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="px-5 py-4 bg-gradient-to-r from-purple-600 to-pink-500">
                             <div className="flex items-center gap-2">
                                 <Flag className="w-5 h-5 text-white" />
                                 <h3 className="text-white font-bold text-base">Reportar publicación</h3>
                             </div>
-                            <p className="text-purple-100 text-xs mt-1">Tu reporte ayuda a mantener la comunidad segura</p>
                         </div>
 
-                        {/* Body */}
-                        <div className="px-5 py-4">
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                ¿Por qué reportas esta publicación?
-                            </label>
-
-                            {/* Opciones rápidas */}
+                        <div className="p-5">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">¿Por qué reportas esta publicación?</label>
                             <div className="flex flex-wrap gap-2 mb-3">
-                                {['Contenido inapropiado', 'Spam', 'Acoso', 'Información falsa', 'Otro'].map(opt => (
-                                    <button
-                                        key={opt}
-                                        onClick={() => setReportReason(opt)}
-                                        className="text-xs px-3 py-1.5 rounded-full border-2 transition font-medium"
-                                        style={{
-                                            borderColor: reportReason === opt ? '#7C3AED' : '#e5e7eb',
-                                            background: reportReason === opt ? '#7C3AED' : 'white',
-                                            color: reportReason === opt ? 'white' : '#374151'
-                                        }}
-                                    >
-                                        {opt}
-                                    </button>
+                                {['Spam', 'Acoso', 'Inapropiado', 'Falso', 'Otro'].map(opt => (
+                                    <button key={opt} onClick={() => setReportReason(opt)} className={`text-xs px-3 py-1.5 rounded-full border transition ${reportReason === opt ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-200'}`}>{opt}</button>
                                 ))}
                             </div>
-
-                            <textarea
-                                value={reportReason}
-                                onChange={e => setReportReason(e.target.value)}
-                                placeholder="Describe el problema..."
-                                rows={3}
-                                className="w-full text-sm border-2 border-gray-200 rounded-xl px-3 py-2 outline-none resize-none transition"
-                                style={{ focusBorderColor: '#7C3AED' }}
-                                onFocus={e => e.target.style.borderColor = '#7C3AED'}
-                                onBlur={e => e.target.style.borderColor = '#e5e7eb'}
-                            />
+                            <textarea value={reportReason} onChange={e => setReportReason(e.target.value)} rows={3} className="w-full text-sm border-2 border-gray-100 rounded-xl px-3 py-2 outline-none focus:border-purple-400" />
                         </div>
 
-                        {/* Footer */}
-                        <div className="px-5 pb-5 flex gap-3 justify-end">
-                            <button
-                                onClick={() => setShowReportModal(false)}
-                                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSubmitReport}
-                                disabled={!reportReason.trim()}
-                                className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50"
-                                style={{ background: 'linear-gradient(135deg, #7C3AED, #EC4899)' }}
-                            >
-                                Enviar reporte
-                            </button>
+                        <div className="px-5 pb-5 flex gap-3">
+                            <button onClick={() => setShowReportModal(false)} className="flex-1 py-2 rounded-xl text-sm font-bold bg-gray-100 text-gray-600">Cancelar</button>
+                            <button onClick={handleSubmitReport} disabled={!reportReason.trim()} className="flex-1 py-2 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-500 disabled:opacity-50">Enviar</button>
                         </div>
                     </div>
                 </div>
             )}
+
+            <ConfirmModal 
+                isOpen={confirmModal.isOpen}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                type={confirmModal.type}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+            />
         </>
     );
 };

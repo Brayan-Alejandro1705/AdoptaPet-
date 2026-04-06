@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { Send, Camera, X, Minus, AlertCircle } from 'lucide-react';
 
 export default function FloatingAIChat() {
@@ -45,7 +46,7 @@ export default function FloatingAIChat() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('La imagen es muy grande. Máximo 5MB.');
+        toast.error('La imagen es muy grande. Máximo 5MB.');
         return;
       }
       setImageFile(file);
@@ -70,7 +71,7 @@ export default function FloatingAIChat() {
 
     const token = localStorage.getItem('token');
     if (!token) {
-      alert('Debes iniciar sesión para usar el asistente');
+      toast.error('Debes iniciar sesión para usar el asistente');
       return;
     }
 

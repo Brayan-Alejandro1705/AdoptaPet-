@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 import { friendRequestService } from '../services/friendRequestService';
 import PostCard from '../components/common/PostCard';
+import ConfirmModal from '../components/common/ConfirmModal';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -27,7 +29,7 @@ function Perfil() {
   const [activeTab, setActiveTab] = useState('publicaciones');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ nombre: '', email: '', bio: '', telefono: '', ubicacion: '' });
-  const [notification, setNotification] = useState('');
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
 
   const [posts, setPosts] = useState([]);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -171,10 +173,10 @@ function Perfil() {
     try {
       await friendRequestService.sendFriendRequest(userId);
       setFriendRequestStatus('pending');
-      showNotification('✅ Solicitud de amistad enviada');
+      toast.success('✅ Solicitud de amistad enviada');
     } catch (err) {
       console.error('Error al enviar solicitud:', err);
-      showNotification('❌ Error al enviar la solicitud');
+      toast.error('❌ Error al enviar la solicitud');
     } finally { setSendingRequest(false); }
   };
 
@@ -182,27 +184,35 @@ function Perfil() {
     try {
       await friendRequestService.acceptRequest(requestId);
       setFriendRequests(prev => prev.filter(req => req._id !== requestId));
-      showNotification('✅ Solicitud de amistad aceptada');
-    } catch { showNotification('❌ Error al aceptar solicitud'); }
+      toast.success('✅ Solicitud de amistad aceptada');
+    } catch { toast.error('❌ Error al aceptar solicitud'); }
   };
 
   const handleRejectRequest = async (requestId) => {
     try {
       await friendRequestService.rejectRequest(requestId);
       setFriendRequests(prev => prev.filter(req => req._id !== requestId));
-      showNotification('✅ Solicitud rechazada');
-    } catch { showNotification('❌ Error al rechazar solicitud'); }
+      toast.success('✅ Solicitud rechazada');
+    } catch { toast.error('❌ Error al rechazar solicitud'); }
   };
 
-  const handleDeletePost = async (postId) => {
-    if (!window.confirm('¿Estás seguro de eliminar esta publicación?')) return;
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${API}/api/posts/${postId}`, { headers: { Authorization: `Bearer ${token}` } });
-      setPosts(prev => prev.filter(post => post._id !== postId));
-      setPostsCount(prev => prev - 1);
-      showNotification('✅ Publicación eliminada');
-    } catch { showNotification('❌ Error al eliminar la publicación'); }
+  const handleDeletePost = (postId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar publicación',
+      message: '¿Estás seguro de que quieres eliminar esta publicación?',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await axios.delete(`${API}/api/posts/${postId}`, { headers: { Authorization: `Bearer ${token}` } });
+          setPosts(prev => prev.filter(post => post._id !== postId));
+          setPostsCount(prev => prev - 1);
+          toast.success('✅ Publicación eliminada');
+        } catch { toast.error('❌ Error al eliminar la publicación'); }
+        finally { setConfirmModal(prev => ({ ...prev, isOpen: false })); }
+      }
+    });
   };
 
   const handleAvatarClick = () => { fileInputRef.current?.click(); };
@@ -211,12 +221,12 @@ function Perfil() {
     const file = e.target.files[0];
     if (!file) return;
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) { showNotification('❌ Solo se permiten imágenes (JPG, PNG, GIF, WEBP)'); e.target.value = ''; return; }
-    if (file.size > 5 * 1024 * 1024) { showNotification('❌ La imagen no puede superar los 5MB'); e.target.value = ''; return; }
+    if (!allowedTypes.includes(file.type)) { toast.error('❌ Solo se permiten imágenes (JPG, PNG, GIF, WEBP)'); e.target.value = ''; return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('❌ La imagen no puede superar los 5MB'); e.target.value = ''; return; }
     setIsUploadingAvatar(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) { showNotification('❌ No estás autenticado'); window.location.href = '/login'; return; }
+      if (!token) { toast.error('❌ No estás autenticado'); window.location.href = '/login'; return; }
       const formData = new FormData();
       formData.append('avatar', file);
       const response = await fetch(`${API}/api/users/avatar`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
@@ -226,9 +236,9 @@ function Perfil() {
         const updatedUser = { ...user, avatar: avatarUrl };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        showNotification('✅ Foto de perfil actualizada');
-      } else { showNotification('❌ ' + (data.message || 'Error al subir la imagen')); }
-    } catch { showNotification('❌ Error al subir la imagen'); }
+        toast.success('✅ Foto de perfil actualizada');
+      } else { toast.error('❌ ' + (data.message || 'Error al subir la imagen')); }
+    } catch { toast.error('❌ Error al subir la imagen'); }
     finally { setIsUploadingAvatar(false); e.target.value = ''; }
   };
 
@@ -256,7 +266,7 @@ function Perfil() {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (!editForm.nombre || !editForm.email) { showNotification('❌ Nombre y email son obligatorios'); return; }
+    if (!editForm.nombre || !editForm.email) { toast.error('❌ Nombre y email son obligatorios'); return; }
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API}/api/users/profile`, {
@@ -271,12 +281,10 @@ function Perfil() {
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
         setShowEditModal(false);
-        showNotification('✅ Perfil actualizado correctamente');
-      } else { showNotification('❌ ' + (data.message || 'Error al actualizar perfil')); }
-    } catch { showNotification('❌ Error al actualizar perfil'); }
+        toast.success('✅ Perfil actualizado correctamente');
+      } else { toast.error('❌ ' + (data.message || 'Error al actualizar perfil')); }
+    } catch { toast.error('❌ Error al actualizar perfil'); }
   };
-
-  const showNotification = (message) => { setNotification(message); setTimeout(() => setNotification(''), 5000); };
 
   const formatTimeAgo = (date) => {
     if (!date) return 'reciente';
@@ -554,9 +562,14 @@ function Perfil() {
         </div>
       )}
 
-      {notification && (
-        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce">{notification}</div>
-      )}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

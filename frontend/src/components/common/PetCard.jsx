@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Trash2, MapPin, Play } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import ConfirmModal from './ConfirmModal';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -9,6 +11,7 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showVideo, setShowVideo] = useState(false); // ✅ alterna foto ↔ video
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -58,30 +61,38 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
     }
   };
 
-  const handleDelete = async (e) => {
+  const handleDelete = (e) => {
     e.stopPropagation();
-    if (!window.confirm(`¿Estás seguro de que deseas eliminar a ${pet.name}?`)) return;
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) { toast.error('Debes iniciar sesión'); return; }
-      setIsDeleting(true);
-      const res = await fetch(`${API_BASE}/api/pets/${pet._id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success('Mascota eliminada correctamente');
-        if (onDelete) onDelete(pet._id);
-      } else {
-        toast.error(data.message || 'Error al eliminar mascota');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar mascota',
+      message: `¿Estás seguro de que quieres eliminar a ${pet.name}? Esta acción es irreversible.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) { toast.error('Debes iniciar sesión'); return; }
+          setIsDeleting(true);
+          const res = await fetch(`${API_BASE}/api/pets/${pet._id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (data.success) {
+            toast.success('Mascota eliminada correctamente');
+            if (onDelete) onDelete(pet._id);
+          } else {
+            toast.error(data.message || 'Error al eliminar mascota');
+          }
+        } catch (error) {
+          console.error('Error eliminando mascota:', error);
+          toast.error('Error al eliminar mascota');
+        } finally {
+          setIsDeleting(false);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
-    } catch (error) {
-      console.error('Error eliminando mascota:', error);
-      toast.error('Error al eliminar mascota');
-    } finally {
-      setIsDeleting(false);
-    }
+    });
   };
 
   const handleToggleVideo = (e) => {
@@ -241,6 +252,15 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
           Ver detalles
         </button>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

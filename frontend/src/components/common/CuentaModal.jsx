@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'react-hot-toast';
 
 // ============================================================
 // CONSTANTS
@@ -40,19 +41,19 @@ const CuentaModal = ({ isOpen, onClose }) => {
   const validatePasswordChange = () => {
 
     if (newPassword !== confirmPassword) {
-      alert('Las contraseñas no coinciden');
+      toast.error('Las contraseñas no coinciden');
       return false;
     }
 
     if (newPassword.length < 6) {
-      alert('La contraseña debe tener al menos 6 caracteres');
+      toast.error('La contraseña debe tener al menos 6 caracteres');
       return false;
     }
 
     const token = getToken();
 
     if (!token) {
-      alert('❌ No hay sesión activa.');
+      toast.error('❌ No hay sesión activa.');
       return false;
     }
 
@@ -84,17 +85,17 @@ const CuentaModal = ({ isOpen, onClose }) => {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        alert('❌ ' + (data.message || 'Error al cambiar contraseña'));
+        toast.error('❌ ' + (data.message || 'Error al cambiar contraseña'));
         return;
       }
 
-      alert('✅ Contraseña cambiada');
+      toast.success('✅ Contraseña cambiada');
       resetPasswordForm();
 
     } catch (error) {
 
       console.error(error);
-      alert('❌ Error del servidor');
+      toast.error('❌ Error del servidor');
 
     } finally {
       setLoading(false);
@@ -103,13 +104,8 @@ const CuentaModal = ({ isOpen, onClose }) => {
 
   // ✅ ELIMINAR CUENTA PERMANENTEMENTE
   const handleEliminarCuenta = async () => {
-    const confirmed = window.confirm(
-      '⚠️ ¿Seguro que quieres ELIMINAR tu cuenta? Esta acción es irreversible.'
-    );
-    if (!confirmed) return;
-
     const token = getToken();
-    if (!token) { alert('No hay sesión activa'); return; }
+    if (!token) { toast.error('No hay sesión activa'); return; }
 
     setLoading(true);
     try {
@@ -124,16 +120,16 @@ const CuentaModal = ({ isOpen, onClose }) => {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        alert('❌ ' + (data.message || 'Error al eliminar'));
+        toast.error('❌ ' + (data.message || 'Error al eliminar'));
         return;
       }
 
-      alert('✅ Cuenta eliminada correctamente');
+      toast.success('✅ Cuenta eliminada correctamente');
       logoutAndRedirect();
 
     } catch (error) {
       console.error(error);
-      alert('❌ Error del servidor');
+      toast.error('❌ Error del servidor');
     } finally {
       setLoading(false);
     }

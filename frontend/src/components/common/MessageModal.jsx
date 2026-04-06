@@ -1,6 +1,6 @@
-//esta pagina es de amigos
 import { X, Send } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 export default function MessageModal({ friend, onClose, onSendMessage }) {
@@ -12,7 +12,7 @@ export default function MessageModal({ friend, onClose, onSendMessage }) {
 
   const handleSend = async () => {
     if (!message.trim()) {
-      alert('Por favor escribe un mensaje');
+      toast.error('Por favor escribe un mensaje');
       return;
     }
 
@@ -25,7 +25,7 @@ export default function MessageModal({ friend, onClose, onSendMessage }) {
 
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('Debes iniciar sesión para enviar mensajes');
+        toast.error('Debes iniciar sesión para enviar mensajes');
         return;
       }
 
@@ -58,7 +58,7 @@ export default function MessageModal({ friend, onClose, onSendMessage }) {
 
     } catch (error) {
       console.error('❌ Error al enviar mensaje:', error);
-      alert(`Error al enviar mensaje: ${error.message}`);
+      toast.error(`Error al enviar mensaje: ${error.message}`);
     } finally {
       setLoading(false);
     }
