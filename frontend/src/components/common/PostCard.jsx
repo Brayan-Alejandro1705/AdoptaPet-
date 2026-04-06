@@ -352,7 +352,9 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
     const [showShareModal, setShowShareModal] = useState(false);
     const [replyingTo, setReplyingTo]         = useState(null);
     const [replyText, setReplyText]           = useState('');
-    const [lightbox, setLightbox]             = useState(null);
+    const [lightbox, setLightbox]               = useState(null);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportReason, setReportReason]       = useState('Contenido inapropiado');
 
     const getAvatarUrl = (user) => {
         if (!user) return generateAvatarSVG('U');
@@ -531,19 +533,25 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
         } catch { alert('Error al eliminar publicación'); }
     };
 
-    const handleReport = async () => {
-        const reason = window.prompt('¿Por qué reportas esta publicación?', 'Contenido inapropiado');
-        if (!reason) return;
+    const handleReport = () => {
+        setReportReason('Contenido inapropiado');
+        setShowReportModal(true);
+    };
+
+    const handleSubmitReport = async () => {
+        if (!reportReason.trim()) return;
+        setShowReportModal(false);
         try {
             const token = localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/api/posts/${post._id}/report`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason })
+                body: JSON.stringify({ reason: reportReason })
             });
             const data = await res.json();
-            if (data.success) alert('Gracias por tu reporte. Lo revisaremos pronto.');
-        } catch { alert('Error al enviar el reporte'); }
+            if (data.success) toast.success('Gracias por tu reporte. Lo revisaremos pronto.');
+            else toast.error('Error al enviar el reporte');
+        } catch { toast.error('Error al enviar el reporte'); }
     };
 
     const handleReply = async (commentId, replyToUserId) => {
@@ -661,18 +669,23 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                                     <button onClick={() => { setShowMenu(false); handleReport(); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2 text-sm text-amber-600 border-t border-gray-100">
                                         <Flag className="w-4 h-4" /> Reportar publicación
                                     </button>
-                                    {isOwner && (
-                                        <>
-                                            {onEdit && (
-                                                <button onClick={() => { setShowMenu(false); onEdit(post); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2 text-sm border-t border-gray-100">
-                                                    <Edit2 className="w-4 h-4" /> Editar
+                                    {isOwner && (() => {
+                                        const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+                                        const elapsed = Date.now() - new Date(post.createdAt).getTime();
+                                        const canEdit = elapsed < EDIT_WINDOW_MS;
+                                        return (
+                                            <>
+                                                {canEdit && onEdit && (
+                                                    <button onClick={() => { setShowMenu(false); onEdit(post); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2 text-sm border-t border-gray-100">
+                                                        <Edit2 className="w-4 h-4" /> Editar
+                                                    </button>
+                                                )}
+                                                <button onClick={() => { setShowMenu(false); handleDelete(); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2 text-red-600 text-sm border-t border-gray-100">
+                                                    <Trash2 className="w-4 h-4" /> Eliminar
                                                 </button>
-                                            )}
-                                            <button onClick={() => { setShowMenu(false); handleDelete(); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-2 text-red-600 text-sm border-t border-gray-100">
-                                                <Trash2 className="w-4 h-4" /> Eliminar
-                                            </button>
-                                        </>
-                                    )}
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             </>
                         )}
@@ -992,6 +1005,83 @@ const PostCard = ({ post, currentUser, onDelete, onLike, onComment, onEdit, onDe
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ===== MODAL DE REPORTE ===== */}
+            {showReportModal && (
+                <div
+                    className="fixed inset-0 flex items-center justify-center z-[9999] px-4"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+                    onClick={() => setShowReportModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="px-5 py-4" style={{ background: 'linear-gradient(135deg, #7C3AED, #EC4899)' }}>
+                            <div className="flex items-center gap-2">
+                                <Flag className="w-5 h-5 text-white" />
+                                <h3 className="text-white font-bold text-base">Reportar publicación</h3>
+                            </div>
+                            <p className="text-purple-100 text-xs mt-1">Tu reporte ayuda a mantener la comunidad segura</p>
+                        </div>
+
+                        {/* Body */}
+                        <div className="px-5 py-4">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                ¿Por qué reportas esta publicación?
+                            </label>
+
+                            {/* Opciones rápidas */}
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {['Contenido inapropiado', 'Spam', 'Acoso', 'Información falsa', 'Otro'].map(opt => (
+                                    <button
+                                        key={opt}
+                                        onClick={() => setReportReason(opt)}
+                                        className="text-xs px-3 py-1.5 rounded-full border-2 transition font-medium"
+                                        style={{
+                                            borderColor: reportReason === opt ? '#7C3AED' : '#e5e7eb',
+                                            background: reportReason === opt ? '#7C3AED' : 'white',
+                                            color: reportReason === opt ? 'white' : '#374151'
+                                        }}
+                                    >
+                                        {opt}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <textarea
+                                value={reportReason}
+                                onChange={e => setReportReason(e.target.value)}
+                                placeholder="Describe el problema..."
+                                rows={3}
+                                className="w-full text-sm border-2 border-gray-200 rounded-xl px-3 py-2 outline-none resize-none transition"
+                                style={{ focusBorderColor: '#7C3AED' }}
+                                onFocus={e => e.target.style.borderColor = '#7C3AED'}
+                                onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+                            />
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-5 pb-5 flex gap-3 justify-end">
+                            <button
+                                onClick={() => setShowReportModal(false)}
+                                className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSubmitReport}
+                                disabled={!reportReason.trim()}
+                                className="px-4 py-2 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50"
+                                style={{ background: 'linear-gradient(135deg, #7C3AED, #EC4899)' }}
+                            >
+                                Enviar reporte
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </>

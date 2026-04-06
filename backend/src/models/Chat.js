@@ -14,7 +14,11 @@ const chatSchema = new mongoose.Schema({
   petRelated: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Pet'
-  }
+  },
+  blockedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, {
   timestamps: true
 });

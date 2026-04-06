@@ -18,6 +18,13 @@ export default function Registro() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
+  // Si ya hay sesión activa, redirigir a home directamente
+  useEffect(() => {
+    if (localStorage.getItem('token')) {
+      navigate('/home', { replace: true });
+    }
+  }, []);
+
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',

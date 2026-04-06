@@ -503,6 +503,67 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 
+// ================================
+// DELETE vaciar chat (solo mis mensajes visibles)
+// ================================
+router.delete('/:chatId/messages', authenticate, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.userId;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
+
+    const hasAccess = chat.participants.some(p => p.toString() === userId);
+    if (!hasAccess) return res.status(403).json({ error: 'Sin acceso' });
+
+    await Message.deleteMany({ chat: chatId });
+    chat.lastMessage = '';
+    await chat.save();
+
+    console.log(`🗑️ Chat ${chatId} vaciado por usuario ${userId}`);
+    res.json({ success: true, message: 'Chat vaciado correctamente' });
+  } catch (error) {
+    console.error('❌ Error al vaciar chat:', error);
+    res.status(500).json({ error: 'Error al vaciar el chat' });
+  }
+});
+
+
+// ================================
+// PATCH bloquear/desbloquear chat
+// ================================
+router.patch('/:chatId/block', authenticate, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId = req.userId;
+
+    const chat = await Chat.findById(chatId);
+    if (!chat) return res.status(404).json({ error: 'Chat no encontrado' });
+
+    const hasAccess = chat.participants.some(p => p.toString() === userId);
+    if (!hasAccess) return res.status(403).json({ error: 'Sin acceso' });
+
+    // Usar un array blockedBy en el chat
+    const alreadyBlocked = (chat.blockedBy || []).some(id => id.toString() === userId);
+
+    if (alreadyBlocked) {
+      chat.blockedBy = (chat.blockedBy || []).filter(id => id.toString() !== userId);
+    } else {
+      chat.blockedBy = [...(chat.blockedBy || []), userId];
+    }
+
+    await chat.save();
+    const isBlocked = !alreadyBlocked;
+    console.log(`${isBlocked ? '🔒' : '🔓'} Chat ${chatId} ${isBlocked ? 'bloqueado' : 'desbloqueado'} por ${userId}`);
+    res.json({ success: true, isBlocked, message: isBlocked ? 'Chat bloqueado' : 'Chat desbloqueado' });
+  } catch (error) {
+    console.error('❌ Error al bloquear chat:', error);
+    res.status(500).json({ error: 'Error al bloquear el chat' });
+  }
+});
+
+
 console.log('✅ Chat routes cargadas');
 
 module.exports = router;

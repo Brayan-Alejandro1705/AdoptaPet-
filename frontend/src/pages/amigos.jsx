@@ -27,7 +27,24 @@ export default function Amigos() {
   useEffect(() => {
     loadFriends();
     loadSuggestions();
+    loadSentRequests();
   }, []);
+
+  // Carga solicitudes ya enviadas para que el estado persista tras refrescar
+  const loadSentRequests = async () => {
+    try {
+      const res = await friendRequestService.getSentRequests();
+      const pending = res?.data || [];
+      const map = {};
+      pending.forEach(req => {
+        const toId = String(req.to?._id || req.to?.id || req.to);
+        if (toId) map[toId] = 'sent';
+      });
+      setSentRequests(map);
+    } catch (error) {
+      console.error('Error al cargar solicitudes enviadas:', error);
+    }
+  };
 
   const loadFriends = async () => {
     try {

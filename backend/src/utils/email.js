@@ -134,7 +134,7 @@ const getWelcomeEmailTemplate = (userName) => {
         <li>🏠 Publicar mascotas en adopción</li>
         <li>❤️ Guardar tus favoritos</li>
         <li>💬 Chatear con otros usuarios</li>
-        <li>📱 Compartir historias y fotos</li>
+        <li>📱 Compartir publicaciones y fotos</li>
         <li>🌟 Solicitar adopciones</li>
       </ul>
       <div style="text-align: center;">
@@ -251,10 +251,78 @@ const sendPasswordResetEmail = async (email, userName, resetUrl) => {
   }
 };
 
+// ─── Template: reporte de publicación ────────────────────────────────────────
+const getReportEmailTemplate = (reporterName, reporterEmail, reason, postLink) => {
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f7; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #7C3AED, #EC4899); padding: 30px 20px; text-align: center; }
+    .header-icon { font-size: 40px; }
+    .header h1 { color: #fff; font-size: 22px; margin: 8px 0 0 0; }
+    .content { padding: 30px; }
+    .field { margin-bottom: 18px; }
+    .field-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #9333ea; font-weight: bold; margin-bottom: 4px; }
+    .field-value { font-size: 15px; color: #1f2937; background: #f9fafb; border-left: 4px solid #7C3AED; padding: 10px 14px; border-radius: 6px; }
+    .btn { display: inline-block; background: linear-gradient(135deg, #7C3AED, #EC4899); color: #fff; padding: 14px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px; margin-top: 10px; }
+    .footer { background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-icon">🚨</div>
+      <h1>Nueva publicación reportada</h1>
+    </div>
+    <div class="content">
+      <p style="color:#374151;font-size:15px;">Se ha recibido un nuevo reporte en AdoptaPet. Por favor revísalo.</p>
+      <div class="field">
+        <div class="field-label">Reportado por</div>
+        <div class="field-value">${reporterName} (${reporterEmail})</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Motivo del reporte</div>
+        <div class="field-value">${reason}</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Enlace a la publicación</div>
+        <div class="field-value"><a href="${postLink}" style="color:#7C3AED;">${postLink}</a></div>
+      </div>
+      <div style="text-align:center;margin-top:24px;">
+        <a href="${postLink}" class="btn">Ver publicación</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>© 2025 AdoptaPet · Panel de Administración</p>
+    </div>
+  </div>
+</body>
+</html>`;
+};
+
+// ─── Enviar reporte de publicación al admin ───────────────────────────────────
+const ADMIN_EMAIL = 'adoptapet057@gmail.com';
+
+const sendReportEmail = async (reporterName, reporterEmail, reason, postId) => {
+  try {
+    const postLink = `https://adoptapet.fun/?post=${postId}`;
+    const html = getReportEmailTemplate(reporterName, reporterEmail, reason, postLink);
+    await sendEmail('🚨 Nueva publicación reportada - AdoptaPet', html, ADMIN_EMAIL);
+    console.log('✅ Email de reporte enviado al admin');
+  } catch (error) {
+    console.error('❌ Error enviando email de reporte:', error.message);
+  }
+};
+
 module.exports = {
   generateVerificationCode,
   sendVerificationEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
+  sendReportEmail,
   sendEmail
 };

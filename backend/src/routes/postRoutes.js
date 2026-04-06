@@ -38,6 +38,7 @@ const auth = async (req, res, next) => {
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const { sendReportEmail } = require('../utils/email');
 
 // ============================================
 // ✅ HELPERS
@@ -489,6 +490,19 @@ router.post('/:postId/report', auth, async (req, res) => {
     }
 
     res.json({ success: true, message: 'Reporte enviado' });
+
+    // ✅ Enviar email al admin de forma asíncrona (no bloquea la respuesta)
+    setImmediate(async () => {
+      try {
+        const reporter = await User.findById(req.userId).select('name nombre email').lean();
+        const reporterName  = reporter?.name || reporter?.nombre || 'Usuario';
+        const reporterEmail = reporter?.email || 'sin-email';
+        await sendReportEmail(reporterName, reporterEmail, reason || 'Inapropiado', req.params.postId);
+      } catch (e) {
+        console.error('❌ Error enviando email de reporte:', e.message);
+      }
+    });
+
   } catch (err) {
     console.error('❌ Error al reportar:', err);
     res.status(500).json({ success: false });
@@ -526,16 +540,29 @@ router.delete('/:postId', auth, async (req, res) => {
   }
 });
 
-// 10. EDITAR POST
+// 10. EDITAR POST — solo dentro de las 24h siguientes a la publicación
 router.put('/:postId', auth, async (req, res) => {
   try {
     const { content } = req.body;
-    const post = await Post.findOneAndUpdate(
-      { _id: req.params.postId, author: req.userId },
-      { content, isEdited: true },
-      { new: true }
-    ).populate('author', 'name nombre avatar');
-    if (!post) return res.status(404).json({ success: false });
+
+    const post = await Post.findOne({ _id: req.params.postId, author: req.userId });
+    if (!post) return res.status(404).json({ success: false, message: 'Publicación no encontrada' });
+
+    // ✅ Validar ventana de edición de 24 horas
+    const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h en ms
+    const elapsed = Date.now() - new Date(post.createdAt).getTime();
+    if (elapsed > EDIT_WINDOW_MS) {
+      return res.status(403).json({
+        success: false,
+        message: 'El período de edición de 24 horas ha expirado.'
+      });
+    }
+
+    post.content = content;
+    post.isEdited = true;
+    await post.save();
+    await post.populate('author', 'name nombre avatar');
+
     res.json({ success: true, data: { post } });
   } catch (err) {
     console.error('❌ Error al editar post:', err);
