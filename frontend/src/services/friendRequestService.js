@@ -127,5 +127,19 @@ export const friendRequestService = {
       console.error('❌ Error al obtener amigos:', error.response?.data || error.message);
       throw error;
     }
+  },
+
+  // Eliminar amigo
+  removeFriend: async (userId) => {
+    try {
+      const response = await axios.delete(
+        `${API_URL}/remove/${userId}`,
+        getAuthHeaders()
+      );
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error al eliminar amigo:', error.response?.data || error.message);
+      throw error;
+    }
   }
 };

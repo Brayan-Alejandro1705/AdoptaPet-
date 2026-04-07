@@ -14,5 +14,6 @@ router.delete('/cancel/:userId', controller.cancelFriendRequest);
 router.get('/status/:userId', controller.checkFriendshipStatus);
 router.get('/friends/:userId', controller.getFriends);
 router.get('/friends', controller.getFriends);
+router.delete('/remove/:userId', controller.removeFriend);
 
 module.exports = router;

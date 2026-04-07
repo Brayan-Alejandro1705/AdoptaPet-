@@ -320,6 +320,49 @@ const getFriends = async (req, res) => {
   }
 };
 
+const removeFriend = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user._id;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de usuario no proporcionado'
+      });
+    }
+
+    // 1. Quitar de la lista de amigos de ambos
+    await User.findByIdAndUpdate(currentUserId, {
+      $pull: { friends: userId }
+    });
+
+    await User.findByIdAndUpdate(userId, {
+      $pull: { friends: currentUserId }
+    });
+
+    // 2. Eliminar cualquier solicitud de amistad previa (limpiar historial para permitir nuevas solicitudes)
+    await FriendRequest.deleteMany({
+      $or: [
+        { from: currentUserId, to: userId },
+        { from: userId, to: currentUserId }
+      ]
+    });
+
+    res.json({
+      success: true,
+      message: 'Amigo eliminado correctamente'
+    });
+  } catch (error) {
+    console.error('Error al eliminar amigo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error en el servidor al eliminar amigo',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   sendFriendRequest,
   getReceivedRequests,
@@ -328,5 +371,6 @@ module.exports = {
   rejectFriendRequest,
   cancelFriendRequest,
   checkFriendshipStatus,
-  getFriends
+  getFriends,
+  removeFriend
 };

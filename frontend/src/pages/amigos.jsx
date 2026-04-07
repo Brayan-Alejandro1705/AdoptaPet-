@@ -192,11 +192,18 @@ export default function Amigos() {
       title: 'Eliminar amigo',
       message: `¿Estás seguro de que quieres eliminar a ${friend.name} de tus amigos?`,
       type: 'danger',
-      onConfirm: () => {
-        setFriends(prev => prev.filter(f => f.id !== friend.id));
-        setSelectedFriend(null);
-        toast.success(`${friend.name} eliminado`);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      onConfirm: async () => {
+        try {
+          await friendRequestService.removeFriend(friend.id || friend._id);
+          setFriends(prev => prev.filter(f => f.id !== friend.id));
+          setSelectedFriend(null);
+          toast.success(`${friend.name} eliminado correctamente`);
+        } catch (error) {
+          console.error('Error al eliminar amigo:', error);
+          toast.error('No se pudo eliminar al amigo');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
       }
     });
   };

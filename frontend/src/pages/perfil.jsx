@@ -172,12 +172,47 @@ function Perfil() {
     setSendingRequest(true);
     try {
       await friendRequestService.sendFriendRequest(userId);
-      setFriendRequestStatus('pending');
+      setFriendRequestStatus('sent');
       toast.success('✅ Solicitud de amistad enviada');
     } catch (err) {
       console.error('Error al enviar solicitud:', err);
       toast.error('❌ Error al enviar la solicitud');
     } finally { setSendingRequest(false); }
+  };
+
+  const handleCancelRequest = async () => {
+    setSendingRequest(true);
+    try {
+      await friendRequestService.cancelRequest(userId);
+      setFriendRequestStatus('none');
+      toast.success('✅ Solicitud cancelada');
+    } catch (err) {
+      console.error('Error al cancelar solicitud:', err);
+      toast.error('❌ Error al cancelar la solicitud');
+    } finally { setSendingRequest(false); }
+  };
+
+  const handleRemoveFriend = async () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar amigo',
+      message: `¿Estás seguro de que quieres eliminar a ${userName} de tus amigos?`,
+      type: 'danger',
+      onConfirm: async () => {
+        setSendingRequest(true);
+        try {
+          await friendRequestService.removeFriend(userId);
+          setFriendRequestStatus('none');
+          toast.success('✅ Amigo eliminado');
+        } catch (err) {
+          console.error('Error al eliminar amigo:', err);
+          toast.error('❌ Error al eliminar amigo');
+        } finally {
+          setSendingRequest(false);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
   };
 
   const handleAcceptRequest = async (requestId) => {
@@ -383,20 +418,56 @@ function Perfil() {
                   Editar Perfil
                 </button>
               ) : (
-                <button
-                  onClick={handleSendFriendRequest}
-                  disabled={sendingRequest || friendRequestStatus === 'pending' || friendRequestStatus === 'friends'}
-                  className="mt-4 sm:mt-0 px-6 py-2 rounded-full font-semibold transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
-                  style={{
-                    background: friendRequestStatus === 'pending' ? '#9CA3AF' : friendRequestStatus === 'friends' ? '#10B981' : 'white',
-                    color: friendRequestStatus === 'none' ? '#7C3AED' : 'white'
-                  }}
-                >
-                  {sendingRequest ? 'Enviando...' :
-                   friendRequestStatus === 'pending' ? '⏳ Solicitud enviada' :
-                   friendRequestStatus === 'friends' ? '✅ Amigos' :
-                   '👤 Agregar amigo'}
-                </button>
+                <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+                  {friendRequestStatus === 'none' && (
+                    <button
+                      onClick={handleSendFriendRequest}
+                      disabled={sendingRequest}
+                      className="px-6 py-2 rounded-full font-semibold bg-white text-purple-600 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
+                    >
+                      {sendingRequest ? 'Enviando...' : '👤 Agregar amigo'}
+                    </button>
+                  )}
+
+                  {(friendRequestStatus === 'sent' || friendRequestStatus === 'pending' || friendRequestStatus === 'solicitada') && (
+                    <button
+                      onClick={handleCancelRequest}
+                      disabled={sendingRequest}
+                      className="px-6 py-2 rounded-full font-semibold bg-gray-500 text-white transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
+                    >
+                      {sendingRequest ? 'Cancelando...' : '❌ Cancelar Solicitud'}
+                    </button>
+                  )}
+
+                  {friendRequestStatus === 'received' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAcceptRequest(userId)}
+                        disabled={sendingRequest}
+                        className="px-6 py-2 rounded-full font-semibold bg-green-500 text-white transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
+                      >
+                        ✅ Aceptar
+                      </button>
+                      <button
+                        onClick={() => handleRejectRequest(userId)}
+                        disabled={sendingRequest}
+                        className="px-6 py-2 rounded-full font-semibold bg-red-500 text-white transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
+                      >
+                        ❌ Rechazar
+                      </button>
+                    </div>
+                  )}
+
+                  {friendRequestStatus === 'friends' && (
+                    <button
+                      onClick={handleRemoveFriend}
+                      disabled={sendingRequest}
+                      className="px-6 py-2 rounded-full font-semibold bg-red-100 text-red-600 border border-red-200 transition-all duration-300 hover:bg-red-200 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
+                    >
+                      {sendingRequest ? 'Eliminando...' : '🗑️ Eliminar Amigo'}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
