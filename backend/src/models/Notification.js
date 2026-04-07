@@ -114,7 +114,7 @@ const notificationSchema = new mongoose.Schema({
   
   relatedModel: {
     type: String,
-    enum: ['Pet', 'Chat', 'User', 'Application', 'Post']
+    enum: ['Pet', 'Chat', 'User', 'Application', 'Post', 'FriendRequest']
   },
   
   // --------------------------------------------------------------------------

@@ -22,6 +22,7 @@ const sendFriendRequest = async (req, res) => {
       });
     }
 
+    // Verificar si ya son amigos
     const areAlreadyFriends = await User.findOne({
       _id: fromUserId,
       friends: userId
@@ -34,32 +35,60 @@ const sendFriendRequest = async (req, res) => {
       });
     }
 
-    const existingRequest = await FriendRequest.findOne({
-      $or: [
-        { from: fromUserId, to: userId, status: 'pending' },
-        { from: userId, to: fromUserId, status: 'pending' }
-      ]
+    // Verificar cualquier solicitud previa (independientemente del estado)
+    let friendRequest = await FriendRequest.findOne({
+      from: fromUserId,
+      to: userId
     });
 
-    if (existingRequest) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ya existe una solicitud pendiente'
+    if (friendRequest) {
+      if (friendRequest.status === 'pending') {
+        return res.status(400).json({
+          success: false,
+          message: 'Ya existe una solicitud pendiente'
+        });
+      } else if (friendRequest.status === 'accepted') {
+        return res.status(400).json({
+          success: false,
+          message: 'Ya son amigos'
+        });
+      } else if (friendRequest.status === 'rejected') {
+        // ✅ Si fue rechazada, la reactivamos
+        friendRequest.status = 'pending';
+        friendRequest.message = req.body.message || '';
+        await friendRequest.save();
+      }
+    } else {
+      // 🕵️ Verificar si hay una solicitud inversa pendiente
+      const reverseRequest = await FriendRequest.findOne({
+        from: userId,
+        to: fromUserId,
+        status: 'pending'
+      });
+
+      if (reverseRequest) {
+        return res.status(400).json({
+          success: false,
+          message: 'Este usuario ya te envió una solicitud. Búscala en tus solicitudes recibidas.'
+        });
+      }
+
+      // ✅ Solo crear si no existe ninguna en esa dirección
+      friendRequest = await FriendRequest.create({
+        from: fromUserId,
+        to: userId,
+        message: req.body.message || ''
       });
     }
 
-    const friendRequest = await FriendRequest.create({
-      from: fromUserId,
-      to: userId,
-      message: req.body.message || ''
-    });
-
+    // Crear notificación
     await Notification.create({
       recipient: userId,
       sender: fromUserId,
       type: 'friend_request',
       message: `Te ha enviado una solicitud de amistad`,
-      relatedId: friendRequest._id
+      relatedId: friendRequest._id,
+      relatedModel: 'FriendRequest' // Actualizaremos el modelo Notification.js luego
     });
 
     await friendRequest.populate('from', 'name nombre email avatar');
@@ -71,10 +100,15 @@ const sendFriendRequest = async (req, res) => {
       data: friendRequest
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('❌ ERROR FATAL en sendFriendRequest:', {
+      error: error.message,
+      stack: error.stack,
+      from: req.user._id,
+      to: req.params.userId
+    });
     res.status(500).json({
       success: false,
-      message: 'Error al enviar solicitud',
+      message: 'Error interno del servidor al enviar solicitud de amistad',
       error: error.message
     });
   }
