@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Trash2, MapPin, Play } from 'lucide-react';
+import { Heart, Trash2, MapPin, Play, MoreVertical, Edit2, Flag, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from './ConfirmModal';
+import PetEditModal from './PetEditModal';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -11,8 +12,20 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showVideo, setShowVideo] = useState(false); // ✅ alterna foto ↔ video
+  const [showMenu, setShowMenu] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
   const videoRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Cerrar menú al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -98,6 +111,48 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
   const handleToggleVideo = (e) => {
     e.stopPropagation();
     setShowVideo(v => !v);
+  };
+
+  const handleReport = (e) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Denunciar mascota',
+      message: `¿Estás seguro de que deseas denunciar la publicación de ${pet.name}? Nuestros administradores revisarán el caso.`,
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          if (!token) { toast.error('Debes iniciar sesión'); return; }
+          const res = await fetch(`${API_BASE}/api/pets/${pet._id}/report`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Contenido inapropiado / sospechoso' })
+          });
+          const data = await res.json();
+          if (data.success) toast.success('Reporte enviado correctamente');
+          else toast.error(data.message || 'Error al enviar reporte');
+        } catch (error) {
+          toast.error('Error al conectar con el servidor');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleEditClick = (e) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = (updatedPet) => {
+    // Aquí podrías actualizar el estado local si fuera necesario, 
+    // pero usualmente se recargan las mascotas en el padre (Adoptar.jsx)
+    // Para una mejor UX, recargamos la página o disparamos un evento.
+    window.location.reload(); 
   };
 
   const isOwner = currentUser && pet.owner &&
@@ -187,17 +242,35 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
           </button>
         )}
 
-        {/* Botón eliminar — solo propietario */}
-        {isOwner && (
+        {/* Menú de opciones (...) */}
+        <div className="absolute top-3 right-3" ref={menuRef}>
           <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="absolute bottom-3 right-3 p-2 rounded-full bg-red-500 text-white shadow-md hover:bg-red-600 transition-all active:scale-95 opacity-0 group-hover:opacity-100"
-            title="Eliminar mascota"
+            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+            className="p-2 rounded-full bg-white/90 backdrop-blur-sm shadow-md hover:bg-white transition-all active:scale-95"
           >
-            <Trash2 className="w-5 h-5" />
+            <MoreVertical className="w-5 h-5 text-gray-600" />
           </button>
-        )}
+
+          {showMenu && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              {isOwner ? (
+                <>
+                  <button onClick={handleEditClick} className="w-full px-4 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 transition-colors">
+                    <Edit2 className="w-4 h-4" /> Editar mascota
+                  </button>
+                  <div className="h-px bg-gray-100 my-1 mx-2" />
+                  <button onClick={handleDelete} className="w-full px-4 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
+                    <Trash2 className="w-4 h-4" /> Eliminar mascota
+                  </button>
+                </>
+              ) : (
+                <button onClick={handleReport} className="w-full px-4 py-2.5 text-left text-sm font-semibold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
+                    <Flag className="w-4 h-4" /> Denunciar publicación
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Información de la mascota */}
@@ -261,6 +334,14 @@ const PetCard = ({ pet, onClick, onDelete, currentUser }) => {
         onConfirm={confirmModal.onConfirm}
         onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {isEditModalOpen && (
+        <PetEditModal 
+          pet={pet} 
+          onClose={() => setIsEditModalOpen(false)} 
+          onUpdate={handleUpdate}
+        />
+      )}
     </div>
   );
 };

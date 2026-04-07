@@ -254,6 +254,19 @@ const sendPasswordResetEmail = async (email, userName, resetUrl) => {
 // ─── Template: reporte de publicación ────────────────────────────────────────
 const getReportEmailTemplate = (reporterName, reporterEmail, reason, postLink) => {
   return `
+    </div>
+    <div class="footer">
+      <p>© 2025 AdoptaPet · Panel de Administración</p>
+    </div>
+  </div>
+</body>
+</html>`;
+};
+
+// ─── Template: reporte de MASCOTA ─────────────────────────────────────────────
+const getPetReportEmailTemplate = (reporterName, reporterEmail, reason, petName, petId) => {
+  const petLink = `https://adoptapet.fun/adoptar?pet=${petId}`;
+  return `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -275,11 +288,15 @@ const getReportEmailTemplate = (reporterName, reporterEmail, reason, postLink) =
 <body>
   <div class="container">
     <div class="header">
-      <div class="header-icon">🚨</div>
-      <h1>Nueva publicación reportada</h1>
+      <div class="header-icon">🐾 🚨</div>
+      <h1>Mascota reportada</h1>
     </div>
     <div class="content">
-      <p style="color:#374151;font-size:15px;">Se ha recibido un nuevo reporte en AdoptaPet. Por favor revísalo.</p>
+      <p style="color:#374151;font-size:15px;">Se ha recibido un nuevo reporte de una mascota en AdoptaPet.</p>
+      <div class="field">
+        <div class="field-label">Mascota</div>
+        <div class="field-value">${petName} (ID: ${petId})</div>
+      </div>
       <div class="field">
         <div class="field-label">Reportado por</div>
         <div class="field-value">${reporterName} (${reporterEmail})</div>
@@ -288,12 +305,8 @@ const getReportEmailTemplate = (reporterName, reporterEmail, reason, postLink) =
         <div class="field-label">Motivo del reporte</div>
         <div class="field-value">${reason}</div>
       </div>
-      <div class="field">
-        <div class="field-label">Enlace a la publicación</div>
-        <div class="field-value"><a href="${postLink}" style="color:#7C3AED;">${postLink}</a></div>
-      </div>
       <div style="text-align:center;margin-top:24px;">
-        <a href="${postLink}" class="btn">Ver publicación</a>
+        <a href="${petLink}" class="btn">Ver Mascota</a>
       </div>
     </div>
     <div class="footer">
@@ -318,11 +331,22 @@ const sendReportEmail = async (reporterName, reporterEmail, reason, postId) => {
   }
 };
 
+const sendPetReportEmail = async (reporterName, reporterEmail, reason, petName, petId) => {
+  try {
+    const html = getPetReportEmailTemplate(reporterName, reporterEmail, reason, petName, petId);
+    await sendEmail(`🚨 Mascota reportada: ${petName} - AdoptaPet`, html, ADMIN_EMAIL);
+    console.log('✅ Email de reporte de mascota enviado al admin');
+  } catch (error) {
+    console.error('❌ Error enviando email de reporte de mascota:', error.message);
+  }
+};
+
 module.exports = {
   generateVerificationCode,
   sendVerificationEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
   sendReportEmail,
+  sendPetReportEmail,
   sendEmail
 };

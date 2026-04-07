@@ -35,26 +35,22 @@ export const useSocket = () => {
     const registerPresence = () => {
       if (currentUserId) {
         s.emit('register', currentUserId);
-        console.log('🟢 register enviado:', currentUserId);
       } else {
         console.warn('⚠️ No pude registrar presencia: user.id/user._id no existe');
       }
     };
 
     s.on('connect', () => {
-      console.log('✅ Conectado a Socket.io:', s.id);
       registerPresence();
       socketRef.current = s;
       forceUpdate(n => n + 1); // notificar que el socket ya está listo
     });
 
     s.io.on('reconnect', () => {
-      console.log('🔄 Socket reconectado');
       registerPresence();
     });
 
     s.on('disconnect', (reason) => {
-      console.log('❌ Desconectado de Socket.io:', reason);
     });
 
     s.on('connect_error', (err) => {

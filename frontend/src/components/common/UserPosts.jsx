@@ -339,10 +339,6 @@ const PostCard = ({ post, currentUser, onDelete, onLike }) => {
 // COMPONENTE PRINCIPAL: USER POSTS
 // ============================================
 const UserPosts = ({ userId, currentUser }) => {
-    console.log('🔷 UserPosts renderizado');
-    console.log('UserId:', userId);
-    console.log('CurrentUser:', currentUser);
-    
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -362,10 +358,6 @@ const UserPosts = ({ userId, currentUser }) => {
 
             const token = localStorage.getItem('token');
             
-            console.log('🔍 Cargando posts...');
-            console.log('Token:', token ? '✅ Existe' : '❌ NO EXISTE');
-            console.log('UserId:', userId);
-            
             if (!token) {
                 setError('No estás autenticado');
                 setLoading(false);
@@ -374,14 +366,12 @@ const UserPosts = ({ userId, currentUser }) => {
 
             // Validar que userId sea válido
             if (!userId || userId === 'my-posts' || userId === 'undefined') {
-                console.error('❌ userId inválido:', userId);
                 setError('ID de usuario inválido');
                 setLoading(false);
                 return;
             }
 
             const url = `/api/posts/user/${userId}?page=${page}&limit=10`;
-            console.log('URL:', url);
 
             const response = await fetch(url, {
                 method: 'GET',
@@ -391,27 +381,20 @@ const UserPosts = ({ userId, currentUser }) => {
                 }
             });
 
-            console.log('Response status:', response.status);
-
             if (!response.ok) {
                 throw new Error(`Error ${response.status}`);
             }
 
             const data = await response.json();
             
-            console.log('✅ Data recibida:', data);
-            console.log('📝 Posts:', data.data?.posts?.length || 0);
-
             if (data.success) {
                 const receivedPosts = data.data.posts || [];
-                console.log('Posts a mostrar:', receivedPosts);
                 setPosts(receivedPosts);
                 setHasMore(data.data.pagination?.page < data.data.pagination?.pages);
             } else {
                 setError(data.message || 'Error al cargar publicaciones');
             }
         } catch (err) {
-            console.error('💥 Error:', err);
             setError(err.message || 'Error al cargar las publicaciones');
         } finally {
             setLoading(false);

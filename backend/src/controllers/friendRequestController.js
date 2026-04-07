@@ -331,9 +331,15 @@ const checkFriendshipStatus = async (req, res) => {
 const getFriends = async (req, res) => {
   try {
     const userId = req.params.userId || req.user._id;
+    const currentUserId = req.user._id;
 
+    // 1. Obtener lista de amigos del usuario logueado (IDs) para comparar
+    const currentUser = await User.findById(currentUserId).select('friends');
+    const myFriendsIds = currentUser?.friends?.map(id => id.toString()) || [];
+
+    // 2. Obtener amigos del usuario objetivo
     const user = await User.findById(userId)
-      .populate('friends', 'name nombre email avatar bio location createdAt');
+      .populate('friends', 'name nombre email avatar bio location createdAt friends');
 
     if (!user) {
       return res.status(404).json({
@@ -342,14 +348,29 @@ const getFriends = async (req, res) => {
       });
     }
 
+    // 3. Formatear lista calculando amigos en común
+    const friendsData = user.friends.map(f => {
+      const fObj = f.toObject();
+      const fFriendsIds = f.friends?.map(id => id.toString()) || [];
+      
+      // Amigos en común (intersección de IDs)
+      const mutual = fFriendsIds.filter(id => myFriendsIds.includes(id) && id !== currentUserId.toString());
+
+      return {
+        ...fObj,
+        mutualFriends: mutual.length,
+        friends: undefined // Ocultamos la lista completa por privacidad
+      };
+    });
+
     res.json({
       success: true,
-      data: user.friends || []
+      data: friendsData
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error',
+      message: 'Error al obtener amigos',
       error: error.message
     });
   }

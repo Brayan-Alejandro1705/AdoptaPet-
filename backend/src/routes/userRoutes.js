@@ -710,19 +710,35 @@ router.get('/suggestions', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
+    const myFriendsIds = (currentUser.friends || []).map(id => id.toString());
+
     const excludeIds = [
       req.user.id,
-      ...(currentUser.friends || []).map(id => id.toString())
+      ...myFriendsIds
     ];
 
-    const suggestions = await User.find({
+    // Traer usuarios que no sean amigos (incluyendo su lista de amigos para el cálculo)
+    const rawSuggestions = await User.find({
       _id: { $nin: excludeIds },
-      status: 'active',
-      'verified.email': true
+      status: 'active'
     })
-      .select('name nombre email avatar bio location role verified createdAt')
+      .select('name nombre email avatar bio location role verified createdAt friends')
       .sort({ createdAt: -1 })
       .limit(12);
+
+    // Calcular amigos en común para cada sugerencia
+    const suggestions = rawSuggestions.map(user => {
+      const userObj = user.toObject();
+      const userFriendsIds = (user.friends || []).map(id => id.toString());
+
+      const mutual = userFriendsIds.filter(id => myFriendsIds.includes(id));
+
+      return {
+        ...userObj,
+        mutualFriends: mutual.length,
+        friends: undefined
+      };
+    });
 
     console.log(`✅ Sugerencias encontradas: ${suggestions.length}`);
 

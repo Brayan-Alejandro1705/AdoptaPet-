@@ -59,7 +59,7 @@ export default function Amigos() {
         name: friend.name || friend.nombre || 'Usuario',
         online: false,
         lastSeen: 'hace un momento',
-        mutualFriends: 0,
+        mutualFriends: friend.mutualFriends || 0,
         location: friend.location?.city || 'Sin ubicación',
         friendsSince: friend.createdAt
           ? new Date(friend.createdAt).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
@@ -118,6 +118,7 @@ export default function Amigos() {
           avatar: u.avatar || null,
           bio: u.bio || 'Miembro de AdoptaPet',
           location: u.location?.city || u.ubicacion || '',
+          mutualFriends: u.mutualFriends || 0,
         }));
 
       setSuggestions(filtered);

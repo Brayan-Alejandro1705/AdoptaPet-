@@ -4,6 +4,8 @@ const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
+const User = require('../models/User');
+const { sendPetReportEmail } = require('../utils/email');
 
 // ============================================
 // CLOUDINARY CONFIG
@@ -135,9 +137,16 @@ exports.createPet = async (req, res) => {
 
 exports.updatePet = async (req, res) => {
   try {
-    const pet = await Pet.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const pet = await Pet.findById(req.params.id);
     if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
-    res.json({ success: true, data: pet });
+
+    // Verificar pertenencia (dueño o admin)
+    if (pet.owner.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para editar esta mascota' });
+    }
+
+    const updatedPet = await Pet.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    res.json({ success: true, data: updatedPet });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -145,9 +154,57 @@ exports.updatePet = async (req, res) => {
 
 exports.deletePet = async (req, res) => {
   try {
-    const pet = await Pet.findByIdAndDelete(req.params.id);
+    const pet = await Pet.findById(req.params.id);
     if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
+
+    // Verificar pertenencia
+    if (pet.owner.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para eliminar esta mascota' });
+    }
+
+    await Pet.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Mascota eliminada exitosamente' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.reportPet = async (req, res) => {
+  try {
+    const { reason, description } = req.body;
+    const petId = req.params.id;
+    const reporterId = req.user.id;
+
+    const pet = await Pet.findById(petId);
+    if (!pet) return res.status(404).json({ success: false, message: 'Mascota no encontrada' });
+
+    // Verificar si ya reportó
+    const alreadyReported = pet.reports.some(r => r.reporter && r.reporter.toString() === reporterId.toString());
+    if (alreadyReported) {
+      return res.status(400).json({ success: false, message: 'Ya has reportado esta mascota' });
+    }
+
+    // Agregar reporte
+    pet.reports.push({
+      reporter: reporterId,
+      reason: reason || 'Inapropiado',
+      description: description || ''
+    });
+    pet.reportsCount += 1;
+
+    await pet.save();
+
+    // Enviar email al admin
+    try {
+      const reporter = await User.findById(reporterId).select('nombre name email');
+      const reporterName = reporter?.nombre || reporter?.name || 'Usuario';
+      const reporterEmail = reporter?.email || 'Desconocido';
+      await sendPetReportEmail(reporterName, reporterEmail, reason, pet.name, pet._id);
+    } catch (err) {
+      console.error('Error enviando email de reporte:', err.message);
+    }
+
+    res.json({ success: true, message: 'Reporte enviado correctamente' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

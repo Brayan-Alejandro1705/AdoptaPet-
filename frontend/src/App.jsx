@@ -61,6 +61,12 @@ const GoogleCallbackOrHome = () => {
   return <Home />;
 };
 
+// Redirección inteligente para la ruta raíz (/)
+const RootRedirect = () => {
+  const token = localStorage.getItem('token');
+  return <Navigate to={token ? "/home" : "/login"} replace />;
+};
+
 // 🎯 FloatingAIChat solo en rutas permitidas
 const FloatingAIChatCondicional = () => {
   const location = useLocation();
@@ -92,8 +98,8 @@ function App() {
         <Route path="/recuperar-password" element={<RecuperarPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/* Redirigir raíz al login */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* Redirigir raíz inteligente */}
+        <Route path="/" element={<RootRedirect />} />
 
         {/* ✅ /home maneja tanto Google OAuth como acceso normal */}
         <Route path="/home" element={<GoogleCallbackOrHome />} />

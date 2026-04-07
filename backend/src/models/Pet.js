@@ -321,7 +321,25 @@ const petSchema = new mongoose.Schema({
     
     shares: {
         type: Number,
-        min: [0, 'Los compartidos no pueden ser negativos'],
+        min: [0, 'Los compartidos no pueden ser negativas'],
+        default: 0
+    },
+
+    // =============================================
+    // REPORTES Y MODERACIÓN
+    // =============================================
+
+    reports: [
+        {
+            reporter: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            reason: { type: String, required: true },
+            description: { type: String },
+            createdAt: { type: Date, default: Date.now }
+        }
+    ],
+
+    reportsCount: {
+        type: Number,
         default: 0
     },
     

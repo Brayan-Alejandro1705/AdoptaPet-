@@ -36,9 +36,10 @@ router.post('/', protect, restrictTo('shelter', 'admin'), createPetValidation, p
 // RUTAS CON PARÁMETRO :id - AL FINAL
 // ==========================================
 router.get('/:id', petController.getPetById);
-router.post('/:id/solicitar', protect, petController.solicitarAdopcion); // ← NUEVA
-router.patch('/:id', protect, restrictTo('shelter', 'admin'), updatePetValidation, petController.updatePet);
-router.delete('/:id', protect, restrictTo('shelter', 'admin'), petController.deletePet);
+router.post('/:id/solicitar', protect, petController.solicitarAdopcion);
+router.post('/:id/report', protect, petController.reportPet);
+router.patch('/:id', protect, updatePetValidation, petController.updatePet);
+router.delete('/:id', protect, petController.deletePet);
 router.get('/', petController.getAllPets);
 
 module.exports = router;

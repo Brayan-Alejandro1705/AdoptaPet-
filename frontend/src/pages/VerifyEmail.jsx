@@ -95,7 +95,7 @@ export default function VerifyEmail() {
 
         setMessage('✅ ' + data.message);
 
-        setTimeout(() => navigate('/'), 1000);
+        setTimeout(() => navigate('/home'), 1000);
 
       } else {
         setError('❌ ' + data.message);

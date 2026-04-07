@@ -10,7 +10,6 @@ const getAuthHeaders = () => {
 
 // ✅ Manejo centralizado de token expirado
 const handleUnauthorized = () => {
-  console.warn('🔒 Token expirado o inválido — cerrando sesión');
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   // Redirigir al login solo si no estamos ya ahí
@@ -23,8 +22,6 @@ export const notificationService = {
   // Obtener todas las notificaciones
   getNotifications: async (page = 1, limit = 50, filters = {}) => {
     try {
-      console.log('🔍 Obteniendo notificaciones...');
-
       const response = await fetch(`${API_URL}/notifications`, {
         headers: getAuthHeaders()
       });
@@ -40,7 +37,6 @@ export const notificationService = {
       }
 
       const data = await response.json();
-      console.log('📦 Notificaciones recibidas:', data);
 
       return {
         notifications: Array.isArray(data) ? data : [],

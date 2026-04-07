@@ -15,13 +15,11 @@ export const friendRequestService = {
   // Enviar solicitud de amistad
   sendFriendRequest: async (userId, message = '') => {
     try {
-      console.log('📤 Enviando solicitud de amistad a:', userId);
       const response = await axios.post(
         `${API_URL}/send/${userId}`,
         { message },
         getAuthHeaders()
       );
-      console.log('✅ Solicitud enviada:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Error al enviar solicitud:', error.response?.data || error.message);
@@ -104,12 +102,10 @@ export const friendRequestService = {
   // Verificar estado de amistad
   checkFriendshipStatus: async (userId) => {
     try {
-      console.log('🔍 Verificando estado de amistad con:', userId);
       const response = await axios.get(
         `${API_URL}/status/${userId}`,
         getAuthHeaders()
       );
-      console.log('✅ Estado recibido:', response.data);
       return response.data.status;
     } catch (error) {
       console.error('❌ Error al verificar estado:', error.response?.data || error.message);

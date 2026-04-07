@@ -18,7 +18,9 @@ export default function FriendCard({ friend, onViewProfile, onSendMessage }) {
         {/* Info */}
         <div className="flex-1">
           <h3 className="font-bold text-lg text-gray-800">{friend.name}</h3>
-          <p className="text-sm text-gray-500">{friend.mutualFriends} amigos en común</p>
+          <p className="text-sm text-gray-500">
+            {friend.mutualFriends} {friend.mutualFriends === 1 ? 'amigo' : 'amigos'} en común
+          </p>
           <p className="text-xs text-gray-400">{friend.online ? 'En línea' : `Últ. vez ${friend.lastSeen}`}</p>
         </div>
       </div>

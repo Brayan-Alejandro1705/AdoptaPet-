@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { X, MapPin, Calendar, Heart, MessageCircle, Phone, Check, Play } from 'lucide-react';
+import { X, MapPin, Calendar, Heart, MessageCircle, Phone, Check, Play, MoreVertical, Edit2, Trash2, Flag, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import PetEditModal from './PetEditModal';
+import ConfirmModal from './ConfirmModal';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -19,7 +21,22 @@ const PetModal = ({ pet, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'danger' });
   const videoRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!pet) return null;
 
@@ -64,8 +81,7 @@ const PetModal = ({ pet, onClose }) => {
   const handleSendMessage = async () => {
     try {
       const token = localStorage.getItem('token');
-      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-      if (!token || !currentUser.id) { toast.error('Debes iniciar sesión para enviar mensajes'); return; }
+      if (!token || !currentUser?.id) { toast.error('Debes iniciar sesión para enviar mensajes'); return; }
       if (!pet.owner) { toast.error('No se puede contactar al dueño de esta mascota'); return; }
       const ownerId = pet.owner._id || pet.owner.id || pet.owner;
       if (!ownerId) { toast.error('No se puede contactar al dueño de esta mascota'); return; }
@@ -86,6 +102,71 @@ const PetModal = ({ pet, onClose }) => {
     } catch (error) {
       toast.error(`Error al abrir el chat: ${error.message}`);
     }
+  };
+
+  const isOwner = currentUser && pet.owner &&
+    (String(currentUser._id || currentUser.id) === String(pet.owner._id || pet.owner.id || pet.owner));
+
+  const handleDelete = async () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Eliminar mascota',
+      message: `¿Estás seguro de que quieres eliminar a ${pet.name}? Esta acción es irreversible.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          setIsDeleting(true);
+          const res = await fetch(`${API_BASE}/api/pets/${petId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            toast.success('Mascota eliminada');
+            window.location.reload();
+          } else {
+            const data = await res.json();
+            toast.error(data.message || 'Error al eliminar');
+          }
+        } catch (error) {
+          toast.error('Error de conexión');
+        } finally {
+          setIsDeleting(false);
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleReport = () => {
+    setShowMenu(false);
+    setConfirmModal({
+      isOpen: true,
+      title: 'Denunciar mascota',
+      message: `¿Estás seguro de que deseas denunciar la publicación de ${pet.name}? Nuestros administradores revisarán el caso.`,
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${API_BASE}/api/pets/${petId}/report`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Contenido inapropiado / sospechoso' })
+          });
+          const data = await res.json();
+          if (data.success) toast.success('Reporte enviado');
+          else toast.error(data.message || 'Error al enviar reporte');
+        } catch (error) {
+          toast.error('Error de conexión');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleUpdate = () => {
+    window.location.reload();
   };
 
   return (
@@ -174,6 +255,36 @@ const PetModal = ({ pet, onClose }) => {
             className="absolute top-4 right-4 bg-white hover:bg-gray-100 text-gray-800 rounded-full p-3 shadow-xl transition-all z-10 border-2 border-gray-200">
             <X className="w-6 h-6" />
           </button>
+
+          {/* Menú de opciones (...) */}
+          <div className="absolute top-4 right-20" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-3 rounded-full bg-white/90 backdrop-blur-sm shadow-xl hover:bg-white transition-all active:scale-95 border-2 border-gray-200"
+            >
+              <MoreVertical className="w-6 h-6 text-gray-600" />
+            </button>
+
+            {showMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-left">
+                {isOwner ? (
+                  <>
+                    <button onClick={() => { setShowMenu(false); setIsEditModalOpen(true); }} className="w-full px-4 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2 transition-colors">
+                      <Edit2 className="w-4 h-4" /> Editar mascota
+                    </button>
+                    <div className="h-px bg-gray-100 my-1 mx-2" />
+                    <button onClick={handleDelete} className="w-full px-4 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
+                      <Trash2 className="w-4 h-4" /> Eliminar mascota
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={handleReport} className="w-full px-4 py-2.5 text-left text-sm font-semibold text-orange-600 hover:bg-orange-50 flex items-center gap-2 transition-colors">
+                      <Flag className="w-4 h-4" /> Denunciar publicación
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── CONTENIDO ── */}
@@ -253,6 +364,22 @@ const PetModal = ({ pet, onClose }) => {
           )}
         </div>
       </div>
+      {isEditModalOpen && (
+        <PetEditModal 
+          pet={pet} 
+          onClose={() => setIsEditModalOpen(false)} 
+          onUpdate={handleUpdate}
+        />
+      )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

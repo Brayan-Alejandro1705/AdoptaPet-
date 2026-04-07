@@ -17,8 +17,13 @@ export default function Adoptar() {
     featured: false, vaccinated: false, sterilized: false
   });
   const [selectedPet, setSelectedPet] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  useEffect(() => { loadPets(); }, []);
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    setCurrentUser(user);
+    loadPets();
+  }, []);
 
   const loadPets = async () => {
     try {
@@ -184,7 +189,12 @@ export default function Adoptar() {
           {filteredPets.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredPets.map(pet => (
-                <PetCard key={pet._id} pet={pet} onClick={() => setSelectedPet(pet)} />
+                <PetCard 
+                  key={pet._id} 
+                  pet={pet} 
+                  currentUser={currentUser}
+                  onClick={() => setSelectedPet(pet)} 
+                />
               ))}
             </div>
           ) : (
