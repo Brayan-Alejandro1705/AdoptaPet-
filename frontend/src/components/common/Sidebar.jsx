@@ -1,9 +1,10 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, PawPrint, FileText, Sparkles, Users, Heart, Settings, MessageCircle, LogOut } from 'lucide-react';
 
 const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const navItems = [
     { path: '/',              label: 'Inicio',         icon: Home,      color: 'text-blue-500' },
@@ -62,7 +63,7 @@ const Sidebar = () => {
           Danos tu opinión
         </Link>
         <button
-          onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; }}
+          onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login', { replace: true }); }}
           className="group w-full flex items-center gap-3 px-4 py-3 mt-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-500 hover:scale-[1.01] transition-all duration-200"
         >
           <LogOut className="w-5 h-5 flex-shrink-0 text-red-400 group-hover:text-red-500 transition-colors duration-200" strokeWidth={2} />

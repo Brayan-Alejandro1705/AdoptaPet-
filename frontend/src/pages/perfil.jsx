@@ -80,13 +80,13 @@ function Perfil() {
 
   const cargarPerfil = async () => {
     const token = localStorage.getItem('token');
-    if (!token) { window.location.href = '/login'; return; }
+    if (!token) { navigate('/login', { replace: true }); return; }
     try {
       const response = await fetch(`${API}/api/users/profile`, {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
       if (!response.ok) {
-        if (response.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; return; }
+        if (response.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login', { replace: true }); return; }
         throw new Error('Error al cargar el perfil');
       }
       const data = await response.json();
@@ -109,7 +109,7 @@ function Perfil() {
 
   const cargarPerfilAjeno = async (id) => {
     const token = localStorage.getItem('token');
-    if (!token) { window.location.href = '/login'; return; }
+    if (!token) { navigate('/login', { replace: true }); return; }
     try {
       const response = await fetch(`${API}/api/users/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (!response.ok) throw new Error('Usuario no encontrado');
@@ -261,7 +261,7 @@ function Perfil() {
     setIsUploadingAvatar(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) { toast.error('❌ No estás autenticado'); window.location.href = '/login'; return; }
+      if (!token) { toast.error('❌ No estás autenticado'); navigate('/login', { replace: true }); return; }
       const formData = new FormData();
       formData.append('avatar', file);
       const response = await fetch(`${API}/api/users/avatar`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: formData });

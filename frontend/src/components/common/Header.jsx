@@ -628,7 +628,7 @@ export default function Header({ onOpenModal }) {
           <div className="hmb-brand">
             <span>🐾</span><span>AdoptaPet</span>
           </div>
-          <button className="hmb-logout" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login'; }}>
+          <button className="hmb-logout" onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login', { replace: true }); }}>
             Cerrar sesión →
           </button>
         </div>

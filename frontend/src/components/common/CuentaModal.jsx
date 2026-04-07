@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 // ============================================================
@@ -10,6 +11,7 @@ const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`
 // COMPONENT
 // ============================================================
 const CuentaModal = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -35,7 +37,7 @@ const CuentaModal = ({ isOpen, onClose }) => {
   const logoutAndRedirect = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    navigate('/login', { replace: true });
   };
 
   const validatePasswordChange = () => {

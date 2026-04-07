@@ -14,7 +14,7 @@ const handleUnauthorized = () => {
   localStorage.removeItem('user');
   // Redirigir al login solo si no estamos ya ahí
   if (!window.location.pathname.includes('/login')) {
-    window.location.href = '/login';
+    window.location.replace('/login');
   }
 };
 
