@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { Send, Camera, X, Minus, AlertCircle } from 'lucide-react';
+import { Send, Camera, X, AlertCircle } from 'lucide-react';
 
 export default function FloatingAIChat() {
   const [isOpen, setIsOpen] = useState(false);
@@ -234,12 +234,7 @@ export default function FloatingAIChat() {
               </div>
               
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsMinimized(!isMinimized)}
-                  className="text-white hover:bg-white/20 rounded-full p-1.5 transition"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
+          
                 <button
                   onClick={() => setIsOpen(false)}
                   className="text-white hover:bg-white/20 rounded-full p-1.5 transition"
