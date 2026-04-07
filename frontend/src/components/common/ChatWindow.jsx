@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, ArrowLeft, Smile } from 'lucide-react';
+import { Send, ArrowLeft } from 'lucide-react';
 
 const generateAvatar = (name = 'U') =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=7C3AED&color=fff&size=128`;
@@ -119,7 +119,7 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
                 <span className="text-3xl">💬</span>
               </div>
               <p className="text-sm text-gray-400 font-medium text-center">
-                Di hola a {chatName} 👋
+                Di hola a {chatName}
               </p>
             </div>
           )}
@@ -214,7 +214,6 @@ export default function ChatWindow({ chat, messages, onSendMessage, onBack }) {
             placeholder="Escribe un mensaje..."
             className="flex-1 outline-none text-[15px] bg-transparent placeholder-gray-400 min-w-0 text-gray-800"
           />
-          <Smile className="w-5 h-5 text-gray-400 flex-shrink-0 ml-2 cursor-pointer hover:text-yellow-400 transition" />
         </div>
 
         <button

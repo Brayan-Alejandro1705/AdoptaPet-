@@ -86,9 +86,9 @@ const sendFriendRequest = async (req, res) => {
       recipient: userId,
       sender: fromUserId,
       type: 'friend_request',
-      message: `Te ha enviado una solicitud de amistad`,
+      message: `${req.user.nombre || req.user.name} te ha enviado una solicitud de amistad`,
       relatedId: friendRequest._id,
-      relatedModel: 'FriendRequest' // Actualizaremos el modelo Notification.js luego
+      relatedModel: 'FriendRequest'
     });
 
     await friendRequest.populate('from', 'name nombre email avatar');
@@ -190,8 +190,9 @@ const acceptFriendRequest = async (req, res) => {
       recipient: friendRequest.from,
       sender: req.user._id,
       type: 'friend_accept',
-      message: 'Ha aceptado tu solicitud de amistad',
-      relatedId: friendRequest._id
+      message: `${req.user.nombre || req.user.name} ha aceptado tu solicitud de amistad`,
+      relatedId: friendRequest._id,
+      relatedModel: 'FriendRequest'
     });
 
     res.json({
